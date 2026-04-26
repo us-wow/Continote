@@ -727,11 +727,16 @@ export default function Home() {
                   data-on={accuracyMode}
                   aria-checked={accuracyMode}
                   onClick={() => setAccuracyMode((v) => !v)}
-                  style={{ marginTop: 10 }}
+                  // padding: 0은 button 기본 패딩 제거 → 아래 '직접 가사 붙여넣기' div 토글과 X 시작점을 맞춘다.
+                  style={{ marginTop: 10, padding: 0 }}
                 >
                   <span className="track" />
-                  <span>정확도 우선</span>
-                  <span style={{ color: 'var(--ink-3)' }}>(느려짐)</span>
+                  {/* "정확도 우선"과 "(느려짐)"을 wrapper span 하나로 감싸서
+                      .toggle의 gap:10px이 둘 사이에 끼어들지 않게 한다. 보조 텍스트는 6px만 띄움. */}
+                  <span>
+                    정확도 우선
+                    <span style={{ marginLeft: 6, color: 'var(--ink-3)' }}>(느려짐)</span>
+                  </span>
                 </button>
 
                 {files.length > 0 && (
