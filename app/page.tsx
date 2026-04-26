@@ -167,7 +167,9 @@ export default function Home() {
         const f = files[i];
         if (f.type === 'application/pdf') {
           setLoadingMsg(`PDF 변환 중 (${i + 1}/${files.length})`);
-          const pages = await pdfToImages(f);
+          // 정확도 모드에서는 고해상도 렌더링이 OCR 판독 품질에 직접 영향을 준다.
+          // 기본 모드는 lib/pdf.ts의 동적 scale 분기를 유지해 속도와 품질 균형을 맡긴다.
+          const pages = await pdfToImages(f, accuracyMode ? 2 : undefined);
           for (const p of pages) images.push({ data: p.data, mimeType: p.mimeType });
         } else if (f.type.startsWith('image/')) {
           const img = await fileToBase64(f);
@@ -273,6 +275,56 @@ export default function Home() {
       );
     });
   };
+
+  // spacer는 시각적 여백을 담당하므로 위치를 유지하고, 실제 콘텐츠인 title/section만 교환한다.
+  // 이렇게 해야 이동 후에도 블록 사이 빈 줄 흐름이 자연스럽게 유지된다.
+  const moveBlockUp = (idx: number) => {
+    setDoc((d) => {
+      if (d[idx]?.kind === 'spacer') return d;
+      const targetIdx = (() => {
+        for (let i = idx - 1; i >= 0; i--) {
+          if (d[i].kind !== 'spacer') return i;
+        }
+        return -1;
+      })();
+      if (targetIdx === -1) return d;
+      const next = [...d];
+      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+      return next;
+    });
+  };
+
+  // spacer는 그대로 두고 콘텐츠만 아래쪽의 다음 title/section과 바꿔 시각적 간격을 보존한다.
+  // 마지막 콘텐츠 뒤에는 교환 대상이 없으므로 원본 배열을 그대로 반환한다.
+  const moveBlockDown = (idx: number) => {
+    setDoc((d) => {
+      if (d[idx]?.kind === 'spacer') return d;
+      const targetIdx = (() => {
+        for (let i = idx + 1; i < d.length; i++) {
+          if (d[i].kind !== 'spacer') return i;
+        }
+        return -1;
+      })();
+      if (targetIdx === -1) return d;
+      const next = [...d];
+      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+      return next;
+    });
+  };
+
+  const findPrevContentIdx = useCallback((idx: number) => {
+    for (let i = idx - 1; i >= 0; i--) {
+      if (doc[i].kind !== 'spacer') return i;
+    }
+    return -1;
+  }, [doc]);
+
+  const findNextContentIdx = useCallback((idx: number) => {
+    for (let i = idx + 1; i < doc.length; i++) {
+      if (doc[i].kind !== 'spacer') return i;
+    }
+    return -1;
+  }, [doc]);
 
   // ----- 직렬화 (TXT/DOCX/복사용) -----
   // 사용자 요청: "verse 처럼 분류는 콘티 편집 부분에 안들어갔으면" → 라벨 출력에서 제거
@@ -1294,6 +1346,10 @@ export default function Home() {
                       block={b}
                       onUpdate={(next) => updateBlock(i, next)}
                       onRemove={() => removeBlock(i)}
+                      onMoveUp={() => moveBlockUp(i)}
+                      onMoveDown={() => moveBlockDown(i)}
+                      canMoveUp={findPrevContentIdx(i) !== -1}
+                      canMoveDown={findNextContentIdx(i) !== -1}
                     />
                   ))}
                 </div>
@@ -1377,13 +1433,22 @@ function EditorBlockView({
   block,
   onUpdate,
   onRemove,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }: {
   block: Block;
   onUpdate: (next: Block) => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }) {
   // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
   const editableRef = useRef<HTMLElement | null>(null);
+  const [isSectionHovered, setIsSectionHovered] = useState(false);
 
   // block 텍스트가 외부에서 바뀐 경우(블록 추가, 다른 곳 편집)에만 DOM 갱신
   // 사용자가 그냥 타이핑 중일 땐 DOM = state라서 if 조건이 false → 건들지 않음
@@ -1424,6 +1489,48 @@ function EditorBlockView({
           }}
         />
         <button
+          onClick={onMoveUp}
+          disabled={!canMoveUp}
+          aria-label="위로 이동"
+          title="위로 이동"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 58,
+            background: 'none',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-3)',
+            cursor: canMoveUp ? 'pointer' : 'not-allowed',
+            fontSize: 12,
+            padding: '2px 7px',
+            borderRadius: 99,
+            opacity: canMoveUp ? 1 : 0.3,
+          }}
+        >
+          ↑
+        </button>
+        <button
+          onClick={onMoveDown}
+          disabled={!canMoveDown}
+          aria-label="아래로 이동"
+          title="아래로 이동"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 30,
+            background: 'none',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-3)',
+            cursor: canMoveDown ? 'pointer' : 'not-allowed',
+            fontSize: 12,
+            padding: '2px 7px',
+            borderRadius: 99,
+            opacity: canMoveDown ? 1 : 0.3,
+          }}
+        >
+          ↓
+        </button>
+        <button
           onClick={onRemove}
           title="제거"
           style={{
@@ -1447,11 +1554,61 @@ function EditorBlockView({
   // section 블록 — 사용자 요청대로 칩(Verse 1 같은 분류) 제거
   // 가사 본문만 표시하되, hover 시 우측 위에 "제거" 버튼이 나타남
   // 섹션 구분은 spacer(빈 줄)로 자연스럽게
+  // globals.css를 건드리지 않기 위해 이동 버튼 hover 노출은 로컬 state로 처리한다.
+  // 제거 버튼의 기존 hover UX와 맞추면서 이번 변경 범위를 page.tsx 안에 제한한다.
   return (
     <div
       style={{ position: 'relative', marginBottom: 14 }}
       className="editor-section-block"
+      onMouseEnter={() => setIsSectionHovered(true)}
+      onMouseLeave={() => setIsSectionHovered(false)}
     >
+      <button
+        onClick={onMoveUp}
+        disabled={!canMoveUp}
+        aria-label="위로 이동"
+        title="위로 이동"
+        className="editor-section-move"
+        style={{
+          position: 'absolute',
+          top: -2,
+          right: 88,
+          background: 'var(--paper)',
+          border: '1px solid var(--rule)',
+          color: 'var(--ink-3)',
+          cursor: canMoveUp ? 'pointer' : 'not-allowed',
+          fontSize: 11,
+          padding: '2px 8px',
+          borderRadius: 99,
+          opacity: isSectionHovered ? (canMoveUp ? 1 : 0.3) : 0,
+          transition: 'opacity .15s ease',
+        }}
+      >
+        ↑
+      </button>
+      <button
+        onClick={onMoveDown}
+        disabled={!canMoveDown}
+        aria-label="아래로 이동"
+        title="아래로 이동"
+        className="editor-section-move"
+        style={{
+          position: 'absolute',
+          top: -2,
+          right: 54,
+          background: 'var(--paper)',
+          border: '1px solid var(--rule)',
+          color: 'var(--ink-3)',
+          cursor: canMoveDown ? 'pointer' : 'not-allowed',
+          fontSize: 11,
+          padding: '2px 8px',
+          borderRadius: 99,
+          opacity: isSectionHovered ? (canMoveDown ? 1 : 0.3) : 0,
+          transition: 'opacity .15s ease',
+        }}
+      >
+        ↓
+      </button>
       <button
         onClick={onRemove}
         title="섹션 제거"

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+// 정확도 모드에서 큰 PDF 처리 시간 여유 확보. Vercel Hobby 플랜에서 함수 실행 한도가 늘어남.
+export const maxDuration = 120;
 
 const SYSTEM_PROMPT = `당신은 한국 CCM/찬양 악보 분석기입니다. 악보 이미지에서 가사만 추출해 섹션별로 분류합니다.
 
@@ -122,18 +123,21 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // 정확도 모드 ON이면 정확도 우선이라 더 비싼 pro와 낮은 temperature를 사용하고,
-    // 기본 모드는 기존 flash 설정을 유지해 응답 속도와 비용을 지킨다.
+    // Pro 모델은 thinking 토큰으로 JSON 응답이 흔들릴 수 있어 Flash로 고정한다.
+    // 정확도 모드는 temperature만 낮춰 가사 추출 변동성을 줄인다.
     const model = genAI.getGenerativeModel({
-      model: accuracyMode ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: accuracyMode ? 0.1 : 0.2,
+        temperature: accuracyMode ? 0.05 : 0.2,
       },
       systemInstruction: SYSTEM_PROMPT,
     });
 
     const parts: any[] = [];
+    // 정확도 안내를 user prompt에 넣어 Flash가 더 신중하게 가사를 추출하도록 유도한다.
+    const accuracyInstruction =
+      '정확도 우선 모드입니다. 가사를 한 글자도 빠뜨리지 말고 신중히 추출하세요.';
     if (images && images.length > 0) {
       for (const img of images) {
         parts.push({
@@ -144,11 +148,15 @@ export async function POST(req: NextRequest) {
         });
       }
       parts.push({
-        text: '이 악보를 분석해 JSON으로만 응답하세요.',
+        text: accuracyMode
+          ? `이 악보를 분석해 JSON으로만 응답하세요. ${accuracyInstruction}`
+          : '이 악보를 분석해 JSON으로만 응답하세요.',
       });
     } else if (text) {
       parts.push({
-        text: `다음 가사를 분석해 JSON으로만 응답하세요:\n\n${text}`,
+        text: accuracyMode
+          ? `다음 가사를 분석해 JSON으로만 응답하세요. ${accuracyInstruction}\n\n${text}`
+          : `다음 가사를 분석해 JSON으로만 응답하세요:\n\n${text}`,
       });
     }
 
