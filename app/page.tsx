@@ -256,6 +256,25 @@ export default function Home() {
     });
   };
 
+  // 추출된 곡 카드 안에서 섹션 순서 위/아래로 한 칸 이동.
+  // 같은 곡(songIdx) 안에서만 swap. deriveLabel은 자동 갱신되므로 라벨은 자연스럽게 따라온다.
+  const moveSectionInSong = (
+    songIdx: number,
+    secIdx: number,
+    dir: 'up' | 'down'
+  ) => {
+    setSongs((prev) =>
+      prev.map((s, i) => {
+        if (i !== songIdx) return s;
+        const newIdx = dir === 'up' ? secIdx - 1 : secIdx + 1;
+        if (newIdx < 0 || newIdx >= s.sections.length) return s;
+        const sections = [...s.sections];
+        [sections[newIdx], sections[secIdx]] = [sections[secIdx], sections[newIdx]];
+        return { ...s, sections };
+      })
+    );
+  };
+
   // 블록 인라인 수정 (contentEditable blur 시 호출)
   const updateBlock = (idx: number, next: Block) => {
     setDoc((d) => d.map((b, i) => (i === idx ? next : b)));
@@ -1168,12 +1187,16 @@ export default function Home() {
                         }
 
                         // ===== 섹션 표시 모드(기본) =====
+                        // 섹션 카드는 클릭 시 콘티에 추가되므로, 위/아래 이동·수정 버튼은
+                        // e.stopPropagation으로 카드 클릭과 분리한다.
+                        const canSecUp = secIdx > 0;
+                        const canSecDown = secIdx < song.sections.length - 1;
                         return (
                           <div key={secIdx} style={{ position: 'relative' }}>
                             <article
                               className="section-card"
                               onClick={() => insertSection(sec, songIdx, secIdx)}
-                              style={{ paddingRight: 50 }}
+                              style={{ paddingRight: 110 }}
                             >
                               <header
                                 style={{
@@ -1220,9 +1243,70 @@ export default function Home() {
                                 ))}
                               </div>
                             </article>
-                            {/* ✎ 수정 아이콘 — absolute (article 밖 wrapper 안) */}
+                            {/* 우측 상단 도구바 — [↑][↓][✎] 가로 배치.
+                                article 밖 wrapper 안에 절대 배치해 카드 클릭과 분리. */}
                             <button
-                              onClick={() => startCardEdit(songIdx, secIdx, sec)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canSecUp) moveSectionInSong(songIdx, secIdx, 'up');
+                              }}
+                              disabled={!canSecUp}
+                              aria-label="위로 이동"
+                              title="위로 이동"
+                              style={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 80,
+                                width: 26,
+                                height: 26,
+                                borderRadius: '50%',
+                                background: 'var(--paper)',
+                                border: '1px solid var(--rule)',
+                                color: 'var(--ink-2)',
+                                cursor: canSecUp ? 'pointer' : 'not-allowed',
+                                opacity: canSecUp ? 1 : 0.3,
+                                fontSize: 12,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canSecDown) moveSectionInSong(songIdx, secIdx, 'down');
+                              }}
+                              disabled={!canSecDown}
+                              aria-label="아래로 이동"
+                              title="아래로 이동"
+                              style={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 46,
+                                width: 26,
+                                height: 26,
+                                borderRadius: '50%',
+                                background: 'var(--paper)',
+                                border: '1px solid var(--rule)',
+                                color: 'var(--ink-2)',
+                                cursor: canSecDown ? 'pointer' : 'not-allowed',
+                                opacity: canSecDown ? 1 : 0.3,
+                                fontSize: 12,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              ↓
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startCardEdit(songIdx, secIdx, sec);
+                              }}
+                              aria-label="섹션 수정"
                               title="섹션 수정"
                               style={{
                                 position: 'absolute',
