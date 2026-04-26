@@ -85,6 +85,8 @@ export default function Home() {
   const [loadingMsg, setLoadingMsg] = useState('');
   const [toast, setToast] = useState('');
   const [dragging, setDragging] = useState(false);
+  // 정확도 우선 모드는 서버 분석 프롬프트를 더 보수적으로 쓰게 하므로, 업로드/붙여넣기 요청에 함께 전달한다.
+  const [accuracyMode, setAccuracyMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,7 +125,8 @@ export default function Home() {
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: pasted.trim() }),
+          // 같은 UI 토글이 텍스트 분석과 이미지 분석 모두에 동일하게 적용되어야 한다.
+          body: JSON.stringify({ text: pasted.trim(), accuracyMode }),
         });
         // 서버가 JSON이 아닌 응답(HTML 에러 페이지 등) 반환하면 res.json()이 throw —
         // try/catch로 감싸 의미있는 에러 메시지로 변환
@@ -181,7 +184,8 @@ export default function Home() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images }),
+        // 이미지 분석도 사용자가 고른 정확도 모드를 서버에서 판단할 수 있게 함께 보낸다.
+        body: JSON.stringify({ images, accuracyMode }),
       });
       // res.json() 실패 시 의미있는 에러로 변환
       let data: any;
@@ -567,10 +571,7 @@ export default function Home() {
           JPG·PDF 악보를 올리면 가사만 깔끔하게 추출해드립니다. 결과에서 곡 제목과 섹션을 클릭해 콘티를 조립하세요.
         </p>
         {/* 히어로 마스코트 — done 포즈로 차별화 (헤더에 미니 idle, 에디터 빈 상태에 큰 idle 있음) */}
-        <div
-          style={{ position: 'absolute', right: 32, top: 36, opacity: 0.95 }}
-          className="mascot-float"
-        >
+        <div className="mascot-float hero-mascot">
           <Mascot pose="done" size={120} />
         </div>
       </section>
@@ -594,9 +595,13 @@ export default function Home() {
                 <div className="label" style={{ marginBottom: 12 }}>
                   1. 악보 업로드
                 </div>
-                <div
+                {/* 키보드 접근성을 위해 클릭 가능한 div 대신 button을 사용한다.
+                    Enter/Space로 파일 선택을 열 수 있고 기존 drag/drop 이벤트도 그대로 받는다. */}
+                <button
+                  type="button"
                   className="dropzone"
                   data-active={dragging || files.length > 0}
+                  aria-label="악보 파일 업로드. 클릭하거나 끌어다 놓으세요"
                   onDragOver={(e) => {
                     e.preventDefault();
                     setDragging(true);
@@ -604,7 +609,13 @@ export default function Home() {
                   onDragLeave={() => setDragging(false)}
                   onDrop={onDrop}
                   onClick={() => inputRef.current?.click()}
-                  style={{ padding: '32px 24px 28px', textAlign: 'center', cursor: 'pointer' }}
+                  style={{
+                    width: '100%',
+                    display: 'block',
+                    padding: '32px 24px 28px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                  }}
                 >
                   <input
                     ref={inputRef}
@@ -612,6 +623,7 @@ export default function Home() {
                     multiple
                     accept="image/*,application/pdf"
                     onChange={onPick}
+                    onClick={(e) => e.stopPropagation()}
                     style={{ display: 'none' }}
                   />
                   <div
@@ -633,14 +645,31 @@ export default function Home() {
                     <span style={{ margin: '0 8px', color: 'var(--ink-3)' }}>·</span>
                     JPG · PNG · PDF
                   </div>
-                </div>
+                </button>
+
+                {/* 정확도 모드는 1차 행동인 업로드를 가리지 않도록 드롭존 아래 고급 옵션으로 둔다.
+                    기존 토글 패턴을 재사용해 붙여넣기 토글과 조작감을 맞춘다. */}
+                <button
+                  type="button"
+                  role="switch"
+                  className="toggle"
+                  data-on={accuracyMode}
+                  aria-checked={accuracyMode}
+                  onClick={() => setAccuracyMode((v) => !v)}
+                  style={{ marginTop: 10 }}
+                >
+                  <span className="track" />
+                  <span>정확도 우선</span>
+                  <span style={{ color: 'var(--ink-3)' }}>(느려짐)</span>
+                </button>
 
                 {files.length > 0 && (
                   <div
                     style={{
                       marginTop: 14,
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      // auto-fit으로 컨테이너 폭에 따라 카드 개수 자동 조정. 좁아지면 한 줄에 적게, 넓어지면 많이 배치한다.
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
                       gap: 12,
                     }}
                   >
@@ -1249,6 +1278,12 @@ export default function Home() {
                     왼쪽 결과에서 <span style={{ color: 'var(--ink)' }}>곡 제목</span>이나{' '}
                     <span style={{ color: 'var(--ink)' }}>섹션 카드</span>를 눌러보세요.
                     순서대로 빈 줄을 두고 이어집니다.
+                  </div>
+                  {/* 붙여넣기 모드 발견율을 높이기 위해 시작 경로를 둘 다 명시한다. */}
+                  <div className="caption" style={{ maxWidth: 360, margin: '10px auto 0' }}>
+                    1) 악보 파일 업로드 — JPG·PDF 올리기
+                    <br />
+                    2) 직접 가사 붙여넣기 — 토글 켜고 텍스트 입력
                   </div>
                 </div>
               ) : (

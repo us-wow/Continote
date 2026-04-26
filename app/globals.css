@@ -27,12 +27,23 @@ body {
   font-feature-settings: 'ss03', 'ss05';
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  letter-spacing: -0.005em;
   min-height: 100vh;
 }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; }
 textarea, input { font-family: inherit; }
+
+/* :focus가 아닌 :focus-visible로 키보드 포커스만 표시해 마우스 클릭 시 outline 노출을 방지한다. */
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="switch"]:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
 
 /* 종이 텍스처 — 매우 미세한 점 패턴 (배경 전면 깔림) */
 body::before {
@@ -102,13 +113,15 @@ body::after {
   line-height: 1.82;
   color: var(--ink);
   font-weight: 400;
-  letter-spacing: -0.003em;
+  /* body 전역 letter-spacing 제거 → UI 텍스트 눌림 방지. 한글 본문 미세조정은 헤드라인/본문 클래스에서만 */
+  letter-spacing: -0.005em;
 }
 .caption {
   font-family: var(--sans);
   font-size: 13.5px;
   color: var(--ink-2);
   line-height: 1.55;
+  letter-spacing: -0.005em;
 }
 .mono {
   font-family: var(--mono);
@@ -135,7 +148,8 @@ body::after {
 /* 메인 추출 버튼 */
 .btn-primary {
   background: var(--accent);
-  color: #fff;
+  /* 흰 텍스트는 accent 위에서 AA 미달이라 잉크 색으로 변경. 톤 유지하면서 가독성 ↑ */
+  color: var(--ink);
   font-family: var(--sans);
   font-weight: 600;
   font-size: 16px;
@@ -257,6 +271,11 @@ textarea:focus, input[type='text']:focus {
   cursor: pointer; user-select: none;
   font-size: 14px; color: var(--ink-2);
 }
+.toggle > span:not(.track) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .toggle .track {
   width: 32px; height: 18px; border-radius: 99px;
   background: var(--rule);
@@ -279,6 +298,18 @@ textarea:focus, input[type='text']:focus {
   50% { transform: translateY(-3px); }
 }
 .mascot-float { animation: floatY 4s ease-in-out infinite; }
+
+/* 히어로 마스코트만 절대 배치해 데스크톱 헤드라인 옆 장식으로 쓰고, 다른 마스코트 사용처와 분리한다. */
+.hero-mascot {
+  position: absolute;
+  right: 32px;
+  top: 36px;
+  opacity: 0.95;
+}
+.hero-mascot img {
+  width: clamp(88px, 12vw, 120px);
+  height: auto;
+}
 
 /* 자식 요소 사이 간격 유틸 — --gap 변수로 조절 */
 .stack > * + * { margin-top: var(--gap, 16px); }
@@ -311,6 +342,17 @@ textarea:focus, input[type='text']:focus {
 @media (max-width: 880px) {
   .two-col { grid-template-columns: 1fr !important; }
   .topbar-meta { display: none !important; }
+  /* 좁은 화면에서는 절대 배치를 풀어 헤드라인과 마스코트가 겹치지 않게 한다. */
+  .hero-mascot {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+  }
+  .hero-mascot img {
+    width: 88px;
+    height: auto;
+  }
   .editor-pane {
     position: static !important;
     max-height: none !important;
@@ -318,6 +360,13 @@ textarea:focus, input[type='text']:focus {
   }
   .editor-body {
     overflow-y: visible !important;
+  }
+}
+
+/* 초소형 화면에서는 마스코트를 숨겨 업로드 동선과 헤드라인 공간을 우선한다. */
+@media (max-width: 480px) {
+  .hero-mascot {
+    display: none;
   }
 }
 

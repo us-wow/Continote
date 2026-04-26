@@ -30,7 +30,8 @@ export default function Mascot({ pose = 'idle', size = 140, className }: MascotP
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={POSE_FILES[pose]}
-      alt={`마스코트 (${pose})`}
+      // 이 이미지는 장식 용도이므로 스크린리더에서 무시되도록 alt를 비웠다.
+      alt=""
       width={size}
       height={size}
       className={className}
@@ -46,7 +47,8 @@ export function MascotMini({ size = 28 }: { size?: number }) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={POSE_FILES.idle}
-      alt="콘티노트 마스코트"
+      // 이 이미지는 장식 용도이므로 스크린리더에서 무시되도록 alt를 비웠다.
+      alt=""
       width={size}
       height={size}
       style={{ display: 'inline-block', verticalAlign: 'middle' }}

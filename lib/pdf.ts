@@ -25,15 +25,19 @@ async function getPdfJs() {
 // scale 1.5 + JPEG 0.85로 페이로드 크게 축소
 // 이유: scale=2 PNG는 가사 OCR 용도엔 과한 화질. 1.5 + JPEG로 60~70% 작아지고
 // Gemini도 더 빨리 처리 → 추출 시간 5~9초 단축
-export async function pdfToImages(file: File, scale = 1.5): Promise<PdfPageImage[]> {
+export async function pdfToImages(file: File, scale?: number): Promise<PdfPageImage[]> {
   const lib = await getPdfJs();
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
+  // 작은 PDF는 scale 2로 렌더링해 OCR 정확도를 높인다.
+  // 큰 PDF나 페이지가 많은 PDF에서 같은 해상도를 쓰면 이미지 페이로드가 급증하므로
+  // 기존 기본값인 1.5를 유지해 처리 시간과 메모리 사용량을 제한한다.
+  const effectiveScale = scale ?? (file.size <= 8 * 1024 * 1024 && pdf.numPages <= 4 ? 2 : 1.5);
 
   const images: PdfPageImage[] = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale: effectiveScale });
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas context 생성 실패');
