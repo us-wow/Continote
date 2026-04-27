@@ -256,6 +256,50 @@ export default function Home() {
     });
   };
 
+  // 곡 단위 삭제 — songs에서 해당 곡 제거 + 콘티 편집창에서도 해당 곡 관련 블록 정리.
+  // sectionId가 "songIdx-secIdx" 인덱스 기반이므로, 삭제 후 남은 곡들의 sectionId도 reindex 한다.
+  const removeSong = (targetIdx: number) => {
+    const target = songs[targetIdx];
+    if (!target) return;
+    const ok = window.confirm(
+      `"${target.title || 'Untitled'}" 곡을 삭제할까요?\n이미 콘티에 추가한 같은 곡 블록도 함께 사라집니다.`
+    );
+    if (!ok) return;
+
+    // 1) 콘티 편집창(doc) 정리: 같은 곡 제목 블록과 sectionId가 targetIdx로 시작하는 섹션 제거,
+    //    남은 곡 블록 중 songIdx가 targetIdx보다 큰 건 인덱스 한 칸 당김.
+    setDoc((d) => {
+      const filtered = d.filter((b) => {
+        if (b.kind === 'title' && b.text === target.title) return false;
+        if (b.kind === 'section') {
+          const songIdxStr = b.sectionId.split('-')[0];
+          if (Number(songIdxStr) === targetIdx) return false;
+        }
+        return true;
+      });
+      const reindexed = filtered.map((b) => {
+        if (b.kind !== 'section') return b;
+        const [songIdxStr, secIdxStr] = b.sectionId.split('-');
+        const songIdx = Number(songIdxStr);
+        if (songIdx > targetIdx) {
+          return { ...b, sectionId: `${songIdx - 1}-${secIdxStr}` };
+        }
+        return b;
+      });
+      // 양 끝/연속 spacer 정리 (removeBlock과 동일 패턴)
+      return reindexed.filter(
+        (b, i, arr) =>
+          !(
+            b.kind === 'spacer' &&
+            (i === 0 || i === arr.length - 1 || arr[i - 1]?.kind === 'spacer')
+          )
+      );
+    });
+
+    // 2) songs에서 제거
+    setSongs((prev) => prev.filter((_, i) => i !== targetIdx));
+  };
+
   // 추출된 곡 카드 안에서 섹션 순서 위/아래로 한 칸 이동.
   // 같은 곡(songIdx) 안에서만 swap. deriveLabel은 자동 갱신되므로 라벨은 자연스럽게 따라온다.
   const moveSectionInSong = (
@@ -995,8 +1039,8 @@ export default function Home() {
                             background: isTitleInDoc(song.title)
                               ? 'color-mix(in oklab, var(--paper) 90%, var(--ink) 4%)'
                               : 'color-mix(in oklab, var(--paper) 65%, white)',
-                            // 우측에 ✎ 버튼 들어갈 자리 확보 (paddingRight 늘림)
-                            padding: '16px 56px 16px 20px',
+                            // 우측에 ✕(곡 삭제) + ✎(제목 수정) 두 버튼 자리 확보
+                            padding: '16px 96px 16px 20px',
                             cursor: 'pointer',
                             borderRadius: 2,
                             color: 'var(--ink)',
@@ -1051,9 +1095,35 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
-                        {/* ✎ 수정 아이콘 — 우상단 absolute. stopPropagation 불필요 (별도 div 밖) */}
+                        {/* 우상단 도구바: ✕(곡 삭제) + ✎(제목 수정).
+                            클릭 영역(div role=button) 바깥이라 stopPropagation 불필요. */}
+                        <button
+                          onClick={() => removeSong(songIdx)}
+                          aria-label="곡 삭제"
+                          title="곡 삭제 (콘티 블록도 함께)"
+                          style={{
+                            position: 'absolute',
+                            top: 12,
+                            right: 50,
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: 'var(--paper)',
+                            border: '1px solid var(--rule)',
+                            color: 'var(--ink-3)',
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            lineHeight: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          ✕
+                        </button>
                         <button
                           onClick={() => startTitleEdit(songIdx, song.title)}
+                          aria-label="제목 수정"
                           title="제목 수정"
                           style={{
                             position: 'absolute',
