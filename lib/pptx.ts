@@ -57,6 +57,23 @@ export function validateSlide(slide: PptSlide): PptValidation {
   return { ok: true, fontSize, lineCount };
 }
 
+// 브라우저에서 public 경로의 이미지를 fetch해서 base64로 변환.
+// pptxgenjs 3.x는 슬라이드 배경에 path 대신 'image/png;base64,...' 형식의 data 문자열을 요구한다.
+async function loadBgAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`배경 이미지를 가져오지 못했습니다 (${res.status})`);
+  const blob = await res.blob();
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+  // FileReader 결과는 'data:image/png;base64,XXX' 형태인데
+  // pptxgenjs는 'data:' 접두사 없이 'image/png;base64,XXX'만 받는다.
+  return dataUrl.replace(/^data:/, '');
+}
+
 // 모든 슬라이드 PPT로 변환해서 다운로드
 export async function exportToPptx(
   slides: PptSlide[],
@@ -69,9 +86,22 @@ export async function exportToPptx(
   const pres = new pptxgen();
   pres.layout = 'LAYOUT_WIDE';
 
+  // 배경 이미지를 한 번만 fetch해서 모든 슬라이드에 재사용한다.
+  // 실패해도 검정 단색 배경으로 fallback해서 다운로드 자체는 막지 않는다.
+  let bgData: string | null = null;
+  try {
+    bgData = await loadBgAsBase64('/pptx-bg-starry.png');
+  } catch (err) {
+    console.warn('배경 이미지 로드 실패 → 검정 단색으로 대체:', err);
+  }
+
   for (const pptSlide of slides) {
     const slide = pres.addSlide();
-    slide.background = { path: '/pptx-bg-starry.png' };
+    if (bgData) {
+      slide.background = { data: bgData };
+    } else {
+      slide.background = { color: '000000' };
+    }
 
     const validation = validateSlide(pptSlide);
 
