@@ -1471,6 +1471,108 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* 4. PPT 제작 — 콘티 편집 결과를 검정+별 배경 슬라이드로 변환.
+                좌측 컬럼 하단(1·2·4 흐름)에 두어 우측 sticky aside가 가리는 문제를 회피한다. */}
+            <div className="stack" style={cssVar('--gap', '16px')}>
+              <div className="label">4. PPT 제작</div>
+
+              {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={pptFont}
+                  onChange={(e) => setPptFont(e.target.value as PptFont)}
+                  aria-label="PPT 폰트 선택"
+                  style={{
+                    padding: '10px 14px',
+                    border: '1px solid var(--rule)',
+                    borderRadius: 2,
+                    background: 'var(--paper)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--sans)',
+                    fontSize: 14,
+                  }}
+                >
+                  {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => (
+                    <option key={f} value={f}>
+                      {PPT_FONT_LABELS[f]}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
+                  PPT 다운로드 (.pptx)
+                </button>
+              </div>
+
+              {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
+                  한도 초과 시 빨강 표시. */}
+              {!isEmpty && (
+                <div className="stack" style={cssVar('--gap', '8px')}>
+                  {docToSlides().map((slide, i) => {
+                    const v = validateSlide(slide);
+                    const isOverflow = !v.ok;
+                    const slideMeta = 'fontSize' in v
+                      ? `${v.lineCount}줄 · ${v.fontSize}pt`
+                      : v.reason === 'too-many-lines'
+                        ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
+                        : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          border:
+                            '1px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
+                          borderLeft:
+                            '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--ink)'),
+                          padding: '12px 14px',
+                          borderRadius: 2,
+                          background: 'color-mix(in oklab, var(--paper) 70%, white)',
+                        }}
+                      >
+                        <div
+                          className="mono"
+                          style={{
+                            marginBottom: 6,
+                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
+                          }}
+                        >
+                          슬라이드 {i + 1} · {slideMeta}
+                        </div>
+                        <div
+                          className="lyric"
+                          style={{
+                            fontSize: 13.5,
+                            lineHeight: 1.5,
+                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-2)',
+                          }}
+                        >
+                          {slide.lines.length === 0 ? (
+                            <span style={{ color: 'var(--ink-3)' }}>(빈 슬라이드)</span>
+                          ) : (
+                            slide.lines.map((l, j) => <div key={j}>{l}</div>)
+                          )}
+                        </div>
+                        {isOverflow && (
+                          <div
+                            className="caption"
+                            style={{ marginTop: 6, color: 'var(--accent-ink)' }}
+                          >
+                            한 슬라이드 최대 4줄 · 줄당 최대 14~25자(줄수에 따라). 콘티
+                            편집에서 분리해주세요.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {isEmpty && (
+                <div className="caption" style={{ color: 'var(--ink-3)' }}>
+                  콘티 편집에 섹션을 추가하면 여기에 슬라이드 미리보기가 나타납니다.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="stack" style={cssVar('--gap', '32px')}>
@@ -1592,108 +1694,6 @@ export default function Home() {
                 </div>
               </footer>
             </aside>
-
-            {/* 4. PPT 제작 — 콘티 편집 결과를 검정+별 배경 슬라이드로 변환 */}
-            <div className="stack" style={{ ...cssVar('--gap', '16px'), marginTop: 32 }}>
-              <div className="label">4. PPT 제작</div>
-
-              {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <select
-                  value={pptFont}
-                  onChange={(e) => setPptFont(e.target.value as PptFont)}
-                  aria-label="PPT 폰트 선택"
-                  style={{
-                    padding: '10px 14px',
-                    border: '1px solid var(--rule)',
-                    borderRadius: 2,
-                    background: 'var(--paper)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--sans)',
-                    fontSize: 14,
-                  }}
-                >
-                  {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => (
-                    <option key={f} value={f}>
-                      {PPT_FONT_LABELS[f]}
-                    </option>
-                  ))}
-                </select>
-                <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
-                  PPT 다운로드 (.pptx)
-                </button>
-              </div>
-
-              {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
-                  한도 초과 시 빨강 표시. */}
-              {!isEmpty && (
-                <div className="stack" style={cssVar('--gap', '8px')}>
-                  {docToSlides().map((slide, i) => {
-                    const v = validateSlide(slide);
-                    const isOverflow = !v.ok;
-                    const slideMeta = 'fontSize' in v
-                      ? `${v.lineCount}줄 · ${v.fontSize}pt`
-                      : v.reason === 'too-many-lines'
-                        ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
-                        : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          border:
-                            '1px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
-                          borderLeft:
-                            '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--ink)'),
-                          padding: '12px 14px',
-                          borderRadius: 2,
-                          background: 'color-mix(in oklab, var(--paper) 70%, white)',
-                        }}
-                      >
-                        <div
-                          className="mono"
-                          style={{
-                            marginBottom: 6,
-                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
-                          }}
-                        >
-                          슬라이드 {i + 1} ·{' '}
-                          {slideMeta}
-                        </div>
-                        <div
-                          className="lyric"
-                          style={{
-                            fontSize: 13.5,
-                            lineHeight: 1.5,
-                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-2)',
-                          }}
-                        >
-                          {slide.lines.length === 0 ? (
-                            <span style={{ color: 'var(--ink-3)' }}>(빈 슬라이드)</span>
-                          ) : (
-                            slide.lines.map((l, j) => <div key={j}>{l}</div>)
-                          )}
-                        </div>
-                        {isOverflow && (
-                          <div
-                            className="caption"
-                            style={{ marginTop: 6, color: 'var(--accent-ink)' }}
-                          >
-                            한 슬라이드 최대 4줄 · 줄당 최대 14~25자(줄수에 따라). 콘티
-                            편집에서 분리해주세요.
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {isEmpty && (
-                <div className="caption" style={{ color: 'var(--ink-3)' }}>
-                  콘티 편집에 섹션을 추가하면 여기에 슬라이드 미리보기가 나타납니다.
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </main>
