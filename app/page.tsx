@@ -24,9 +24,10 @@ import Mascot from '@/components/Mascot';
 import SectionChip from '@/components/SectionChip';
 
 // 편집창 블록 모델
-// title:   곡 제목 (큰 헤더)
-// section: 섹션 칩 + 편집 가능한 가사 본문
-// spacer:  블록 사이 빈 줄 (시각적 호흡)
+// title:      곡 제목 (큰 헤더)
+// section:    섹션 칩 + 편집 가능한 가사 본문
+// spacer:     블록 사이 빈 줄 (시각적 호흡)
+// slidebreak: PPT 슬라이드 분리자. 한 콘티 안에서 슬라이드 단위를 사용자가 자유롭게 자른다.
 type Block =
   | { kind: 'title'; text: string }
   | {
@@ -37,7 +38,8 @@ type Block =
       verseNum: number | null;
       body: string;
     }
-  | { kind: 'spacer' };
+  | { kind: 'spacer' }
+  | { kind: 'slidebreak' };
 
 // CSS 커스텀 프로퍼티(--gap)를 React style에 쓰기 위한 헬퍼
 // TS가 기본 CSSProperties에 -- 시작 키를 안 받으므로 캐스팅 필요
@@ -406,10 +408,18 @@ export default function Home() {
       .map((b) => {
         if (b.kind === 'title') return `━━━ ${b.text} ━━━\n`;
         if (b.kind === 'section') return b.body;
-        return ''; // spacer
+        // spacer/slidebreak는 텍스트 변환에서는 빈 줄로 처리한다.
+        return '';
       })
       .join('\n');
   }, [doc]);
+
+  // 콘티 끝에 슬라이드 구분자 추가. 사용자가 ↑↓로 위치 조정 가능.
+  // PPT 변환 시 이 마커를 기준으로 슬라이드가 나뉜다.
+  const addSlidebreak = () => {
+    setDoc((d) => [...d, { kind: 'slidebreak' }]);
+    showToast('슬라이드 구분 추가됨');
+  };
 
   // 파일명에 들어갈 오늘 날짜 (콘티_20260426.txt 같은 식)
   const dateStr = () => {
@@ -454,17 +464,42 @@ export default function Home() {
   };
 
   // 콘티 편집창의 doc 블록 → PPT 슬라이드 배열로 변환.
-  // section 블록 1개 = 한 슬라이드. title/spacer 블록은 PPT에서 제외.
-  // 각 슬라이드의 lines는 section.body를 \n으로 분할한 결과(빈 줄 제거).
+  // - slidebreak가 있으면 그것을 기준으로 슬라이드를 나눈다 (사용자가 자유롭게 분리).
+  //   slidebreak 사이의 모든 section 가사가 한 슬라이드로 합쳐진다.
+  // - slidebreak가 하나도 없으면 호환성을 위해 기존 동작(section 1개 = 슬라이드 1개)을 유지.
+  // title/spacer 블록은 PPT에서 제외.
   const docToSlides = (): PptSlide[] => {
-    return doc
-      .filter((b): b is Extract<Block, { kind: 'section' }> => b.kind === 'section')
-      .map((b) => ({
-        lines: b.body
-          .split('\n')
-          .map((l) => l.trim())
-          .filter((l) => l.length > 0),
-      }));
+    const hasSlidebreak = doc.some((b) => b.kind === 'slidebreak');
+    if (!hasSlidebreak) {
+      return doc
+        .filter((b): b is Extract<Block, { kind: 'section' }> => b.kind === 'section')
+        .map((b) => ({
+          lines: b.body
+            .split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0),
+        }));
+    }
+    // slidebreak 모드: 누적 lines를 만들고 break를 만나면 슬라이드 push
+    const slides: PptSlide[] = [];
+    let buf: string[] = [];
+    const pushIfNotEmpty = () => {
+      if (buf.length > 0) {
+        slides.push({ lines: buf });
+        buf = [];
+      }
+    };
+    for (const b of doc) {
+      if (b.kind === 'section') {
+        const lines = b.body.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+        buf.push(...lines);
+      } else if (b.kind === 'slidebreak') {
+        pushIfNotEmpty();
+      }
+      // title/spacer는 무시
+    }
+    pushIfNotEmpty();
+    return slides;
   };
 
   // PPT 다운로드 — lib/pptx.ts 검증을 통과한 섹션 슬라이드만 내보낸다.
@@ -1474,10 +1509,17 @@ export default function Home() {
               </div>
             )}
 
-            {/* 4. PPT 제작 — 콘티 편집 결과를 검정+별 배경 슬라이드로 변환.
+            {/* 4. PPT 제작 — 콘티 편집 결과를 검정 배경 슬라이드로 변환.
                 좌측 컬럼 하단(1·2·4 흐름)에 두어 우측 sticky aside가 가리는 문제를 회피한다. */}
             <div className="stack" style={cssVar('--gap', '16px')}>
               <div className="label">4. PPT 제작</div>
+
+              {/* 사용자 가이드 — 슬라이드당 가사 양 권장. 4줄 한도지만 2~3줄이 가장 깔끔하다. */}
+              <div className="caption" style={{ color: 'var(--ink-2)', lineHeight: 1.6 }}>
+                한 슬라이드는 <span style={{ color: 'var(--ink)', fontWeight: 600 }}>2~3줄</span>일 때 가장 깔끔하게 만들어집니다 (최대 4줄).
+                <br />
+                콘티 편집에서 <span style={{ color: 'var(--accent-ink)' }}>+ 슬라이드 구분</span> 버튼으로 슬라이드를 자유롭게 자를 수 있어요.
+              </div>
 
               {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1610,9 +1652,19 @@ export default function Home() {
                   </div>
                 </div>
                 {!isEmpty && (
-                  <button className="btn-ghost" onClick={onClear}>
-                    전체 비우기
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {/* 슬라이드 구분 추가 — 콘티 끝에 점선 분리자가 들어가고, ↑↓로 위치 조정 가능 */}
+                    <button
+                      className="btn-ghost"
+                      onClick={addSlidebreak}
+                      title="여기 위치에 슬라이드 분리자 추가 (PPT에서 페이지 구분)"
+                    >
+                      + 슬라이드 구분
+                    </button>
+                    <button className="btn-ghost" onClick={onClear}>
+                      전체 비우기
+                    </button>
+                  </div>
                 )}
               </header>
 
@@ -1777,6 +1829,105 @@ function EditorBlockView({
 
   if (block.kind === 'spacer') {
     return <div style={{ height: 14 }} />;
+  }
+
+  if (block.kind === 'slidebreak') {
+    // 슬라이드 구분자 — PPT에서 여기를 기준으로 페이지가 나뉜다.
+    // 시각적으로 점선 + 가운데 라벨 + 우측 [↑][↓][✕] 도구바.
+    return (
+      <div
+        style={{
+          position: 'relative',
+          margin: '12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          paddingRight: 96,
+        }}
+      >
+        <div style={{ flex: 1, height: 1, borderTop: '1px dashed var(--accent)' }} />
+        <div
+          className="mono"
+          style={{
+            color: 'var(--accent-ink)',
+            whiteSpace: 'nowrap',
+            fontSize: 10.5,
+            letterSpacing: '0.18em',
+          }}
+        >
+          ─ 슬라이드 구분 ─
+        </div>
+        <div style={{ flex: 1, height: 1, borderTop: '1px dashed var(--accent)' }} />
+        <button
+          onClick={() => canMoveUp && onMoveUp()}
+          disabled={!canMoveUp}
+          aria-label="위로 이동"
+          title="위로 이동"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: 68,
+            transform: 'translateY(-50%)',
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-2)',
+            cursor: canMoveUp ? 'pointer' : 'not-allowed',
+            opacity: canMoveUp ? 1 : 0.3,
+            fontSize: 11,
+          }}
+        >
+          ↑
+        </button>
+        <button
+          onClick={() => canMoveDown && onMoveDown()}
+          disabled={!canMoveDown}
+          aria-label="아래로 이동"
+          title="아래로 이동"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: 38,
+            transform: 'translateY(-50%)',
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-2)',
+            cursor: canMoveDown ? 'pointer' : 'not-allowed',
+            opacity: canMoveDown ? 1 : 0.3,
+            fontSize: 11,
+          }}
+        >
+          ↓
+        </button>
+        <button
+          onClick={onRemove}
+          aria-label="구분 제거"
+          title="구분 제거"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            right: 8,
+            transform: 'translateY(-50%)',
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-3)',
+            cursor: 'pointer',
+            fontSize: 12,
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    );
   }
 
   if (block.kind === 'title') {
