@@ -421,6 +421,29 @@ export default function Home() {
     showToast('슬라이드 구분 추가됨');
   };
 
+  // section 블록을 특정 줄(lineIdx) 다음에서 둘로 자르고 사이에 slidebreak를 끼운다.
+  // 사용자가 같은 섹션 안에서도 자유롭게 슬라이드를 분리할 수 있게 한다.
+  // 두 section은 같은 라벨/sectionId를 그대로 유지하므로 좌측 카드와의 매칭도 깨지지 않는다.
+  const splitSectionAt = (blockIdx: number, lineIdx: number) => {
+    setDoc((d) => {
+      const block = d[blockIdx];
+      if (!block || block.kind !== 'section') return d;
+      const lines = block.body.split('\n');
+      // 마지막 줄 다음에는 split 의미가 없다 (그 뒤엔 줄이 없으므로).
+      if (lineIdx < 0 || lineIdx >= lines.length - 1) return d;
+      const before = lines.slice(0, lineIdx + 1).join('\n');
+      const after = lines.slice(lineIdx + 1).join('\n');
+      return [
+        ...d.slice(0, blockIdx),
+        { ...block, body: before },
+        { kind: 'slidebreak' as const },
+        { ...block, body: after },
+        ...d.slice(blockIdx + 1),
+      ];
+    });
+    showToast('슬라이드 구분 추가됨');
+  };
+
   // 파일명에 들어갈 오늘 날짜 (콘티_20260426.txt 같은 식)
   const dateStr = () => {
     const d = new Date();
@@ -1714,6 +1737,7 @@ export default function Home() {
                         onMoveDown={() => moveBlockDown(i)}
                         canMoveUp={findPrevContentIdx(i) !== -1}
                         canMoveDown={findNextContentIdx(i) !== -1}
+                        onSplitAt={(lineIdx) => splitSectionAt(i, lineIdx)}
                       />
                     ))}
                   </div>
@@ -1802,6 +1826,7 @@ function EditorBlockView({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  onSplitAt,
 }: {
   block: Block;
   onUpdate: (next: Block) => void;
@@ -1810,6 +1835,8 @@ function EditorBlockView({
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  // section 줄 단위로 슬라이드 분리. lineIdx는 0부터 시작 — "n줄 다음에 자른다" 의미.
+  onSplitAt?: (lineIdx: number) => void;
 }) {
   // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
   const editableRef = useRef<HTMLElement | null>(null);
@@ -2110,6 +2137,47 @@ function EditorBlockView({
           lineHeight: 1.85,
         }}
       />
+      {/* 줄별 슬라이드 분리 — section이 2줄 이상일 때만 표시.
+          사용자가 같은 섹션 안에서도 원하는 줄에서 슬라이드를 자를 수 있게 한다. */}
+      {onSplitAt && block.body.split('\n').length >= 2 && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            marginTop: 4,
+            paddingTop: 8,
+            borderTop: '1px dashed var(--rule)',
+          }}
+        >
+          <span
+            className="mono"
+            style={{ color: 'var(--ink-3)', fontSize: 10.5, marginRight: 4 }}
+          >
+            슬라이드 구분
+          </span>
+          {block.body.split('\n').slice(0, -1).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => onSplitAt(i)}
+              title={`${i + 1}줄 다음에서 슬라이드 자르기`}
+              className="mono"
+              style={{
+                padding: '3px 9px',
+                fontSize: 10.5,
+                border: '1px solid var(--rule)',
+                borderRadius: 99,
+                background: 'var(--paper)',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+              }}
+            >
+              ↳ {i + 1}줄 다음
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
