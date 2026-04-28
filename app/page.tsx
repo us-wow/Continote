@@ -37,6 +37,9 @@ type Block =
       label: string;
       verseNum: number | null;
       body: string;
+      // 슬라이드 구분 위치 (0-based 줄 인덱스). 해당 줄 다음에 슬라이드를 자른다.
+      // section을 분해하지 않고 metadata만 저장하므로 체크/해제로 자유롭게 토글 가능.
+      breakAfterLines?: number[];
     }
   | { kind: 'spacer' }
   | { kind: 'slidebreak' };
@@ -421,28 +424,6 @@ export default function Home() {
     showToast('슬라이드 구분 추가됨');
   };
 
-  // section 블록을 특정 줄(lineIdx) 다음에서 둘로 자르고 사이에 slidebreak를 끼운다.
-  // 사용자가 같은 섹션 안에서도 자유롭게 슬라이드를 분리할 수 있게 한다.
-  // 두 section은 같은 라벨/sectionId를 그대로 유지하므로 좌측 카드와의 매칭도 깨지지 않는다.
-  const splitSectionAt = (blockIdx: number, lineIdx: number) => {
-    setDoc((d) => {
-      const block = d[blockIdx];
-      if (!block || block.kind !== 'section') return d;
-      const lines = block.body.split('\n');
-      // 마지막 줄 다음에는 split 의미가 없다 (그 뒤엔 줄이 없으므로).
-      if (lineIdx < 0 || lineIdx >= lines.length - 1) return d;
-      const before = lines.slice(0, lineIdx + 1).join('\n');
-      const after = lines.slice(lineIdx + 1).join('\n');
-      return [
-        ...d.slice(0, blockIdx),
-        { ...block, body: before },
-        { kind: 'slidebreak' as const },
-        { ...block, body: after },
-        ...d.slice(blockIdx + 1),
-      ];
-    });
-    showToast('슬라이드 구분 추가됨');
-  };
 
   // 파일명에 들어갈 오늘 날짜 (콘티_20260426.txt 같은 식)
   const dateStr = () => {
@@ -487,13 +468,19 @@ export default function Home() {
   };
 
   // 콘티 편집창의 doc 블록 → PPT 슬라이드 배열로 변환.
-  // - slidebreak가 있으면 그것을 기준으로 슬라이드를 나눈다 (사용자가 자유롭게 분리).
-  //   slidebreak 사이의 모든 section 가사가 한 슬라이드로 합쳐진다.
-  // - slidebreak가 하나도 없으면 호환성을 위해 기존 동작(section 1개 = 슬라이드 1개)을 유지.
+  // 두 가지 슬라이드 분리 메커니즘 지원:
+  //   1) section 안 줄 단위 — section.breakAfterLines metadata. 체크박스로 토글.
+  //   2) 블록 사이 — doc 안 slidebreak 블록. [+ 슬라이드 구분] 버튼으로 추가.
+  // 둘 중 어느 분리도 없으면 호환성을 위해 기존 동작(section 1개 = 슬라이드 1개)을 유지.
   // title/spacer 블록은 PPT에서 제외.
   const docToSlides = (): PptSlide[] => {
-    const hasSlidebreak = doc.some((b) => b.kind === 'slidebreak');
-    if (!hasSlidebreak) {
+    const hasAnyBreak =
+      doc.some((b) => b.kind === 'slidebreak') ||
+      doc.some(
+        (b) => b.kind === 'section' && (b.breakAfterLines?.length ?? 0) > 0
+      );
+
+    if (!hasAnyBreak) {
       return doc
         .filter((b): b is Extract<Block, { kind: 'section' }> => b.kind === 'section')
         .map((b) => ({
@@ -503,10 +490,10 @@ export default function Home() {
             .filter((l) => l.length > 0),
         }));
     }
-    // slidebreak 모드: 누적 lines를 만들고 break를 만나면 슬라이드 push
+
     const slides: PptSlide[] = [];
     let buf: string[] = [];
-    const pushIfNotEmpty = () => {
+    const flushIfNotEmpty = () => {
       if (buf.length > 0) {
         slides.push({ lines: buf });
         buf = [];
@@ -514,14 +501,20 @@ export default function Home() {
     };
     for (const b of doc) {
       if (b.kind === 'section') {
-        const lines = b.body.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-        buf.push(...lines);
+        // 빈 줄은 슬라이드에 출력하지 않지만, breakAfterLines 인덱스는 split 원본 기준이라 그대로 통과.
+        const linesRaw = b.body.split('\n');
+        const breaks = new Set(b.breakAfterLines ?? []);
+        linesRaw.forEach((line, i) => {
+          const trimmed = line.trim();
+          if (trimmed) buf.push(trimmed);
+          if (breaks.has(i)) flushIfNotEmpty();
+        });
       } else if (b.kind === 'slidebreak') {
-        pushIfNotEmpty();
+        flushIfNotEmpty();
       }
       // title/spacer는 무시
     }
-    pushIfNotEmpty();
+    flushIfNotEmpty();
     return slides;
   };
 
@@ -1737,7 +1730,6 @@ export default function Home() {
                         onMoveDown={() => moveBlockDown(i)}
                         canMoveUp={findPrevContentIdx(i) !== -1}
                         canMoveDown={findNextContentIdx(i) !== -1}
-                        onSplitAt={(lineIdx) => splitSectionAt(i, lineIdx)}
                       />
                     ))}
                   </div>
@@ -1826,7 +1818,6 @@ function EditorBlockView({
   onMoveDown,
   canMoveUp,
   canMoveDown,
-  onSplitAt,
 }: {
   block: Block;
   onUpdate: (next: Block) => void;
@@ -1835,8 +1826,6 @@ function EditorBlockView({
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
-  // section 줄 단위로 슬라이드 분리. lineIdx는 0부터 시작 — "n줄 다음에 자른다" 의미.
-  onSplitAt?: (lineIdx: number) => void;
 }) {
   // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
   const editableRef = useRef<HTMLElement | null>(null);
@@ -2137,9 +2126,11 @@ function EditorBlockView({
           lineHeight: 1.85,
         }}
       />
-      {/* 줄별 슬라이드 분리 — section이 2줄 이상일 때만 표시.
-          사용자가 같은 섹션 안에서도 원하는 줄에서 슬라이드를 자를 수 있게 한다. */}
-      {onSplitAt && block.body.split('\n').length >= 2 && (
+      {/* 줄별 슬라이드 분리 체크박스 — section이 2줄 이상일 때만 표시.
+          체크하면 그 줄 다음에 슬라이드가 잘리고 PPT 미리보기에도 즉시 반영된다.
+          section 자체는 분해하지 않고 metadata(breakAfterLines)만 토글하므로
+          체크 해제로 자유롭게 되돌릴 수 있다. */}
+      {block.body.split('\n').length >= 2 && (
         <div
           style={{
             display: 'flex',
@@ -2155,27 +2146,45 @@ function EditorBlockView({
             className="mono"
             style={{ color: 'var(--ink-3)', fontSize: 10.5, marginRight: 4 }}
           >
-            슬라이드 구분
+            슬라이드 구분 (체크하면 그 줄 다음에 자름)
           </span>
-          {block.body.split('\n').slice(0, -1).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => onSplitAt(i)}
-              title={`${i + 1}줄 다음에서 슬라이드 자르기`}
-              className="mono"
-              style={{
-                padding: '3px 9px',
-                fontSize: 10.5,
-                border: '1px solid var(--rule)',
-                borderRadius: 99,
-                background: 'var(--paper)',
-                color: 'var(--ink-2)',
-                cursor: 'pointer',
-              }}
-            >
-              ↳ {i + 1}줄 다음
-            </button>
-          ))}
+          {block.body.split('\n').slice(0, -1).map((_line, i) => {
+            const isBreak = (block.breakAfterLines ?? []).includes(i);
+            return (
+              <label
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  padding: '3px 9px',
+                  borderRadius: 99,
+                  background: isBreak
+                    ? 'color-mix(in oklab, var(--accent) 18%, var(--paper))'
+                    : 'var(--paper)',
+                  border: '1px solid ' + (isBreak ? 'var(--accent)' : 'var(--rule)'),
+                  color: isBreak ? 'var(--accent-ink)' : 'var(--ink-2)',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isBreak}
+                  onChange={(e) => {
+                    const cur = block.breakAfterLines ?? [];
+                    const next = e.target.checked
+                      ? [...cur, i].sort((a, b) => a - b)
+                      : cur.filter((x) => x !== i);
+                    onUpdate({ ...block, breakAfterLines: next });
+                  }}
+                  style={{ margin: 0, accentColor: 'var(--accent)' }}
+                />
+                {i + 1}줄 다음
+              </label>
+            );
+          })}
         </div>
       )}
     </div>
