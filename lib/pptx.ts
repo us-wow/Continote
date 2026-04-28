@@ -27,13 +27,14 @@ const FONT_FACE_MAP: Record<PptFont, string> = {
   'noto-sans-kr': 'Noto Sans KR',
 };
 
-// 사용자가 직접 PPT를 뽑아본 결과 글자가 너무 커서 약 30% 축소.
-// 사이즈가 줄어든 만큼 줄당 글자 한도는 같은 비율로 늘려 한 줄에 더 많이 들어가게 한다.
+// 한도는 실제 PowerPoint에서 한국어 명조 + 16:9 가운데 정렬 박스 폭 기준 실측치(보수적).
+// 22자에서도 줄이 밀리는 케이스가 있어 한도를 한 글자 정도 더 줄이고,
+// 추가 안전망으로 addText에 fit:'shrink'를 켜서 박스를 넘치면 PowerPoint가 자동으로 살짝 축소한다.
 const SLIDE_TEXT_RULES: Record<number, { maxCharsPerLine: number; fontSize: number }> = {
-  1: { maxCharsPerLine: 20, fontSize: 64 },
-  2: { maxCharsPerLine: 25, fontSize: 54 },
-  3: { maxCharsPerLine: 30, fontSize: 44 },
-  4: { maxCharsPerLine: 36, fontSize: 36 },
+  1: { maxCharsPerLine: 17, fontSize: 64 },
+  2: { maxCharsPerLine: 21, fontSize: 54 },
+  3: { maxCharsPerLine: 26, fontSize: 44 },
+  4: { maxCharsPerLine: 32, fontSize: 36 },
 };
 
 // 한 슬라이드 검증 + 폰트사이즈 자동 결정
@@ -92,6 +93,9 @@ export async function exportToPptx(
       fontSize: validation.ok ? validation.fontSize : 32,
       paraSpaceAfter: 8,
       bold: false,
+      // 한도 통과 후에도 폰트마다 미세하게 박스를 넘는 케이스가 있어
+      // PowerPoint의 자동 축소(shrink-to-fit)를 켜서 한 줄에 들어가게 보장한다.
+      fit: 'shrink',
     });
   }
 

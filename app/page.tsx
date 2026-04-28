@@ -1608,7 +1608,7 @@ export default function Home() {
                             className="caption"
                             style={{ marginTop: 6, color: 'var(--accent-ink)' }}
                           >
-                            한 슬라이드 최대 4줄 · 줄당 최대 20~36자(줄수에 따라). 콘티
+                            한 슬라이드 최대 4줄 · 줄당 최대 17~32자(줄수에 따라). 콘티
                             편집에서 분리해주세요.
                           </div>
                         )}
