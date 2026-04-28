@@ -99,8 +99,6 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 이전에 만들어진 이미지 blob URL들 — files 변경 시 정리해서 메모리 누수 방지
-  const blobUrlsRef = useRef<string[]>([]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -510,18 +508,28 @@ export default function Home() {
   }, [doc.length]);
 
   // 파일 추가/제거 시 실제 썸네일 생성
-  // 이미지는 즉시(blob URL), PDF는 PDF.js로 첫 페이지 렌더링(비동기)
-  // 메모리 누수 방지: 새 URL 만든 뒤 이전 URL들을 revoke하는 순서로 처리
+  // 이미지는 base64 data URL(FileReader)로, PDF는 PDF.js로 첫 페이지 렌더링.
+  // blob URL을 쓰지 않는 이유: Strict Mode dev에서 effect가 두 번 실행될 때 revoke 타이밍이 꼬여
+  // 깨진 이미지(broken icon)가 보이는 케이스가 있었음. data URL은 revoke 필요 없어 안전.
   useEffect(() => {
     let cancelled = false;
-    const newBlobUrls: string[] = [];
+
+    const fileToDataUrl = (f: File): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(f);
+      });
 
     Promise.all(
       files.map(async (f) => {
         if (f.type.startsWith('image/')) {
-          const url = URL.createObjectURL(f);
-          newBlobUrls.push(url);
-          return url;
+          try {
+            return await fileToDataUrl(f);
+          } catch {
+            return '';
+          }
         }
         if (f.type === 'application/pdf') {
           try {
@@ -533,14 +541,7 @@ export default function Home() {
         return '';
       })
     ).then((results) => {
-      if (cancelled) {
-        // unmount되거나 files가 또 바뀐 경우 — 방금 만든 URL은 쓸모없음 → 즉시 정리
-        newBlobUrls.forEach(URL.revokeObjectURL);
-        return;
-      }
-      // 이전 렌더의 URL은 더 이상 안 쓰이므로 정리
-      blobUrlsRef.current.forEach(URL.revokeObjectURL);
-      blobUrlsRef.current = newBlobUrls;
+      if (cancelled) return;
       setThumbs(results);
     });
     return () => {
@@ -548,10 +549,9 @@ export default function Home() {
     };
   }, [files]);
 
-  // 컴포넌트 unmount 시 남은 blob URL + toast 타이머 정리 (메모리 누수 방지)
+  // 컴포넌트 unmount 시 toast 타이머 정리 (메모리 누수 방지)
   useEffect(() => {
     return () => {
-      blobUrlsRef.current.forEach(URL.revokeObjectURL);
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
