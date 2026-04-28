@@ -767,9 +767,13 @@ export default function Home() {
             fontSize: 16.5,
             lineHeight: 1.65,
             color: 'var(--ink-2)',
+            // 한국어 단어 단위 줄바꿈 — '콘티'처럼 두 글자 단어가 줄 끝에서 잘리지 않게 한다.
+            wordBreak: 'keep-all',
           }}
         >
-          JPG·PDF 악보를 올리면 가사만 깔끔하게 추출해드립니다. 결과에서 곡 제목과 섹션을 클릭해 콘티를 조립하세요.
+          JPG·PDF 악보를 올리면 가사만 깔끔하게 추출해드립니다.
+          <br />
+          결과에서 곡 제목과 섹션을 클릭해 콘티를 조립하세요.
         </p>
         {/* 히어로 마스코트 — done 포즈로 차별화 (헤더에 미니 idle, 에디터 빈 상태에 큰 idle 있음) */}
         <div className="mascot-float hero-mascot">
