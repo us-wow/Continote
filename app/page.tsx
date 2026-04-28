@@ -467,10 +467,11 @@ export default function Home() {
 
   // 콘티 편집창의 doc 블록 → PPT 슬라이드 배열로 변환.
   // 슬라이드 분리 규칙(자연스러운 순서):
-  //   1) section 안 빈 줄(Enter 두 번)을 만나면 거기서 자름
-  //   2) section 경계마다 자름 (verse 다음에 chorus면 자동으로 다른 슬라이드)
-  //   3) [+ 슬라이드 구분] 블록(slidebreak)도 자름
-  // title/spacer 블록은 PPT에서 제외.
+  //   1) title 블록을 만나면 그 자체로 한 슬라이드 (보통 콘티 맨 앞에 들어가서 표지 역할)
+  //   2) section 안 빈 줄(Enter 두 번)을 만나면 거기서 자름
+  //   3) section 경계마다 자름 (verse 다음에 chorus면 자동으로 다른 슬라이드)
+  //   4) [+ 슬라이드 구분] 블록(slidebreak)도 자름
+  // spacer 블록은 PPT에서 제외.
   const docToSlides = (): PptSlide[] => {
     const slides: PptSlide[] = [];
     let buf: string[] = [];
@@ -481,7 +482,12 @@ export default function Home() {
       }
     };
     for (const b of doc) {
-      if (b.kind === 'section') {
+      if (b.kind === 'title') {
+        // 직전 슬라이드 닫고 제목을 한 줄짜리 슬라이드로 푸시.
+        flush();
+        const t = b.text.trim();
+        if (t) slides.push({ lines: [t] });
+      } else if (b.kind === 'section') {
         // 새 section 시작 시 직전 슬라이드 닫음 → section 경계 = 자동 슬라이드 분리.
         flush();
         for (const line of b.body.split('\n')) {
@@ -493,7 +499,7 @@ export default function Home() {
       } else if (b.kind === 'slidebreak') {
         flush();
       }
-      // title/spacer는 무시
+      // spacer는 무시
     }
     flush();
     return slides;
