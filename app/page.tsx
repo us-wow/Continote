@@ -97,7 +97,8 @@ export default function Home() {
   // 정확도 우선 모드는 서버 분석 프롬프트를 더 보수적으로 쓰게 하므로, 업로드/붙여넣기 요청에 함께 전달한다.
   const [accuracyMode, setAccuracyMode] = useState(false);
   // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
-  const [pptFont, setPptFont] = useState<PptFont>('nanum-myeongjo');
+  // 기본 폰트는 '본명조 Pro' — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
+  const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1597,7 +1598,7 @@ export default function Home() {
                             className="caption"
                             style={{ marginTop: 6, color: 'var(--accent-ink)' }}
                           >
-                            한 슬라이드 최대 4줄 · 줄당 최대 14~25자(줄수에 따라). 콘티
+                            한 슬라이드 최대 4줄 · 줄당 최대 20~36자(줄수에 따라). 콘티
                             편집에서 분리해주세요.
                           </div>
                         )}
@@ -2103,6 +2104,10 @@ function EditorBlockView({
         ref={editableRef as React.RefObject<HTMLDivElement>}
         contentEditable
         suppressContentEditableWarning
+        // onInput으로 실시간 반영 — Enter로 만든 빈 줄을 백스페이스로 지우자마자
+        // PPT 미리보기가 즉시 합쳐지도록(역방향 호환). useEffect의 동기화 로직이
+        // innerText === expected 비교로 무한 루프를 막아준다.
+        onInput={(e) => onUpdate({ ...block, body: (e.currentTarget as HTMLDivElement).innerText })}
         onBlur={(e) => onUpdate({ ...block, body: e.currentTarget.innerText })}
         className="lyric"
         style={{

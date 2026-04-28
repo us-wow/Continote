@@ -27,11 +27,13 @@ const FONT_FACE_MAP: Record<PptFont, string> = {
   'noto-sans-kr': 'Noto Sans KR',
 };
 
+// 사용자가 직접 PPT를 뽑아본 결과 글자가 너무 커서 약 30% 축소.
+// 사이즈가 줄어든 만큼 줄당 글자 한도는 같은 비율로 늘려 한 줄에 더 많이 들어가게 한다.
 const SLIDE_TEXT_RULES: Record<number, { maxCharsPerLine: number; fontSize: number }> = {
-  1: { maxCharsPerLine: 14, fontSize: 96 },
-  2: { maxCharsPerLine: 17, fontSize: 80 },
-  3: { maxCharsPerLine: 21, fontSize: 64 },
-  4: { maxCharsPerLine: 25, fontSize: 54 },
+  1: { maxCharsPerLine: 20, fontSize: 64 },
+  2: { maxCharsPerLine: 25, fontSize: 54 },
+  3: { maxCharsPerLine: 30, fontSize: 44 },
+  4: { maxCharsPerLine: 36, fontSize: 36 },
 };
 
 // 한 슬라이드 검증 + 폰트사이즈 자동 결정
@@ -39,8 +41,8 @@ export function validateSlide(slide: PptSlide): PptValidation {
   const lineCount = slide.lines.length;
 
   // 빈 슬라이드는 사용자가 의도적으로 여백을 넣을 수 있어 허용하고,
-  // 실제 표시 텍스트가 없으므로 최대 크기 기준인 96pt를 돌려준다.
-  if (lineCount === 0) return { ok: true, fontSize: 96, lineCount: 0 };
+  // 실제 표시 텍스트가 없으므로 최대 크기인 64pt(1줄)를 돌려준다.
+  if (lineCount === 0) return { ok: true, fontSize: 64, lineCount: 0 };
 
   // 16:9 와이드 슬라이드의 가운데 텍스트 박스에서 읽기 좋은 최대 줄 수를 4줄로 제한한다.
   // 5줄 이상은 예배/발표 화면에서 한눈에 읽기 어려워 검증 실패로 처리한다.
@@ -48,7 +50,7 @@ export function validateSlide(slide: PptSlide): PptValidation {
 
   const { maxCharsPerLine, fontSize } = SLIDE_TEXT_RULES[lineCount];
 
-  // 14/17/21/25자와 96/80/64/54pt는 16:9 가운데 정렬 가독성 기준이다.
+  // 20/25/30/36자와 64/54/44/36pt는 16:9 가운데 정렬 + 모니터 투영 가독성 기준이다.
   // Array.from으로 세면 한글과 이모지 같은 유니코드 문자를 화면 글자 단위에 가깝게 다룰 수 있다.
   if (slide.lines.some((line) => Array.from(line).length > maxCharsPerLine)) {
     return { ok: false, reason: 'line-too-long', lineCount, maxCharsPerLine };
