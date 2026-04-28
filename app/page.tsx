@@ -12,6 +12,13 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
+import {
+  exportToPptx,
+  validateSlide,
+  PPT_FONT_LABELS,
+  type PptFont,
+  type PptSlide,
+} from '@/lib/pptx';
 import type { Song, Section, SectionType } from '@/lib/types';
 import Mascot from '@/components/Mascot';
 import SectionChip from '@/components/SectionChip';
@@ -87,6 +94,8 @@ export default function Home() {
   const [dragging, setDragging] = useState(false);
   // 정확도 우선 모드는 서버 분석 프롬프트를 더 보수적으로 쓰게 하므로, 업로드/붙여넣기 요청에 함께 전달한다.
   const [accuracyMode, setAccuracyMode] = useState(false);
+  // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
+  const [pptFont, setPptFont] = useState<PptFont>('nanum-myeongjo');
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -443,6 +452,45 @@ export default function Home() {
       showToast('.docx 저장됨');
     } catch (err: any) {
       showToast('저장 실패: ' + err.message);
+    }
+  };
+
+  // 콘티 편집창의 doc 블록 → PPT 슬라이드 배열로 변환.
+  // section 블록 1개 = 한 슬라이드. title/spacer 블록은 PPT에서 제외.
+  // 각 슬라이드의 lines는 section.body를 \n으로 분할한 결과(빈 줄 제거).
+  const docToSlides = (): PptSlide[] => {
+    return doc
+      .filter((b): b is Extract<Block, { kind: 'section' }> => b.kind === 'section')
+      .map((b) => ({
+        lines: b.body
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0),
+      }));
+  };
+
+  // PPT 다운로드 — lib/pptx.ts 검증을 통과한 섹션 슬라이드만 내보낸다.
+  const handleSavePptx = async () => {
+    const slides = docToSlides();
+    if (slides.length === 0) {
+      showToast('PPT로 만들 섹션이 없어요');
+      return;
+    }
+    // 5줄 이상 슬라이드는 자동 축소보다 분리 편집이 예배 콘티 가독성을 지키므로 차단한다.
+    const overflow = slides.findIndex((s) => {
+      const v = validateSlide(s);
+      return !v.ok;
+    });
+    if (overflow !== -1) {
+      showToast(`${overflow + 1}번 슬라이드를 분리해주세요 (4줄 한도)`);
+      return;
+    }
+    try {
+      const fname = `contionote-${Date.now()}.pptx`;
+      await exportToPptx(slides, pptFont, fname);
+      showToast('PPT 다운로드 시작');
+    } catch (err: any) {
+      showToast(`PPT 생성 실패: ${err.message}`);
     }
   };
 
@@ -1425,124 +1473,228 @@ export default function Home() {
             )}
           </div>
 
-          {/* === 우측: 편집창 (sticky — 좌측 스크롤해도 화면 고정) === */}
-          <aside
-            className="editor-pane"
-            style={{
-              border: '1px solid var(--rule)',
-              background: 'color-mix(in oklab, var(--paper) 80%, white)',
-              borderRadius: 3,
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <header
+          <div className="stack" style={cssVar('--gap', '32px')}>
+            {/* === 우측: 편집창 (sticky — 좌측 스크롤해도 화면 고정) === */}
+            <aside
+              className="editor-pane"
               style={{
-                padding: '16px 22px',
-                borderBottom: '1px solid var(--rule)',
+                border: '1px solid var(--rule)',
+                background: 'color-mix(in oklab, var(--paper) 80%, white)',
+                borderRadius: 3,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
+                flexDirection: 'column',
               }}
             >
-              <div>
-                <div className="label" style={{ marginBottom: 2 }}>
-                  3. 콘티 편집
-                </div>
-                <div className="caption">
-                  {isEmpty
-                    ? '왼쪽에서 곡 제목·섹션을 눌러 콘티를 만드세요'
-                    : `${blockCount}개 섹션`}
-                </div>
-              </div>
-              {!isEmpty && (
-                <button className="btn-ghost" onClick={onClear}>
-                  전체 비우기
-                </button>
-              )}
-            </header>
-
-            {/* editor-body — 내용이 길어지면 여기서만 내부 스크롤 (aside 자체는 잘리지 않음)
-                ref로 자동 스크롤(맨 아래로) 제어 */}
-            <div
-              ref={editorBodyRef}
-              className="editor-body"
-              style={{
-                padding: '28px 32px',
-                background: '#fff',
-                position: 'relative',
-              }}
-            >
-              {isEmpty ? (
-                <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-                  <div
-                    className="mascot-float"
-                    style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}
-                  >
-                    <Mascot pose="idle" size={140} />
-                  </div>
-                  <div className="h-song" style={{ fontSize: 22, margin: 0 }}>
-                    빈 콘티에서 시작
-                  </div>
-                  <div className="caption" style={{ maxWidth: 320, margin: '12px auto 0' }}>
-                    왼쪽 결과에서 <span style={{ color: 'var(--ink)' }}>곡 제목</span>이나{' '}
-                    <span style={{ color: 'var(--ink)' }}>섹션 카드</span>를 눌러보세요.
-                    순서대로 빈 줄을 두고 이어집니다.
-                  </div>
-                  {/* 붙여넣기 모드 발견율을 높이기 위해 시작 경로를 둘 다 명시한다. */}
-                  <div className="caption" style={{ maxWidth: 360, margin: '10px auto 0' }}>
-                    1) 악보 파일 업로드 — JPG·PDF 올리기
-                    <br />
-                    2) 직접 가사 붙여넣기 — 토글 켜고 텍스트 입력
-                  </div>
-                </div>
-              ) : (
+              <header
+                style={{
+                  padding: '16px 22px',
+                  borderBottom: '1px solid var(--rule)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
                 <div>
-                  {doc.map((b, i) => (
-                    <EditorBlockView
-                      key={i}
-                      block={b}
-                      onUpdate={(next) => updateBlock(i, next)}
-                      onRemove={() => removeBlock(i)}
-                      onMoveUp={() => moveBlockUp(i)}
-                      onMoveDown={() => moveBlockDown(i)}
-                      canMoveUp={findPrevContentIdx(i) !== -1}
-                      canMoveDown={findNextContentIdx(i) !== -1}
-                    />
+                  <div className="label" style={{ marginBottom: 2 }}>
+                    3. 콘티 편집
+                  </div>
+                  <div className="caption">
+                    {isEmpty
+                      ? '왼쪽에서 곡 제목·섹션을 눌러 콘티를 만드세요'
+                      : `${blockCount}개 섹션`}
+                  </div>
+                </div>
+                {!isEmpty && (
+                  <button className="btn-ghost" onClick={onClear}>
+                    전체 비우기
+                  </button>
+                )}
+              </header>
+
+              {/* editor-body — 내용이 길어지면 여기서만 내부 스크롤 (aside 자체는 잘리지 않음)
+                  ref로 자동 스크롤(맨 아래로) 제어 */}
+              <div
+                ref={editorBodyRef}
+                className="editor-body"
+                style={{
+                  padding: '28px 32px',
+                  background: '#fff',
+                  position: 'relative',
+                }}
+              >
+                {isEmpty ? (
+                  <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                    <div
+                      className="mascot-float"
+                      style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}
+                    >
+                      <Mascot pose="idle" size={140} />
+                    </div>
+                    <div className="h-song" style={{ fontSize: 22, margin: 0 }}>
+                      빈 콘티에서 시작
+                    </div>
+                    <div className="caption" style={{ maxWidth: 320, margin: '12px auto 0' }}>
+                      왼쪽 결과에서 <span style={{ color: 'var(--ink)' }}>곡 제목</span>이나{' '}
+                      <span style={{ color: 'var(--ink)' }}>섹션 카드</span>를 눌러보세요.
+                      순서대로 빈 줄을 두고 이어집니다.
+                    </div>
+                    {/* 붙여넣기 모드 발견율을 높이기 위해 시작 경로를 둘 다 명시한다. */}
+                    <div className="caption" style={{ maxWidth: 360, margin: '10px auto 0' }}>
+                      1) 악보 파일 업로드 — JPG·PDF 올리기
+                      <br />
+                      2) 직접 가사 붙여넣기 — 토글 켜고 텍스트 입력
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {doc.map((b, i) => (
+                      <EditorBlockView
+                        key={i}
+                        block={b}
+                        onUpdate={(next) => updateBlock(i, next)}
+                        onRemove={() => removeBlock(i)}
+                        onMoveUp={() => moveBlockUp(i)}
+                        onMoveDown={() => moveBlockDown(i)}
+                        canMoveUp={findPrevContentIdx(i) !== -1}
+                        canMoveDown={findNextContentIdx(i) !== -1}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 다운로드/복사 버튼 — 편집창 하단 footer */}
+              <footer
+                style={{
+                  padding: '16px 22px',
+                  borderTop: '1px solid var(--rule)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div className="caption" style={{ color: 'var(--ink-3)' }}>
+                  {!isEmpty ? '준비 완료' : '비어있음'}
+                </div>
+                <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
+                  <button className="btn-text" disabled={isEmpty} onClick={handleSaveTxt}>
+                    TXT 다운로드
+                  </button>
+                  <button className="btn-text" disabled={isEmpty} onClick={handleSaveDocx}>
+                    DOCX 다운로드
+                  </button>
+                  <button className="btn-text" disabled={isEmpty} onClick={handleCopy}>
+                    클립보드 복사
+                  </button>
+                </div>
+              </footer>
+            </aside>
+
+            {/* 4. PPT 제작 — 콘티 편집 결과를 검정+별 배경 슬라이드로 변환 */}
+            <div className="stack" style={{ ...cssVar('--gap', '16px'), marginTop: 32 }}>
+              <div className="label">4. PPT 제작</div>
+
+              {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={pptFont}
+                  onChange={(e) => setPptFont(e.target.value as PptFont)}
+                  aria-label="PPT 폰트 선택"
+                  style={{
+                    padding: '10px 14px',
+                    border: '1px solid var(--rule)',
+                    borderRadius: 2,
+                    background: 'var(--paper)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--sans)',
+                    fontSize: 14,
+                  }}
+                >
+                  {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => (
+                    <option key={f} value={f}>
+                      {PPT_FONT_LABELS[f]}
+                    </option>
                   ))}
+                </select>
+                <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
+                  PPT 다운로드 (.pptx)
+                </button>
+              </div>
+
+              {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
+                  한도 초과 시 빨강 표시. */}
+              {!isEmpty && (
+                <div className="stack" style={cssVar('--gap', '8px')}>
+                  {docToSlides().map((slide, i) => {
+                    const v = validateSlide(slide);
+                    const isOverflow = !v.ok;
+                    const slideMeta = 'fontSize' in v
+                      ? `${v.lineCount}줄 · ${v.fontSize}pt`
+                      : v.reason === 'too-many-lines'
+                        ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
+                        : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          border:
+                            '1px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
+                          borderLeft:
+                            '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--ink)'),
+                          padding: '12px 14px',
+                          borderRadius: 2,
+                          background: 'color-mix(in oklab, var(--paper) 70%, white)',
+                        }}
+                      >
+                        <div
+                          className="mono"
+                          style={{
+                            marginBottom: 6,
+                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
+                          }}
+                        >
+                          슬라이드 {i + 1} ·{' '}
+                          {slideMeta}
+                        </div>
+                        <div
+                          className="lyric"
+                          style={{
+                            fontSize: 13.5,
+                            lineHeight: 1.5,
+                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-2)',
+                          }}
+                        >
+                          {slide.lines.length === 0 ? (
+                            <span style={{ color: 'var(--ink-3)' }}>(빈 슬라이드)</span>
+                          ) : (
+                            slide.lines.map((l, j) => <div key={j}>{l}</div>)
+                          )}
+                        </div>
+                        {isOverflow && (
+                          <div
+                            className="caption"
+                            style={{ marginTop: 6, color: 'var(--accent-ink)' }}
+                          >
+                            한 슬라이드 최대 4줄 · 줄당 최대 14~25자(줄수에 따라). 콘티
+                            편집에서 분리해주세요.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {isEmpty && (
+                <div className="caption" style={{ color: 'var(--ink-3)' }}>
+                  콘티 편집에 섹션을 추가하면 여기에 슬라이드 미리보기가 나타납니다.
                 </div>
               )}
             </div>
-
-            {/* 다운로드/복사 버튼 — 편집창 하단 footer */}
-            <footer
-              style={{
-                padding: '16px 22px',
-                borderTop: '1px solid var(--rule)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 16,
-                flexWrap: 'wrap',
-              }}
-            >
-              <div className="caption" style={{ color: 'var(--ink-3)' }}>
-                {!isEmpty ? '준비 완료' : '비어있음'}
-              </div>
-              <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-                <button className="btn-text" disabled={isEmpty} onClick={handleSaveTxt}>
-                  TXT 다운로드
-                </button>
-                <button className="btn-text" disabled={isEmpty} onClick={handleSaveDocx}>
-                  DOCX 다운로드
-                </button>
-                <button className="btn-text" disabled={isEmpty} onClick={handleCopy}>
-                  클립보드 복사
-                </button>
-              </div>
-            </footer>
-          </aside>
+          </div>
         </div>
       </main>
 
