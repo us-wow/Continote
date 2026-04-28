@@ -37,9 +37,6 @@ type Block =
       label: string;
       verseNum: number | null;
       body: string;
-      // 슬라이드 구분 위치 (0-based 줄 인덱스). 해당 줄 다음에 슬라이드를 자른다.
-      // section을 분해하지 않고 metadata만 저장하므로 체크/해제로 자유롭게 토글 가능.
-      breakAfterLines?: number[];
     }
   | { kind: 'spacer' }
   | { kind: 'slidebreak' };
@@ -468,32 +465,15 @@ export default function Home() {
   };
 
   // 콘티 편집창의 doc 블록 → PPT 슬라이드 배열로 변환.
-  // 두 가지 슬라이드 분리 메커니즘 지원:
-  //   1) section 안 줄 단위 — section.breakAfterLines metadata. 체크박스로 토글.
-  //   2) 블록 사이 — doc 안 slidebreak 블록. [+ 슬라이드 구분] 버튼으로 추가.
-  // 둘 중 어느 분리도 없으면 호환성을 위해 기존 동작(section 1개 = 슬라이드 1개)을 유지.
+  // 슬라이드 분리 규칙(자연스러운 순서):
+  //   1) section 안 빈 줄(Enter 두 번)을 만나면 거기서 자름
+  //   2) section 경계마다 자름 (verse 다음에 chorus면 자동으로 다른 슬라이드)
+  //   3) [+ 슬라이드 구분] 블록(slidebreak)도 자름
   // title/spacer 블록은 PPT에서 제외.
   const docToSlides = (): PptSlide[] => {
-    const hasAnyBreak =
-      doc.some((b) => b.kind === 'slidebreak') ||
-      doc.some(
-        (b) => b.kind === 'section' && (b.breakAfterLines?.length ?? 0) > 0
-      );
-
-    if (!hasAnyBreak) {
-      return doc
-        .filter((b): b is Extract<Block, { kind: 'section' }> => b.kind === 'section')
-        .map((b) => ({
-          lines: b.body
-            .split('\n')
-            .map((l) => l.trim())
-            .filter((l) => l.length > 0),
-        }));
-    }
-
     const slides: PptSlide[] = [];
     let buf: string[] = [];
-    const flushIfNotEmpty = () => {
+    const flush = () => {
       if (buf.length > 0) {
         slides.push({ lines: buf });
         buf = [];
@@ -501,20 +481,20 @@ export default function Home() {
     };
     for (const b of doc) {
       if (b.kind === 'section') {
-        // 빈 줄은 슬라이드에 출력하지 않지만, breakAfterLines 인덱스는 split 원본 기준이라 그대로 통과.
-        const linesRaw = b.body.split('\n');
-        const breaks = new Set(b.breakAfterLines ?? []);
-        linesRaw.forEach((line, i) => {
+        // 새 section 시작 시 직전 슬라이드 닫음 → section 경계 = 자동 슬라이드 분리.
+        flush();
+        for (const line of b.body.split('\n')) {
           const trimmed = line.trim();
+          // 빈 줄은 사용자의 명시적 슬라이드 구분 신호로 처리한다.
           if (trimmed) buf.push(trimmed);
-          if (breaks.has(i)) flushIfNotEmpty();
-        });
+          else flush();
+        }
       } else if (b.kind === 'slidebreak') {
-        flushIfNotEmpty();
+        flush();
       }
       // title/spacer는 무시
     }
-    flushIfNotEmpty();
+    flush();
     return slides;
   };
 
@@ -1530,11 +1510,11 @@ export default function Home() {
             <div className="stack" style={cssVar('--gap', '16px')}>
               <div className="label">4. PPT 제작</div>
 
-              {/* 사용자 가이드 — 슬라이드당 가사 양 권장. 4줄 한도지만 2~3줄이 가장 깔끔하다. */}
+              {/* 사용자 가이드 — 슬라이드당 가사 양 권장 + 분리 방법. */}
               <div className="caption" style={{ color: 'var(--ink-2)', lineHeight: 1.6 }}>
                 한 슬라이드는 <span style={{ color: 'var(--ink)', fontWeight: 600 }}>2~3줄</span>일 때 가장 깔끔하게 만들어집니다 (최대 4줄).
                 <br />
-                콘티 편집에서 <span style={{ color: 'var(--accent-ink)' }}>+ 슬라이드 구분</span> 버튼으로 슬라이드를 자유롭게 자를 수 있어요.
+                콘티 편집에서 가사 안 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 거기서 슬라이드가 나뉘어요.
               </div>
 
               {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
@@ -1665,6 +1645,13 @@ export default function Home() {
                     {isEmpty
                       ? '왼쪽에서 곡 제목·섹션을 눌러 콘티를 만드세요'
                       : `${blockCount}개 섹션`}
+                  </div>
+                  {/* 사용자 안내: contentEditable 안에서 Enter 두 번이면 빈 줄 → PPT에서 슬라이드 분리 */}
+                  <div
+                    className="caption"
+                    style={{ color: 'var(--ink-3)', marginTop: 4, fontSize: 12 }}
+                  >
+                    가사 안에서 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 PPT 슬라이드가 거기서 나뉩니다.
                   </div>
                 </div>
                 {!isEmpty && (
@@ -2126,67 +2113,6 @@ function EditorBlockView({
           lineHeight: 1.85,
         }}
       />
-      {/* 줄별 슬라이드 분리 체크박스 — section이 2줄 이상일 때만 표시.
-          체크하면 그 줄 다음에 슬라이드가 잘리고 PPT 미리보기에도 즉시 반영된다.
-          section 자체는 분해하지 않고 metadata(breakAfterLines)만 토글하므로
-          체크 해제로 자유롭게 되돌릴 수 있다. */}
-      {block.body.split('\n').length >= 2 && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 6,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            marginTop: 4,
-            paddingTop: 8,
-            borderTop: '1px dashed var(--rule)',
-          }}
-        >
-          <span
-            className="mono"
-            style={{ color: 'var(--ink-3)', fontSize: 10.5, marginRight: 4 }}
-          >
-            슬라이드 구분 (체크하면 그 줄 다음에 자름)
-          </span>
-          {block.body.split('\n').slice(0, -1).map((_line, i) => {
-            const isBreak = (block.breakAfterLines ?? []).includes(i);
-            return (
-              <label
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  padding: '3px 9px',
-                  borderRadius: 99,
-                  background: isBreak
-                    ? 'color-mix(in oklab, var(--accent) 18%, var(--paper))'
-                    : 'var(--paper)',
-                  border: '1px solid ' + (isBreak ? 'var(--accent)' : 'var(--rule)'),
-                  color: isBreak ? 'var(--accent-ink)' : 'var(--ink-2)',
-                  userSelect: 'none',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isBreak}
-                  onChange={(e) => {
-                    const cur = block.breakAfterLines ?? [];
-                    const next = e.target.checked
-                      ? [...cur, i].sort((a, b) => a - b)
-                      : cur.filter((x) => x !== i);
-                    onUpdate({ ...block, breakAfterLines: next });
-                  }}
-                  style={{ margin: 0, accentColor: 'var(--accent)' }}
-                />
-                {i + 1}줄 다음
-              </label>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
