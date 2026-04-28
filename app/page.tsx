@@ -836,9 +836,11 @@ export default function Home() {
                     style={{
                       marginTop: 14,
                       display: 'grid',
-                      // auto-fit으로 컨테이너 폭에 따라 카드 개수 자동 조정. 좁아지면 한 줄에 적게, 넓어지면 많이 배치한다.
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
+                      // auto-fill + 최대 110px로 셀 크기 제한.
+                      // auto-fit + 1fr이었을 때 파일 1개면 컨테이너 전체로 늘어나 썸네일이 화면을 다 차지하는 문제 발생.
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 110px))',
                       gap: 12,
+                      justifyContent: 'start',
                     }}
                   >
                     {files.map((f, i) => (
