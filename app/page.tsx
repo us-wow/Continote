@@ -1217,10 +1217,10 @@ export default function Home() {
                           title="곡 삭제 (콘티 블록도 함께)"
                           style={{
                             position: 'absolute',
-                            top: 12,
+                            top: 10,
                             right: 50,
-                            width: 28,
-                            height: 28,
+                            width: 36,
+                            height: 36,
                             borderRadius: '50%',
                             background: 'var(--paper)',
                             border: '1px solid var(--rule)',
@@ -1241,10 +1241,10 @@ export default function Home() {
                           title="제목 수정"
                           style={{
                             position: 'absolute',
-                            top: 12,
-                            right: 12,
-                            width: 28,
-                            height: 28,
+                            top: 10,
+                            right: 10,
+                            width: 36,
+                            height: 36,
                             borderRadius: '50%',
                             background: 'var(--paper)',
                             border: '1px solid var(--rule)',
@@ -1385,7 +1385,7 @@ export default function Home() {
                             <article
                               className="section-card"
                               onClick={() => insertSection(sec, songIdx, secIdx)}
-                              style={{ paddingRight: 110 }}
+                              style={{ paddingRight: 128 }}
                             >
                               <header
                                 style={{
@@ -1444,10 +1444,10 @@ export default function Home() {
                               title="위로 이동"
                               style={{
                                 position: 'absolute',
-                                top: 12,
-                                right: 80,
-                                width: 26,
-                                height: 26,
+                                top: 10,
+                                right: 92,
+                                width: 32,
+                                height: 32,
                                 borderRadius: '50%',
                                 background: 'var(--paper)',
                                 border: '1px solid var(--rule)',
@@ -1472,10 +1472,10 @@ export default function Home() {
                               title="아래로 이동"
                               style={{
                                 position: 'absolute',
-                                top: 12,
-                                right: 46,
-                                width: 26,
-                                height: 26,
+                                top: 10,
+                                right: 52,
+                                width: 32,
+                                height: 32,
                                 borderRadius: '50%',
                                 background: 'var(--paper)',
                                 border: '1px solid var(--rule)',
@@ -1499,10 +1499,10 @@ export default function Home() {
                               title="섹션 수정"
                               style={{
                                 position: 'absolute',
-                                top: 12,
+                                top: 10,
                                 right: 12,
-                                width: 26,
-                                height: 26,
+                                width: 32,
+                                height: 32,
                                 borderRadius: '50%',
                                 background: 'var(--paper)',
                                 border: '1px solid var(--rule)',
@@ -2073,8 +2073,8 @@ function EditorBlockView({
             top: '50%',
             right: 68,
             transform: 'translateY(-50%)',
-            width: 24,
-            height: 24,
+            width: 30,
+            height: 30,
             borderRadius: '50%',
             background: 'var(--paper)',
             border: '1px solid var(--rule)',
@@ -2096,8 +2096,8 @@ function EditorBlockView({
             top: '50%',
             right: 38,
             transform: 'translateY(-50%)',
-            width: 24,
-            height: 24,
+            width: 30,
+            height: 30,
             borderRadius: '50%',
             background: 'var(--paper)',
             border: '1px solid var(--rule)',
@@ -2118,8 +2118,8 @@ function EditorBlockView({
             top: '50%',
             right: 8,
             transform: 'translateY(-50%)',
-            width: 24,
-            height: 24,
+            width: 30,
+            height: 30,
             borderRadius: '50%',
             background: 'var(--paper)',
             border: '1px solid var(--rule)',
