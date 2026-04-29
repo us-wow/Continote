@@ -338,9 +338,16 @@ textarea:focus, input[type='text']:focus {
   overflow-y: auto;
 }
 
-/* 모바일 — 880px 이하면 단일 컬럼, sticky 해제 (좌·우가 위아래로 쌓이므로 의미 없음) */
+/* 모바일 — 880px 이하면 단일 컬럼, sticky 해제 (좌·우가 위아래로 쌓이므로 의미 없음).
+ * grid-template-areas를 모바일에서 1·2 → 3 → 4 순서로 재정렬하여 자연스러운 흐름 보장. */
 @media (max-width: 880px) {
-  .two-col { grid-template-columns: 1fr !important; }
+  .two-col {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "left"
+      "right"
+      "ppt" !important;
+  }
   .topbar-meta { display: none !important; }
   /* 좁은 화면에서는 절대 배치를 풀어 헤드라인과 마스코트가 겹치지 않게 한다. */
   .hero-mascot {

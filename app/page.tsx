@@ -99,6 +99,8 @@ export default function Home() {
   // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
   // 기본 폰트는 '본명조 Pro' — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
   const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
+  // 도움말 모달 — 헤더의 [사용법] 버튼으로 토글
+  const [showHelp, setShowHelp] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -731,11 +733,24 @@ export default function Home() {
             콘티노트
           </span>
         </div>
-        <nav className="topbar-meta" style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-          <span className="caption" style={{ color: 'var(--ink-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+          <span
+            className="caption topbar-meta"
+            style={{ color: 'var(--ink-2)' }}
+          >
             찬양팀·예배 사역자를 위한 AI 콘티 메이커
           </span>
-        </nav>
+          {/* 사용법 버튼 — 모바일·데스크톱 모두 노출 (topbar-meta는 모바일에서 숨김 처리) */}
+          <button
+            type="button"
+            onClick={() => setShowHelp(true)}
+            aria-label="사용법 보기"
+            className="btn-ghost"
+            style={{ padding: '6px 12px', fontSize: 13 }}
+          >
+            사용법
+          </button>
+        </div>
       </header>
 
       {/* ----- 히어로 ----- */}
@@ -783,17 +798,24 @@ export default function Home() {
 
       {/* ----- 메인: 2단 레이아웃 ----- */}
       <main style={{ maxWidth: 1320, margin: '0 auto', padding: '0 32px 56px' }}>
+        {/* grid-template-areas로 데스크톱·모바일 순서를 분리:
+            데스크톱: 좌측에 1·2·4가 위→아래, 우측에 3 (sticky)
+            모바일: 1 → 2 → 3 → 4 자연스러운 흐름 (CSS는 globals.css에서 처리) */}
         <div
           className="two-col"
           style={{
             display: 'grid',
             gridTemplateColumns: 'minmax(360px, 0.85fr) minmax(0, 1.15fr)',
+            gridTemplateAreas: `
+              "left right"
+              "ppt right"
+            `,
             gap: 40,
             alignItems: 'start',
           }}
         >
-          {/* === 좌측: 업로드 + 추출 결과 === */}
-          <div className="stack" style={cssVar('--gap', '32px')}>
+          {/* === 좌측: 업로드 + 추출 결과 (grid-area: left) === */}
+          <div className="stack" style={{ ...cssVar('--gap', '32px'), gridArea: 'left' }}>
             {/* --- 1. 업로드 영역 --- */}
             <div className="stack" style={cssVar('--gap', '20px')}>
               <div>
@@ -1515,118 +1537,9 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            {/* 4. PPT 제작 — 콘티 편집 결과를 검정 배경 슬라이드로 변환.
-                좌측 컬럼 하단(1·2·4 흐름)에 두어 우측 sticky aside가 가리는 문제를 회피한다. */}
-            <div className="stack" style={cssVar('--gap', '16px')}>
-              <div className="label">4. PPT 제작</div>
-
-              {/* 사용자 가이드 — 슬라이드당 가사 양 권장 + 분리 방법. */}
-              <div className="caption" style={{ color: 'var(--ink-2)', lineHeight: 1.6 }}>
-                한 슬라이드는 <span style={{ color: 'var(--ink)', fontWeight: 600 }}>2~3줄</span>일 때 가장 깔끔하게 만들어집니다 (최대 4줄).
-                <br />
-                콘티 편집에서 가사 안 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 거기서 슬라이드가 나뉘어요.
-              </div>
-
-              {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <select
-                  value={pptFont}
-                  onChange={(e) => setPptFont(e.target.value as PptFont)}
-                  aria-label="PPT 폰트 선택"
-                  style={{
-                    padding: '10px 14px',
-                    border: '1px solid var(--rule)',
-                    borderRadius: 2,
-                    background: 'var(--paper)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--sans)',
-                    fontSize: 14,
-                  }}
-                >
-                  {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => (
-                    <option key={f} value={f}>
-                      {PPT_FONT_LABELS[f]}
-                    </option>
-                  ))}
-                </select>
-                <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
-                  PPT 다운로드 (.pptx)
-                </button>
-              </div>
-
-              {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
-                  한도 초과 시 빨강 표시. */}
-              {!isEmpty && (
-                <div className="stack" style={cssVar('--gap', '8px')}>
-                  {docToSlides().map((slide, i) => {
-                    const v = validateSlide(slide);
-                    const isOverflow = !v.ok;
-                    const slideMeta = 'fontSize' in v
-                      ? `${v.lineCount}줄 · ${v.fontSize}pt`
-                      : v.reason === 'too-many-lines'
-                        ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
-                        : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          border:
-                            '1px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
-                          borderLeft:
-                            '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--ink)'),
-                          padding: '12px 14px',
-                          borderRadius: 2,
-                          background: 'color-mix(in oklab, var(--paper) 70%, white)',
-                        }}
-                      >
-                        <div
-                          className="mono"
-                          style={{
-                            marginBottom: 6,
-                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
-                          }}
-                        >
-                          슬라이드 {i + 1} · {slideMeta}
-                        </div>
-                        <div
-                          className="lyric"
-                          style={{
-                            fontSize: 13.5,
-                            lineHeight: 1.5,
-                            color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-2)',
-                          }}
-                        >
-                          {slide.lines.length === 0 ? (
-                            <span style={{ color: 'var(--ink-3)' }}>(빈 슬라이드)</span>
-                          ) : (
-                            slide.lines.map((l, j) => <div key={j}>{l}</div>)
-                          )}
-                        </div>
-                        {isOverflow && (
-                          <div
-                            className="caption"
-                            style={{ marginTop: 6, color: 'var(--accent-ink)' }}
-                          >
-                            한 슬라이드 최대 4줄 · 줄당 최대 17~32자(줄수에 따라). 콘티
-                            편집에서 분리해주세요.
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {isEmpty && (
-                <div className="caption" style={{ color: 'var(--ink-3)' }}>
-                  콘티 편집에 섹션을 추가하면 여기에 슬라이드 미리보기가 나타납니다.
-                </div>
-              )}
-            </div>
           </div>
 
-          <div className="stack" style={cssVar('--gap', '32px')}>
+          <div className="stack" style={{ ...cssVar('--gap', '32px'), gridArea: 'right' }}>
             {/* === 우측: 편집창 (sticky — 좌측 스크롤해도 화면 고정) === */}
             <aside
               className="editor-pane"
@@ -1763,6 +1676,119 @@ export default function Home() {
               </footer>
             </aside>
           </div>
+
+          {/* === 4. PPT 제작 (grid-area: ppt) ===
+              데스크톱: 좌측 컬럼 하단 영역에 자리.
+              모바일: 1·2·3 다음 마지막 순서로 자연스럽게 흐름. */}
+          <div
+            className="stack"
+            style={{ ...cssVar('--gap', '16px'), gridArea: 'ppt' }}
+          >
+            <div className="label">4. PPT 제작</div>
+
+            {/* 사용자 가이드 — 슬라이드당 가사 양 권장 + 분리 방법. */}
+            <div className="caption" style={{ color: 'var(--ink-2)', lineHeight: 1.6 }}>
+              한 슬라이드는 <span style={{ color: 'var(--ink)', fontWeight: 600 }}>2~3줄</span>일 때 가장 깔끔하게 만들어집니다 (최대 4줄).
+              <br />
+              콘티 편집에서 가사 안 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 거기서 슬라이드가 나뉘어요.
+            </div>
+
+            {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select
+                value={pptFont}
+                onChange={(e) => setPptFont(e.target.value as PptFont)}
+                aria-label="PPT 폰트 선택"
+                style={{
+                  padding: '10px 14px',
+                  border: '1px solid var(--rule)',
+                  borderRadius: 2,
+                  background: 'var(--paper)',
+                  color: 'var(--ink)',
+                  fontFamily: 'var(--sans)',
+                  fontSize: 14,
+                }}
+              >
+                {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => (
+                  <option key={f} value={f}>
+                    {PPT_FONT_LABELS[f]}
+                  </option>
+                ))}
+              </select>
+              <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
+                PPT 다운로드 (.pptx)
+              </button>
+            </div>
+
+            {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
+                한도 초과 시 빨강 표시. */}
+            {!isEmpty && (
+              <div className="stack" style={cssVar('--gap', '8px')}>
+                {docToSlides().map((slide, i) => {
+                  const v = validateSlide(slide);
+                  const isOverflow = !v.ok;
+                  const slideMeta = 'fontSize' in v
+                    ? `${v.lineCount}줄 · ${v.fontSize}pt`
+                    : v.reason === 'too-many-lines'
+                      ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
+                      : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        border:
+                          '1px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
+                        borderLeft:
+                          '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--ink)'),
+                        padding: '12px 14px',
+                        borderRadius: 2,
+                        background: 'color-mix(in oklab, var(--paper) 70%, white)',
+                      }}
+                    >
+                      <div
+                        className="mono"
+                        style={{
+                          marginBottom: 6,
+                          color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
+                        }}
+                      >
+                        슬라이드 {i + 1} · {slideMeta}
+                      </div>
+                      <div
+                        className="lyric"
+                        style={{
+                          fontSize: 13.5,
+                          lineHeight: 1.5,
+                          color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-2)',
+                        }}
+                      >
+                        {slide.lines.length === 0 ? (
+                          <span style={{ color: 'var(--ink-3)' }}>(빈 슬라이드)</span>
+                        ) : (
+                          slide.lines.map((l, j) => <div key={j}>{l}</div>)
+                        )}
+                      </div>
+                      {isOverflow && (
+                        <div
+                          className="caption"
+                          style={{ marginTop: 6, color: 'var(--accent-ink)' }}
+                        >
+                          한 슬라이드 최대 4줄 · 줄당 최대 17~32자(줄수에 따라). 콘티
+                          편집에서 분리해주세요.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {isEmpty && (
+              <div className="caption" style={{ color: 'var(--ink-3)' }}>
+                콘티 편집에 섹션을 추가하면 여기에 슬라이드 미리보기가 나타납니다.
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
@@ -1795,6 +1821,171 @@ export default function Home() {
 
       {/* 토스트 알림 */}
       {toast && <div className="toast">{toast}</div>}
+
+      {/* 도움말 모달 — 헤더 [사용법] 버튼으로 열림. ESC/배경 클릭/✕로 닫힘. */}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+    </div>
+  );
+}
+
+// ============== 도움말 모달 ==============
+// USAGE.md의 핵심 내용을 React 컴포넌트로 직접 작성. 외부 마크다운 파서 의존성 없이 정적 가이드.
+function HelpModal({ onClose }: { onClose: () => void }) {
+  // ESC 키로 닫기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="콘티노트 사용법"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(31, 27, 22, 0.55)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--paper)',
+          maxWidth: 680,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          borderRadius: 4,
+          padding: '32px 32px 24px',
+          position: 'relative',
+          boxShadow: '0 20px 60px -10px rgba(0,0,0,0.3)',
+          border: '1px solid var(--rule)',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="닫기"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid var(--rule)',
+            background: 'var(--paper)',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          ✕
+        </button>
+
+        <h2 className="h-song" style={{ margin: '0 0 6px', fontSize: 26 }}>
+          콘티노트 사용법
+        </h2>
+        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 24 }}>
+          찬양팀·예배 사역자를 위한 AI 콘티 메이커
+        </p>
+
+        <Section title="빠른 시작 (5단계)">
+          <ol style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>악보 업로드 (JPG/PNG/PDF, 최대 12개)</li>
+            <li><b>가사 추출하기</b> 클릭</li>
+            <li>좌측 결과에서 곡 제목 + 섹션 카드 클릭 → 우측 콘티에 추가</li>
+            <li>가사 안에서 <b>Enter 두 번</b>(빈 줄)으로 슬라이드 분리</li>
+            <li><b>PPT 다운로드 (.pptx)</b></li>
+          </ol>
+        </Section>
+
+        <Section title="슬라이드 분리 4가지 방법">
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>
+              <b>Enter 두 번</b>(가장 직관적) — 가사 안에서 빈 줄 만들면 거기서 분리. 백스페이스로 빈 줄 지우면 즉시 합쳐짐.
+            </li>
+            <li><b>섹션 경계</b> — Verse 다음에 후렴이면 자동 분리</li>
+            <li><b>+ 슬라이드 구분</b> 버튼 — 콘티 헤더에서 명시적 분리자 추가</li>
+            <li><b>합치기</b> — Enter 한 번(줄바꿈)만 하면 같은 슬라이드 안 여러 줄</li>
+          </ul>
+        </Section>
+
+        <Section title="글자수 / 사이즈 한도 (자동 적용)">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--rule)' }}>
+                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>줄 수</th>
+                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>폰트 사이즈</th>
+                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>줄당 글자(띄어쓰기 포함)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>64pt</td><td style={{ padding: '6px 4px' }}>17자</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>54pt</td><td style={{ padding: '6px 4px' }}>21자</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>44pt</td><td style={{ padding: '6px 4px' }}>26자</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>36pt</td><td style={{ padding: '6px 4px' }}>32자</td></tr>
+              <tr><td style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>5줄+</td><td colSpan={2} style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>분리 필요 (빨강 알림)</td></tr>
+            </tbody>
+          </table>
+          <p className="caption" style={{ color: 'var(--ink-3)', marginTop: 8 }}>
+            한도 통과 후에도 미세하게 박스 넘으면 PowerPoint가 자동으로 살짝 축소해서 한 줄에 맞춥니다.
+          </p>
+        </Section>
+
+        <Section title="자주 묻는 질문">
+          <FAQ q="정확도 우선과 기본 모드 차이?" a="정확도 ON은 PDF를 고화질(scale 2)로 변환하고 AI가 더 신중히 동작. 흐릿한 PDF에서 효과적이고 시간은 살짝 더 걸립니다." />
+          <FAQ q="가사가 빠지거나 잘못 추출됐어요." a="정확도 우선 토글 켜고 다시 추출. 그래도 안 되면 ✎ 버튼으로 직접 수정." />
+          <FAQ q="곡 카드의 ✕로 곡을 지우면 콘티에도 영향?" a="네, 그 곡과 연결된 콘티 블록도 함께 삭제됩니다. confirm으로 미리 확인합니다." />
+          <FAQ q="PPT 폰트가 다른 걸로 보여요." a="시스템에 그 폰트가 설치돼 있어야 정확히 표시됩니다. 본명조 Pro(Noto Serif KR)가 호환성이 가장 좋아 추천." />
+        </Section>
+
+        <Section title="다른 다운로드 형식">
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li><b>TXT</b> — 콘티 텍스트만 (제목은 ━━━ 강조)</li>
+            <li><b>DOCX</b> — 워드 문서 (제목 가운데 헤딩)</li>
+            <li><b>클립보드 복사</b> — 콘티 전체 텍스트</li>
+          </ul>
+        </Section>
+
+        <p className="caption" style={{ color: 'var(--ink-3)', textAlign: 'center', marginTop: 24 }}>
+          전체 가이드는 GitHub의 USAGE.md에서 볼 수 있어요.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <h3
+        className="label"
+        style={{ marginBottom: 10, fontSize: 13, color: 'var(--ink)' }}
+      >
+        {title}
+      </h3>
+      <div style={{ fontSize: 14.5, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FAQ({ q, a }: { q: string; a: string }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 2 }}>Q. {q}</div>
+      <div style={{ color: 'var(--ink-2)' }}>{a}</div>
     </div>
   );
 }
