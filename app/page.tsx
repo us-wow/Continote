@@ -463,6 +463,39 @@ export default function Home() {
     setDoc((d) => arrayMove(d, oldIdx, newIdx));
   };
 
+  // 콘티 편집창에서 section 본문 맨 앞 Backspace → 위 section과 합치기.
+  // doc 안에서 idx 위쪽의 가장 가까운 section을 찾아 body를 이어 붙이고, 사이의 spacer/현재 section은 제거한다.
+  // title을 만나면 멈춤 (제목과 가사를 합치지 않는다).
+  const mergeWithPrev = (idx: number) => {
+    setDoc((d) => {
+      if (idx <= 0) return d;
+      let prevIdx = -1;
+      for (let i = idx - 1; i >= 0; i--) {
+        const b = d[i];
+        if (b.kind === 'title') return d; // title 위에선 합치지 않음
+        if (b.kind === 'section') {
+          prevIdx = i;
+          break;
+        }
+      }
+      if (prevIdx === -1) return d;
+      const prev = d[prevIdx];
+      const cur = d[idx];
+      if (prev.kind !== 'section' || cur.kind !== 'section') return d;
+      // 두 본문 사이에 빈 줄을 넣지 않고 자연스럽게 이어붙임 (사용자가 의도하면 다시 Enter로 빈 줄 추가).
+      const merged = {
+        ...prev,
+        body: prev.body && cur.body ? `${prev.body}\n${cur.body}` : prev.body || cur.body,
+      };
+      // prevIdx 위치만 merged로 교체, prevIdx 다음부터 idx까지(spacer + 현재 section) 제거
+      return d.flatMap((b, i) => {
+        if (i === prevIdx) return [merged];
+        if (i > prevIdx && i <= idx) return [];
+        return [b];
+      });
+    });
+  };
+
   // "2. 추출된 곡" 영역의 섹션 카드 드래그 — 같은 곡 안 song.sections를 재정렬한다.
   // 다른 곡으로 이동은 막아서(같은 SortableContext만) 라벨 자동 갱신과 충돌 없게 한다.
   const handleSectionDragEnd = (event: DragEndEvent, songIdx: number) => {
@@ -1818,6 +1851,7 @@ export default function Home() {
                               onMoveDown={() => moveBlockDown(i)}
                               canMoveUp={findPrevContentIdx(i) !== -1}
                               canMoveDown={findNextContentIdx(i) !== -1}
+                              onMergeWithPrev={() => mergeWithPrev(i)}
                             />
                           </SortableBlock>
                         ))}
@@ -2505,6 +2539,7 @@ function EditorBlockView({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  onMergeWithPrev,
 }: {
   block: Block;
   onUpdate: (next: Block) => void;
@@ -2513,6 +2548,8 @@ function EditorBlockView({
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  // 커서가 section 본문 맨 앞 + Backspace → 위 section과 합치기 트리거
+  onMergeWithPrev?: () => void;
 }) {
   // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
   const editableRef = useRef<HTMLElement | null>(null);
@@ -2809,6 +2846,29 @@ function EditorBlockView({
         // innerText === expected 비교로 무한 루프를 막아준다.
         onFocus={() => {
           sectionFocusTextRef.current = block.body;
+        }}
+        onKeyDown={(e) => {
+          // 본문 맨 앞에서 Backspace → 위 section과 합치기 (사용자가 두 섹션을 자연스럽게 이어붙이고 싶을 때)
+          if (e.key === 'Backspace' && onMergeWithPrev) {
+            const sel = window.getSelection();
+            if (
+              sel &&
+              sel.isCollapsed &&
+              sel.anchorOffset === 0 &&
+              // contentEditable 안 첫 번째 텍스트 노드/요소에 커서가 있는 경우만
+              e.currentTarget.contains(sel.anchorNode)
+            ) {
+              // 추가 안전장치: 첫 줄 첫 글자 앞인지 확인
+              const range = sel.getRangeAt(0);
+              const preRange = document.createRange();
+              preRange.selectNodeContents(e.currentTarget as HTMLDivElement);
+              preRange.setEnd(range.startContainer, range.startOffset);
+              if (preRange.toString().length === 0) {
+                e.preventDefault();
+                onMergeWithPrev();
+              }
+            }
+          }
         }}
         onInput={(e) => onUpdate({ ...block, body: (e.currentTarget as HTMLDivElement).innerText })}
         onBlur={(e) => {

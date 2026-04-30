@@ -121,10 +121,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { images, text, accuracyMode } = body as {
+    const { images, text, accuracyMode, hint } = body as {
       images?: { data: string; mimeType: string }[];
       text?: string;
       accuracyMode?: boolean;
+      // OCR 학습 힌트 — 클라이언트가 lib/ocr-learning.ts의 buildCorrectionHint()로 만든 텍스트.
+      // 사용자 이전 수정 패턴을 system prompt 끝에 붙여 같은 실수를 줄인다.
+      hint?: string;
     };
 
     // 큰 이미지 요청은 Gemini 호출 전에 차단해 서버 메모리 사용량과
@@ -150,13 +153,15 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     // Pro 모델은 thinking 토큰으로 JSON 응답이 흔들릴 수 있어 Flash로 고정한다.
     // 정확도 모드는 temperature만 낮춰 가사 추출 변동성을 줄인다.
+    // hint가 있으면 system prompt 끝에 붙여 사용자 수정 패턴을 학습한 것처럼 동작하도록 유도한다.
+    const systemPrompt = hint && hint.trim() ? `${SYSTEM_PROMPT}${hint}` : SYSTEM_PROMPT;
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: accuracyMode ? 0.05 : 0.2,
       },
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: systemPrompt,
     });
 
     const parts: any[] = [];
