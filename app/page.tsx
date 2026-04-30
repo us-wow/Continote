@@ -12,6 +12,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
+import { encodeStateToHash, decodeHashToState } from '@/lib/url-sync';
 import {
   exportToPptx,
   validateSlide,
@@ -47,6 +48,22 @@ type Block =
 // TS가 기본 CSSProperties에 -- 시작 키를 안 받으므로 캐스팅 필요
 const cssVar = (name: string, value: string): React.CSSProperties =>
   ({ [name]: value } as React.CSSProperties);
+
+// PPT 미리보기 배경 — lib/pptx.ts의 실제 테마 키와 맞춘다.
+const themeBackground = (theme: PptTheme): string => {
+  switch (theme) {
+    case 'black':    return '#000000';
+    case 'white':    return '#FFFFFF';
+    case 'paper':    return '#FAF5EC';
+    case 'gradient': return 'linear-gradient(180deg, #FAF5EC 0%, #1F1B16 100%)';
+    case 'meadow':   return 'linear-gradient(180deg, #7BA776 0%, #2E5232 100%)';
+    case 'cross':    return 'linear-gradient(180deg, #4B3F72 0%, #1F1B36 100%)';
+    case 'bible':    return 'linear-gradient(180deg, #A37D5C 0%, #4A3422 100%)';
+  }
+};
+
+const themeText = (theme: PptTheme): string =>
+  theme === 'white' || theme === 'paper' ? '#1F1B16' : '#FFFFFF';
 
 // type별 기본 표시 이름 (한국 찬양팀 관행 기준)
 const TYPE_BASE_LABEL: Record<SectionType, string> = {
@@ -444,6 +461,12 @@ export default function Home() {
     showToast('복사됨');
   };
 
+  const handleCopyShareLink = () => {
+    const hash = encodeStateToHash({ songs, doc });
+    const url = `${window.location.origin}${window.location.pathname}#${hash}`;
+    navigator.clipboard.writeText(url).then(() => showToast('공유 링크 복사됨'));
+  };
+
   const handleSaveTxt = () => {
     if (!serializeDoc.trim()) {
       showToast('비어있어요');
@@ -550,6 +573,20 @@ export default function Home() {
       });
     }
   }, [doc.length]);
+
+  // 공유 링크로 진입한 경우 URL hash에서 콘티 상태를 자동 복원한다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash) return;
+    const restored = decodeHashToState<{ songs: Song[]; doc: Block[] }>(hash);
+    if (restored && Array.isArray(restored.songs) && Array.isArray(restored.doc)) {
+      setSongs(restored.songs);
+      setDoc(restored.doc);
+      showToast('공유 링크에서 콘티를 복원했어요');
+      // 복원 후 hash는 그대로 유지 (사용자가 다시 공유 가능)
+    }
+  }, []);
 
   // 파일 추가/제거 시 실제 썸네일 생성
   // 이미지는 base64 data URL(FileReader)로, PDF는 PDF.js로 첫 페이지 렌더링.
@@ -1676,6 +1713,14 @@ export default function Home() {
                   <button className="btn-text" disabled={isEmpty} onClick={handleCopy}>
                     클립보드 복사
                   </button>
+                  <button
+                    className="btn-text"
+                    disabled={isEmpty}
+                    onClick={handleCopyShareLink}
+                    title="이 콘티를 공유 링크로 복사 (URL hash에 인코딩, 외부 서버 X)"
+                  >
+                    공유 링크 복사
+                  </button>
                 </div>
               </footer>
             </aside>
@@ -1719,7 +1764,7 @@ export default function Home() {
                   </option>
                 ))}
               </select>
-              {/* 테마 — 검정/흰색/종이 톤 3종. 예배 환경에 맞춰 선택. */}
+              {/* 테마 — PPT_THEME_LABELS의 모든 테마를 자동 표시한다. */}
               <select
                 value={pptTheme}
                 onChange={(e) => setPptTheme(e.target.value as PptTheme)}
@@ -1764,13 +1809,11 @@ export default function Home() {
                     : v.reason === 'too-many-lines'
                       ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
                       : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
-                  // 테마별 배경/글자색을 미리보기에도 동일 적용 — 실제 PPT와 시각 일치.
-                  const themeBg =
-                    pptTheme === 'black' ? '#000000'
-                    : pptTheme === 'white' ? '#FFFFFF'
-                    : '#FAF5EC';
-                  const themeText =
-                    pptTheme === 'black' ? '#FFFFFF' : '#1F1B16';
+                  const needsTextBackdrop =
+                    pptTheme === 'gradient' ||
+                    pptTheme === 'meadow' ||
+                    pptTheme === 'cross' ||
+                    pptTheme === 'bible';
                   return (
                     <div key={i}>
                       <div
@@ -1786,8 +1829,8 @@ export default function Home() {
                       <div
                         style={{
                           aspectRatio: '16 / 9',
-                          background: themeBg,
-                          color: themeText,
+                          background: themeBackground(pptTheme),
+                          color: themeText(pptTheme),
                           borderRadius: 4,
                           border:
                             '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
@@ -1805,6 +1848,19 @@ export default function Home() {
                       >
                         {slide.lines.length === 0 ? (
                           <span style={{ opacity: 0.4 }}>(빈 슬라이드)</span>
+                        ) : needsTextBackdrop ? (
+                          // 그라데이션/이미지 테마는 글자 뒤에 반투명 검정 박스로 가독성 보장
+                          <div
+                            style={{
+                              background: 'rgba(0,0,0,0.35)',
+                              padding: '8px 12px',
+                              borderRadius: 2,
+                            }}
+                          >
+                            {slide.lines.map((l, j) => (
+                              <div key={j}>{l}</div>
+                            ))}
+                          </div>
                         ) : (
                           <div>
                             {slide.lines.map((l, j) => (
