@@ -463,6 +463,24 @@ export default function Home() {
     setDoc((d) => arrayMove(d, oldIdx, newIdx));
   };
 
+  // "2. 추출된 곡" 영역의 섹션 카드 드래그 — 같은 곡 안 song.sections를 재정렬한다.
+  // 다른 곡으로 이동은 막아서(같은 SortableContext만) 라벨 자동 갱신과 충돌 없게 한다.
+  const handleSectionDragEnd = (event: DragEndEvent, songIdx: number) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const sections = songs[songIdx]?.sections;
+    if (!sections) return;
+    const ids = sections.map((_, i) => `sec-${songIdx}-${i}`);
+    const oldIdx = ids.indexOf(active.id as string);
+    const newIdx = ids.indexOf(over.id as string);
+    if (oldIdx === -1 || newIdx === -1) return;
+    setSongs((prev) =>
+      prev.map((s, i) =>
+        i === songIdx ? { ...s, sections: arrayMove(s.sections, oldIdx, newIdx) } : s
+      )
+    );
+  };
+
   const findPrevContentIdx = useCallback((idx: number) => {
     for (let i = idx - 1; i >= 0; i--) {
       if (doc[i].kind !== 'spacer') return i;
@@ -1398,7 +1416,17 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* 섹션 카드들 — 편집 모드면 인라인 에디터, 아니면 클릭 삽입 + ✎ 수정 */}
+                    {/* 섹션 카드들 — 편집 모드면 인라인 에디터, 아니면 클릭 삽입 + ✎ 수정.
+                        같은 곡 안에서 섹션 순서를 드래그앤드롭으로 바꿀 수 있다. */}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(e) => handleSectionDragEnd(e, songIdx)}
+                    >
+                      <SortableContext
+                        items={song.sections.map((_, i) => `sec-${songIdx}-${i}`)}
+                        strategy={verticalListSortingStrategy}
+                      >
                     <div className="stack" style={cssVar('--gap', '10px')}>
                       {song.sections.map((sec, secIdx) => {
                         const id = sectionId(songIdx, secIdx);
@@ -1407,11 +1435,12 @@ export default function Home() {
                         const previewLines = sec.text.split('\n').filter((l) => l.trim());
                         const isEditing = editingCardKey === cardKey;
 
+                        const sortableId = `sec-${songIdx}-${secIdx}`;
                         if (isEditing && cardDraft) {
                           // ===== 섹션 편집 모드 =====
                           return (
+                            <SortableBlock key={sortableId} id={sortableId}>
                             <div
-                              key={secIdx}
                               style={{
                                 border: '1px solid var(--accent)',
                                 borderLeft: '2px solid var(--accent)',
@@ -1509,6 +1538,7 @@ export default function Home() {
                                 </button>
                               </div>
                             </div>
+                            </SortableBlock>
                           );
                         }
 
@@ -1518,7 +1548,8 @@ export default function Home() {
                         const canSecUp = secIdx > 0;
                         const canSecDown = secIdx < song.sections.length - 1;
                         return (
-                          <div key={secIdx} style={{ position: 'relative' }}>
+                          <SortableBlock key={sortableId} id={sortableId}>
+                          <div style={{ position: 'relative' }}>
                             <article
                               className="section-card"
                               onClick={() => insertSection(sec, songIdx, secIdx)}
@@ -1654,6 +1685,7 @@ export default function Home() {
                               ✎
                             </button>
                           </div>
+                          </SortableBlock>
                         );
                       })}
 
@@ -1666,6 +1698,8 @@ export default function Home() {
                         + 섹션 추가
                       </button>
                     </div>
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 ))}
 
