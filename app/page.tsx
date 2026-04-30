@@ -10,9 +10,27 @@
 // 4. 섹션 카드 클릭 → 칩 + 가사 블록으로 추가 (중복 허용 — 후렴은 여러 번 들어가야 함)
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  KeyboardSensor,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
 import { encodeStateToHash, decodeHashToState } from '@/lib/url-sync';
+import { recordCorrection, buildCorrectionHint } from '@/lib/ocr-learning';
 import {
   listSavedSets,
   saveSet,
@@ -63,7 +81,6 @@ const themeBackground = (theme: PptTheme): string => {
     case 'black':    return '#000000';
     case 'white':    return '#FFFFFF';
     case 'paper':    return '#FAF5EC';
-    case 'gradient': return 'linear-gradient(180deg, #FAF5EC 0%, #1F1B16 100%)';
     case 'meadow':   return "url('/pptx-bg-meadow.jpg') center/cover";
     case 'cross':    return "url('/pptx-bg-cross.jpg') center/cover";
     case 'bible':    return "url('/pptx-bg-bible.jpg') center/cover";
@@ -71,7 +88,7 @@ const themeBackground = (theme: PptTheme): string => {
 };
 
 const themeText = (theme: PptTheme): string =>
-  theme === 'white' || theme === 'paper' ? '#1F1B16' : '#FFFFFF';
+  theme === 'black' ? '#FFFFFF' : '#1F1B16';
 
 // type별 기본 표시 이름 (한국 찬양팀 관행 기준)
 const TYPE_BASE_LABEL: Record<SectionType, string> = {
@@ -119,6 +136,7 @@ export default function Home() {
   const [pasted, setPasted] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
+  const [progressStep, setProgressStep] = useState<0 | 1 | 2 | 3>(0);
   const [toast, setToast] = useState('');
   const [dragging, setDragging] = useState(false);
   // 정확도 우선 모드는 서버 분석 프롬프트를 더 보수적으로 쓰게 하므로, 업로드/붙여넣기 요청에 함께 전달한다.
@@ -163,13 +181,15 @@ export default function Home() {
     // 직접 가사 붙여넣기 모드: 텍스트만 보냄
     if (pasteMode && pasted.trim()) {
       setExtracting(true);
+      setProgressStep(1);
       setLoadingMsg('가사를 분석 중');
       try {
+        setProgressStep(3);
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          // 같은 UI 토글이 텍스트 분석과 이미지 분석 모두에 동일하게 적용되어야 한다.
-          body: JSON.stringify({ text: pasted.trim(), accuracyMode }),
+          // OCR 수정 이력은 서버가 활용할 수 있도록 힌트로만 전달한다.
+          body: JSON.stringify({ text: pasted.trim(), accuracyMode, hint: buildCorrectionHint() }),
         });
         // 서버가 JSON이 아닌 응답(HTML 에러 페이지 등) 반환하면 res.json()이 throw —
         // try/catch로 감싸 의미있는 에러 메시지로 변환
@@ -191,6 +211,7 @@ export default function Home() {
         showToast(`오류: ${err.message}`);
       } finally {
         setExtracting(false);
+        setProgressStep(0);
       }
       return;
     }
@@ -201,6 +222,7 @@ export default function Home() {
     }
 
     setExtracting(true);
+    setProgressStep(1);
     setLoadingMsg('파일을 준비 중');
 
     try {
@@ -209,12 +231,14 @@ export default function Home() {
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         if (f.type === 'application/pdf') {
+          setProgressStep(2);
           setLoadingMsg(`PDF 변환 중 (${i + 1}/${files.length})`);
           // 정확도 모드에서는 고해상도 렌더링이 OCR 판독 품질에 직접 영향을 준다.
           // 기본 모드는 lib/pdf.ts의 동적 scale 분기를 유지해 속도와 품질 균형을 맡긴다.
           const pages = await pdfToImages(f, accuracyMode ? 2 : undefined);
           for (const p of pages) images.push({ data: p.data, mimeType: p.mimeType });
         } else if (f.type.startsWith('image/')) {
+          setProgressStep(2);
           const img = await fileToBase64(f);
           images.push(img);
         } else {
@@ -225,12 +249,13 @@ export default function Home() {
         showToast('분석할 이미지가 없어요');
         return;
       }
+      setProgressStep(3);
       setLoadingMsg(`AI가 가사 추출 중 (${images.length}장)`);
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // 이미지 분석도 사용자가 고른 정확도 모드를 서버에서 판단할 수 있게 함께 보낸다.
-        body: JSON.stringify({ images, accuracyMode }),
+        // 이미지 분석도 사용자가 고른 정확도 모드와 OCR 수정 힌트를 서버에서 판단할 수 있게 함께 보낸다.
+        body: JSON.stringify({ images, accuracyMode, hint: buildCorrectionHint() }),
       });
       // res.json() 실패 시 의미있는 에러로 변환
       let data: any;
@@ -250,6 +275,7 @@ export default function Home() {
       showToast(`오류: ${err.message}`);
     } finally {
       setExtracting(false);
+      setProgressStep(0);
     }
   };
 
@@ -416,6 +442,25 @@ export default function Home() {
       [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
       return next;
     });
+  };
+
+  const blockIds = useMemo(() => doc.map((_, i) => `block-${i}`), [doc]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // 드래그 시작 거리(8px)를 두는 이유 — 의도하지 않은 드래그 방지
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = blockIds.indexOf(active.id as string);
+    const newIdx = blockIds.indexOf(over.id as string);
+    if (oldIdx === -1 || newIdx === -1) return;
+    setDoc((d) => arrayMove(d, oldIdx, newIdx));
   };
 
   const findPrevContentIdx = useCallback((idx: number) => {
@@ -674,6 +719,11 @@ export default function Home() {
     const [songIdxStr, secIdxStr] = editingCardKey.split('-');
     const songIdx = Number(songIdxStr);
     const secIdx = Number(secIdxStr);
+    const originalText = songs[songIdx]?.sections[secIdx]?.text ?? '';
+    // 사용자가 추출 결과를 직접 고친 패턴을 다음 OCR 요청의 약한 힌트로 저장한다.
+    if (originalText.trim() !== cardDraft.text.trim()) {
+      recordCorrection(originalText, cardDraft.text);
+    }
     setSongs((prev) =>
       prev.map((s, i) =>
         i !== songIdx
@@ -1051,27 +1101,53 @@ export default function Home() {
               </div>
 
               {/* 메인 추출 버튼 */}
-              <button
-                className="btn-primary"
-                onClick={handleExtract}
-                disabled={extracting || (files.length === 0 && !pasted.trim())}
-                title="가사 추출하기 (⌘+Enter)"
-              >
-                {extracting ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
-                    <span>{loadingMsg || '가사 추출 중'}</span>
-                    <span style={{ display: 'inline-flex', gap: 4 }}>
-                      <span className="ink-dot" style={{ background: '#fff' }} />
-                      <span className="ink-dot" style={{ background: '#fff' }} />
-                      <span className="ink-dot" style={{ background: '#fff' }} />
+              <div>
+                <button
+                  className="btn-primary"
+                  onClick={handleExtract}
+                  disabled={extracting || (files.length === 0 && !pasted.trim())}
+                  title="가사 추출하기 (⌘+Enter)"
+                  style={{ width: '100%' }}
+                >
+                  {extracting ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+                      <span>{loadingMsg || '가사 추출 중'}</span>
+                      <span style={{ display: 'inline-flex', gap: 4 }}>
+                        <span className="ink-dot" style={{ background: '#fff' }} />
+                        <span className="ink-dot" style={{ background: '#fff' }} />
+                        <span className="ink-dot" style={{ background: '#fff' }} />
+                      </span>
                     </span>
-                  </span>
-                ) : hasResult ? (
-                  '다시 추출하기'
-                ) : (
-                  '가사 추출하기'
+                  ) : hasResult ? (
+                    '다시 추출하기'
+                  ) : (
+                    '가사 추출하기'
+                  )}
+                </button>
+                {extracting && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                    {['파일 준비', '이미지 변환', 'AI 분석'].map((label, i) => {
+                      const stepIdx = i + 1;
+                      const active = progressStep === stepIdx;
+                      const done = progressStep > stepIdx;
+                      return (
+                        <div key={i} style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          borderRadius: 2,
+                          border: '1px solid ' + (active ? 'var(--accent)' : 'var(--rule)'),
+                          background: done ? 'color-mix(in oklab, var(--accent) 18%, var(--paper))' : 'var(--paper)',
+                          color: active || done ? 'var(--accent-ink)' : 'var(--ink-3)',
+                          textAlign: 'center',
+                          fontWeight: active ? 600 : 400,
+                        }}>
+                          {done ? '✓ ' : ''}{label}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-              </button>
+              </div>
             </div>
 
             <hr className="divider" />
@@ -1692,18 +1768,27 @@ export default function Home() {
                   </div>
                 ) : (
                   <div>
-                    {doc.map((b, i) => (
-                      <EditorBlockView
-                        key={i}
-                        block={b}
-                        onUpdate={(next) => updateBlock(i, next)}
-                        onRemove={() => removeBlock(i)}
-                        onMoveUp={() => moveBlockUp(i)}
-                        onMoveDown={() => moveBlockDown(i)}
-                        canMoveUp={findPrevContentIdx(i) !== -1}
-                        canMoveDown={findNextContentIdx(i) !== -1}
-                      />
-                    ))}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
+                        {doc.map((b, i) => (
+                          <SortableBlock key={blockIds[i]} id={blockIds[i]}>
+                            <EditorBlockView
+                              block={b}
+                              onUpdate={(next) => updateBlock(i, next)}
+                              onRemove={() => removeBlock(i)}
+                              onMoveUp={() => moveBlockUp(i)}
+                              onMoveDown={() => moveBlockDown(i)}
+                              canMoveUp={findPrevContentIdx(i) !== -1}
+                              canMoveDown={findNextContentIdx(i) !== -1}
+                            />
+                          </SortableBlock>
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 )}
               </div>
@@ -1829,11 +1914,8 @@ export default function Home() {
                     : v.reason === 'too-many-lines'
                       ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
                       : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
-                  const needsTextBackdrop =
-                    pptTheme === 'gradient' ||
-                    pptTheme === 'meadow' ||
-                    pptTheme === 'cross' ||
-                    pptTheme === 'bible';
+                  const needsWhiteOverlay =
+                    pptTheme === 'meadow' || pptTheme === 'cross' || pptTheme === 'bible';
                   return (
                     <div key={i}>
                       <div
@@ -1864,25 +1946,22 @@ export default function Home() {
                           fontSize: 'fontSize' in v ? `${v.fontSize * 0.18}px` : '11px',
                           lineHeight: 1.35,
                           overflow: 'hidden',
+                          position: 'relative',
                         }}
                       >
-                        {slide.lines.length === 0 ? (
-                          <span style={{ opacity: 0.4 }}>(빈 슬라이드)</span>
-                        ) : needsTextBackdrop ? (
-                          // 그라데이션/이미지 테마는 글자 뒤에 반투명 검정 박스로 가독성 보장
+                        {needsWhiteOverlay && (
                           <div
                             style={{
-                              background: 'rgba(0,0,0,0.35)',
-                              padding: '8px 12px',
-                              borderRadius: 2,
+                              position: 'absolute',
+                              inset: 0,
+                              background: 'rgba(255,255,255,0.65)',
                             }}
-                          >
-                            {slide.lines.map((l, j) => (
-                              <div key={j}>{l}</div>
-                            ))}
-                          </div>
+                          />
+                        )}
+                        {slide.lines.length === 0 ? (
+                          <span style={{ opacity: 0.4, position: 'relative', zIndex: 1 }}>(빈 슬라이드)</span>
                         ) : (
-                          <div>
+                          <div style={{ position: 'relative', zIndex: 1 }}>
                             {slide.lines.map((l, j) => (
                               <div key={j}>{l}</div>
                             ))}
@@ -2358,6 +2437,25 @@ function SavedSetsModal({
 
 
 // ============== 편집창 안의 블록 렌더링 ==============
+function SortableBlock({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        position: 'relative',
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
+
 // title / section / spacer 세 종류를 분기 처리
 // section 본문은 contentEditable로 인라인 수정 가능
 //
@@ -2384,6 +2482,7 @@ function EditorBlockView({
 }) {
   // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
   const editableRef = useRef<HTMLElement | null>(null);
+  const sectionFocusTextRef = useRef('');
   const [isSectionHovered, setIsSectionHovered] = useState(false);
 
   // block 텍스트가 외부에서 바뀐 경우(블록 추가, 다른 곳 편집)에만 DOM 갱신
@@ -2674,8 +2773,18 @@ function EditorBlockView({
         // onInput으로 실시간 반영 — Enter로 만든 빈 줄을 백스페이스로 지우자마자
         // PPT 미리보기가 즉시 합쳐지도록(역방향 호환). useEffect의 동기화 로직이
         // innerText === expected 비교로 무한 루프를 막아준다.
+        onFocus={() => {
+          sectionFocusTextRef.current = block.body;
+        }}
         onInput={(e) => onUpdate({ ...block, body: (e.currentTarget as HTMLDivElement).innerText })}
-        onBlur={(e) => onUpdate({ ...block, body: e.currentTarget.innerText })}
+        onBlur={(e) => {
+          const nextBody = e.currentTarget.innerText;
+          // 사용자가 본문을 직접 고친 패턴을 다음 OCR 요청의 약한 힌트로 저장한다.
+          if (sectionFocusTextRef.current.trim() !== nextBody.trim()) {
+            recordCorrection(sectionFocusTextRef.current, nextBody);
+          }
+          onUpdate({ ...block, body: nextBody });
+        }}
         className="lyric"
         style={{
           outline: 'none',
