@@ -14,6 +14,13 @@ import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
 import { encodeStateToHash, decodeHashToState } from '@/lib/url-sync';
 import {
+  listSavedSets,
+  saveSet,
+  removeSet,
+  formatSavedAt,
+  type SavedSet,
+} from '@/lib/conti-storage';
+import {
   exportToPptx,
   validateSlide,
   PPT_FONT_LABELS,
@@ -50,15 +57,16 @@ const cssVar = (name: string, value: string): React.CSSProperties =>
   ({ [name]: value } as React.CSSProperties);
 
 // PPT 미리보기 배경 — lib/pptx.ts의 실제 테마 키와 맞춘다.
+// meadow/cross/bible은 public/에 다운로드된 무료 저작권 이미지(Unsplash) 사용.
 const themeBackground = (theme: PptTheme): string => {
   switch (theme) {
     case 'black':    return '#000000';
     case 'white':    return '#FFFFFF';
     case 'paper':    return '#FAF5EC';
     case 'gradient': return 'linear-gradient(180deg, #FAF5EC 0%, #1F1B16 100%)';
-    case 'meadow':   return 'linear-gradient(180deg, #7BA776 0%, #2E5232 100%)';
-    case 'cross':    return 'linear-gradient(180deg, #4B3F72 0%, #1F1B36 100%)';
-    case 'bible':    return 'linear-gradient(180deg, #A37D5C 0%, #4A3422 100%)';
+    case 'meadow':   return "url('/pptx-bg-meadow.jpg') center/cover";
+    case 'cross':    return "url('/pptx-bg-cross.jpg') center/cover";
+    case 'bible':    return "url('/pptx-bg-bible.jpg') center/cover";
   }
 };
 
@@ -122,6 +130,8 @@ export default function Home() {
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // 도움말 모달 — 헤더의 [사용법] 버튼으로 토글
   const [showHelp, setShowHelp] = useState(false);
+  // 콘티 세트 저장/불러오기 모달
+  const [showSets, setShowSets] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -781,6 +791,16 @@ export default function Home() {
           >
             찬양팀·예배 사역자를 위한 AI 콘티 메이커
           </span>
+          {/* 콘티 모음 — 저장/불러오기 메뉴 */}
+          <button
+            type="button"
+            onClick={() => setShowSets(true)}
+            aria-label="콘티 모음 (저장/불러오기)"
+            className="btn-ghost"
+            style={{ padding: '6px 12px', fontSize: 13 }}
+          >
+            콘티 모음
+          </button>
           {/* 사용법 버튼 — 모바일·데스크톱 모두 노출 (topbar-meta는 모바일에서 숨김 처리) */}
           <button
             type="button"
@@ -1924,6 +1944,25 @@ export default function Home() {
 
       {/* 도움말 모달 — 헤더 [사용법] 버튼으로 열림. ESC/배경 클릭/✕로 닫힘. */}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+      {/* 콘티 모음 모달 — 현재 콘티 저장 + 과거 콘티 불러오기/삭제 */}
+      {showSets && (
+        <SavedSetsModal
+          currentSongs={songs}
+          currentDoc={doc}
+          isCurrentEmpty={isEmpty}
+          onClose={() => setShowSets(false)}
+          onLoad={(s) => {
+            setSongs(s.songs);
+            setDoc(s.doc);
+            showToast(`"${s.name}" 콘티를 불러왔어요`);
+            setShowSets(false);
+          }}
+          onSaved={(s) => {
+            showToast(`"${s.name}" 콘티 저장 완료`);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -2086,6 +2125,233 @@ function FAQ({ q, a }: { q: string; a: string }) {
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 2 }}>Q. {q}</div>
       <div style={{ color: 'var(--ink-2)' }}>{a}</div>
+    </div>
+  );
+}
+
+// ============== 콘티 모음 모달 ==============
+// 사용자가 명시적으로 저장한 콘티들을 localStorage에서 불러와 리스트로 보여주고,
+// 새 저장 또는 과거 콘티 불러오기/삭제를 처리한다.
+function SavedSetsModal({
+  currentSongs,
+  currentDoc,
+  isCurrentEmpty,
+  onClose,
+  onLoad,
+  onSaved,
+}: {
+  currentSongs: Song[];
+  currentDoc: Block[];
+  isCurrentEmpty: boolean;
+  onClose: () => void;
+  onLoad: (set: SavedSet) => void;
+  onSaved: (set: SavedSet) => void;
+}) {
+  // 모달 마운트마다 최신 리스트 로드
+  const [sets, setSets] = useState<SavedSet[]>([]);
+  const [name, setName] = useState('');
+
+  useEffect(() => {
+    setSets(listSavedSets());
+  }, []);
+
+  // ESC로 닫기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const handleSave = () => {
+    if (isCurrentEmpty) return;
+    const saved = saveSet(name, currentSongs, currentDoc);
+    setSets(listSavedSets());
+    setName('');
+    onSaved(saved);
+  };
+
+  const handleRemove = (id: string) => {
+    if (!window.confirm('이 콘티를 삭제할까요?')) return;
+    removeSet(id);
+    setSets(listSavedSets());
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="콘티 모음"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(31, 27, 22, 0.55)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--paper)',
+          maxWidth: 560,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          borderRadius: 4,
+          padding: '32px 28px 24px',
+          position: 'relative',
+          boxShadow: '0 20px 60px -10px rgba(0,0,0,0.3)',
+          border: '1px solid var(--rule)',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="닫기"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid var(--rule)',
+            background: 'var(--paper)',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          ✕
+        </button>
+
+        <h2 className="h-song" style={{ margin: '0 0 6px', fontSize: 22 }}>
+          콘티 모음
+        </h2>
+        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 18 }}>
+          명시적으로 저장한 콘티만 여기에 보입니다 (자동 저장 X). 같은 이름이어도 여러 번 저장 가능.
+        </p>
+
+        {/* 현재 콘티 저장 영역 */}
+        <div
+          style={{
+            border: '1px solid var(--rule)',
+            borderRadius: 4,
+            padding: 14,
+            marginBottom: 20,
+            background: 'color-mix(in oklab, var(--paper) 70%, white)',
+          }}
+        >
+          <div className="label" style={{ marginBottom: 8 }}>현재 콘티 저장</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isCurrentEmpty) handleSave();
+              }}
+              placeholder="예: 2026-05-04 주일 1부"
+              style={{ flex: 1, fontSize: 14 }}
+              disabled={isCurrentEmpty}
+            />
+            <button
+              className="btn-primary"
+              onClick={handleSave}
+              disabled={isCurrentEmpty}
+              style={{ padding: '10px 16px', fontSize: 14 }}
+            >
+              저장
+            </button>
+          </div>
+          {isCurrentEmpty && (
+            <div className="caption" style={{ color: 'var(--ink-3)', marginTop: 6 }}>
+              콘티가 비어있어요. 곡 제목·섹션을 먼저 추가하세요.
+            </div>
+          )}
+        </div>
+
+        {/* 저장된 콘티 리스트 */}
+        <div className="label" style={{ marginBottom: 8 }}>
+          저장된 콘티 ({sets.length})
+        </div>
+        {sets.length === 0 ? (
+          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
+            아직 저장된 콘티가 없어요.
+          </div>
+        ) : (
+          <div className="stack" style={cssVar('--gap', '8px')}>
+            {sets.map((s) => {
+              const sectionCount = s.doc.filter(
+                (b: any) => b && b.kind === 'section'
+              ).length;
+              return (
+                <div
+                  key={s.id}
+                  style={{
+                    border: '1px solid var(--rule)',
+                    borderLeft: '2px solid var(--ink)',
+                    padding: '12px 14px',
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    background: 'color-mix(in oklab, var(--paper) 65%, white)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--serif)',
+                        fontWeight: 600,
+                        fontSize: 16,
+                        color: 'var(--ink)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {s.name}
+                    </div>
+                    <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                      {formatSavedAt(s.savedAt)} · {s.songs.length}곡 · {sectionCount}개 섹션
+                    </div>
+                  </div>
+                  <button
+                    className="btn-text"
+                    onClick={() => onLoad(s)}
+                    style={{ padding: '6px 12px', fontSize: 13 }}
+                  >
+                    불러오기
+                  </button>
+                  <button
+                    onClick={() => handleRemove(s.id)}
+                    aria-label="삭제"
+                    title="삭제"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      border: '1px solid var(--rule)',
+                      background: 'var(--paper)',
+                      color: 'var(--ink-3)',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

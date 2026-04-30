@@ -17,14 +17,15 @@ export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'white': '흰색 (밝은 예배실)',
   'paper': '종이 톤 (따뜻한 분위기)',
   'gradient': '그라데이션 (베이지→잉크)',
-  'meadow': '초원 톤 (녹색 그라데이션)',
-  'cross': '십자가 톤 (보라 그라데이션)',
-  'bible': '성경 톤 (갈색 그라데이션)',
+  'meadow': '초원 (실사 이미지)',
+  'cross': '십자가 (실사 이미지)',
+  'bible': '성경책 (실사 이미지)',
 };
 
 type ThemeConfig =
   | { kind: 'solid'; bg: string; text: string }
-  | { kind: 'gradient'; top: string; bottom: string; text: string };
+  | { kind: 'gradient'; top: string; bottom: string; text: string }
+  | { kind: 'image'; path: string; text: string };
 
 const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   // 검정은 어두운 예배실 투사 환경에서 가장 높은 대비를 주기 위해 선택했다.
@@ -33,14 +34,13 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   'white': { kind: 'solid', bg: 'FFFFFF', text: '1F1B16' },
   // 종이 톤은 콘티노트의 따뜻한 문서 분위기와 찬양 가사에 어울리도록 선택했다.
   'paper': { kind: 'solid', bg: 'FAF5EC', text: '1F1B16' },
-  // 베이지에서 잉크로 내려가는 그라데이션은 따뜻함과 묵직한 집중감을 함께 주기 위해 선택했다.
+  // 베이지에서 잉크로 내려가는 그라데이션 — 따뜻함과 묵직한 집중감.
   'gradient': { kind: 'gradient', top: 'FAF5EC', bottom: '1F1B16', text: 'FFFFFF' },
-  // 초원 톤은 자연스럽고 편안한 예배 분위기를 만들기 위해 녹색 계열로 선택했다.
-  'meadow': { kind: 'gradient', top: '7BA776', bottom: '2E5232', text: 'FFFFFF' },
-  // 십자가 톤은 절제된 보라색으로 경건하고 차분한 분위기를 주기 위해 선택했다.
-  'cross': { kind: 'gradient', top: '4B3F72', bottom: '1F1B36', text: 'FFFFFF' },
-  // 성경 톤은 가죽 표지와 오래된 종이의 묵직한 인상을 살리기 위해 갈색 계열로 선택했다.
-  'bible': { kind: 'gradient', top: 'A37D5C', bottom: '4A3422', text: 'FFFFFF' },
+  // 초원/십자가/성경책은 Unsplash 무료 저작권 이미지를 public/에 다운로드해서 사용한다.
+  // 글자 가독성은 addText의 반투명 검정 fill이 보장한다.
+  'meadow': { kind: 'image', path: '/pptx-bg-meadow.jpg', text: 'FFFFFF' },
+  'cross': { kind: 'image', path: '/pptx-bg-cross.jpg', text: 'FFFFFF' },
+  'bible': { kind: 'image', path: '/pptx-bg-bible.jpg', text: 'FFFFFF' },
 };
 
 // 한 슬라이드의 입력 — 이미 줄바꿈으로 분리된 lines
@@ -123,6 +123,22 @@ export async function createGradientDataUrl(top: string, bottom: string): Promis
   });
 }
 
+// public/ 경로의 이미지 파일을 fetch해서 base64로 변환.
+// pptxgenjs background.path는 브라우저에서 동작하지 않아 'image/jpeg;base64,...' 형식의 data 문자열이 필요하다.
+async function loadPublicImageAsBase64(path: string): Promise<string> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`이미지를 가져오지 못했습니다 (${res.status}): ${path}`);
+  const blob = await res.blob();
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+  // 'data:' 접두사 제거 → pptxgenjs가 받는 형식
+  return dataUrl.replace(/^data:/, '');
+}
+
 // 모든 슬라이드 PPT로 변환해서 다운로드
 export async function exportToPptx(
   slides: PptSlide[],
@@ -136,17 +152,29 @@ export async function exportToPptx(
   const pres = new pptxgen();
   pres.layout = 'LAYOUT_WIDE';
 
-  // 테마에 맞는 배경/글자색 선택
+  // 테마에 맞는 배경/글자색 선택. 그라데이션/이미지는 한 번만 만들어 모든 슬라이드 재사용.
   const config = THEME_CONFIG[theme];
-  const gradientPng = config.kind === 'gradient'
-    ? await createGradientDataUrl(config.top, config.bottom)
-    : undefined;
+  let bgData: string | undefined;
+  if (config.kind === 'gradient') {
+    bgData = await createGradientDataUrl(config.top, config.bottom);
+  } else if (config.kind === 'image') {
+    try {
+      bgData = await loadPublicImageAsBase64(config.path);
+    } catch (err) {
+      console.warn('이미지 배경 로드 실패 → 검정 단색으로 대체:', err);
+    }
+  }
 
   for (const pptSlide of slides) {
     const slide = pres.addSlide();
-    slide.background = config.kind === 'solid'
-      ? { color: config.bg }
-      : { data: gradientPng };
+    if (config.kind === 'solid') {
+      slide.background = { color: config.bg };
+    } else if (bgData) {
+      slide.background = { data: bgData };
+    } else {
+      // 이미지 로드 실패 시 검정 단색 fallback
+      slide.background = { color: '000000' };
+    }
 
     const validation = validateSlide(pptSlide);
 
@@ -165,7 +193,8 @@ export async function exportToPptx(
       paraSpaceAfter: 8,
       bold: false,
       // 이미지/그라데이션 배경 위 글자 가독성을 위해 텍스트박스 뒤에 약한 반투명 검정 fill을 둔다.
-      ...(config.kind === 'gradient' ? { fill: { color: '000000', transparency: 65 } } : {}),
+      // 단색 검정/흰/종이는 fill 없음 (기존 동작).
+      ...(config.kind !== 'solid' ? { fill: { color: '000000', transparency: 55 } } : {}),
       // 한도 통과 후에도 폰트마다 미세하게 박스를 넘는 케이스가 있어
       // PowerPoint의 자동 축소(shrink-to-fit)를 켜서 한 줄에 들어가게 보장한다.
       fit: 'shrink',
