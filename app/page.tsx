@@ -16,8 +16,10 @@ import {
   exportToPptx,
   validateSlide,
   PPT_FONT_LABELS,
+  PPT_THEME_LABELS,
   type PptFont,
   type PptSlide,
+  type PptTheme,
 } from '@/lib/pptx';
 import type { Song, Section, SectionType } from '@/lib/types';
 import Mascot from '@/components/Mascot';
@@ -99,6 +101,8 @@ export default function Home() {
   // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
   // 기본 폰트는 '본명조 Pro' — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
   const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
+  // PPT 배경 테마 — 어두운 예배실 기본은 검정.
+  const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // 도움말 모달 — 헤더의 [사용법] 버튼으로 토글
   const [showHelp, setShowHelp] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -525,7 +529,7 @@ export default function Home() {
     }
     try {
       const fname = `contionote-${Date.now()}.pptx`;
-      await exportToPptx(slides, pptFont, fname);
+      await exportToPptx(slides, pptFont, fname, pptTheme);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -1693,7 +1697,7 @@ export default function Home() {
               콘티 편집에서 가사 안 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 거기서 슬라이드가 나뉘어요.
             </div>
 
-            {/* 폰트 선택 + 다운로드 버튼 한 줄 */}
+            {/* 폰트 + 테마 선택 + 다운로드 버튼 한 줄 */}
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <select
                 value={pptFont}
@@ -1715,15 +1719,43 @@ export default function Home() {
                   </option>
                 ))}
               </select>
+              {/* 테마 — 검정/흰색/종이 톤 3종. 예배 환경에 맞춰 선택. */}
+              <select
+                value={pptTheme}
+                onChange={(e) => setPptTheme(e.target.value as PptTheme)}
+                aria-label="PPT 배경 테마 선택"
+                style={{
+                  padding: '10px 14px',
+                  border: '1px solid var(--rule)',
+                  borderRadius: 2,
+                  background: 'var(--paper)',
+                  color: 'var(--ink)',
+                  fontFamily: 'var(--sans)',
+                  fontSize: 14,
+                }}
+              >
+                {(Object.keys(PPT_THEME_LABELS) as PptTheme[]).map((t) => (
+                  <option key={t} value={t}>
+                    {PPT_THEME_LABELS[t]}
+                  </option>
+                ))}
+              </select>
               <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
                 PPT 다운로드 (.pptx)
               </button>
             </div>
 
             {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
-                한도 초과 시 빨강 표시. */}
+                16:9 비율로 실제 PPT 모양처럼 보여주고 선택한 테마 배경을 그대로 적용한다.
+                한도 초과 시 빨강 테두리. */}
             {!isEmpty && (
-              <div className="stack" style={cssVar('--gap', '8px')}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 12,
+                }}
+              >
                 {docToSlides().map((slide, i) => {
                   const v = validateSlide(slide);
                   const isOverflow = !v.ok;
@@ -1732,49 +1764,61 @@ export default function Home() {
                     : v.reason === 'too-many-lines'
                       ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
                       : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
+                  // 테마별 배경/글자색을 미리보기에도 동일 적용 — 실제 PPT와 시각 일치.
+                  const themeBg =
+                    pptTheme === 'black' ? '#000000'
+                    : pptTheme === 'white' ? '#FFFFFF'
+                    : '#FAF5EC';
+                  const themeText =
+                    pptTheme === 'black' ? '#FFFFFF' : '#1F1B16';
                   return (
-                    <div
-                      key={i}
-                      style={{
-                        border:
-                          '1px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
-                        borderLeft:
-                          '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--ink)'),
-                        padding: '12px 14px',
-                        borderRadius: 2,
-                        background: 'color-mix(in oklab, var(--paper) 70%, white)',
-                      }}
-                    >
+                    <div key={i}>
                       <div
                         className="mono"
                         style={{
-                          marginBottom: 6,
+                          marginBottom: 4,
+                          fontSize: 10.5,
                           color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
                         }}
                       >
                         슬라이드 {i + 1} · {slideMeta}
                       </div>
                       <div
-                        className="lyric"
                         style={{
-                          fontSize: 13.5,
-                          lineHeight: 1.5,
-                          color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-2)',
+                          aspectRatio: '16 / 9',
+                          background: themeBg,
+                          color: themeText,
+                          borderRadius: 4,
+                          border:
+                            '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center',
+                          padding: '8px 10px',
+                          fontFamily: 'var(--serif)',
+                          // 실제 PPT 글자 크기에 비례 — pt 값을 0.18 정도로 스케일.
+                          fontSize: 'fontSize' in v ? `${v.fontSize * 0.18}px` : '11px',
+                          lineHeight: 1.35,
+                          overflow: 'hidden',
                         }}
                       >
                         {slide.lines.length === 0 ? (
-                          <span style={{ color: 'var(--ink-3)' }}>(빈 슬라이드)</span>
+                          <span style={{ opacity: 0.4 }}>(빈 슬라이드)</span>
                         ) : (
-                          slide.lines.map((l, j) => <div key={j}>{l}</div>)
+                          <div>
+                            {slide.lines.map((l, j) => (
+                              <div key={j}>{l}</div>
+                            ))}
+                          </div>
                         )}
                       </div>
                       {isOverflow && (
                         <div
                           className="caption"
-                          style={{ marginTop: 6, color: 'var(--accent-ink)' }}
+                          style={{ marginTop: 4, color: 'var(--accent-ink)', fontSize: 11.5 }}
                         >
-                          한 슬라이드 최대 4줄 · 줄당 최대 17~32자(줄수에 따라). 콘티
-                          편집에서 분리해주세요.
+                          최대 4줄 · 줄당 17~32자. 분리해주세요.
                         </div>
                       )}
                     </div>

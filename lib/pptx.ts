@@ -9,6 +9,25 @@ export const PPT_FONT_LABELS: Record<PptFont, string> = {
   'noto-sans-kr': '본고딕',
 };
 
+// 슬라이드 배경 템플릿 — 예배 분위기에 따라 선택
+export type PptTheme = 'black' | 'white' | 'paper';
+
+export const PPT_THEME_LABELS: Record<PptTheme, string> = {
+  'black': '검정 (어두운 예배실)',
+  'white': '흰색 (밝은 예배실)',
+  'paper': '종이 톤 (따뜻한 분위기)',
+};
+
+// 테마별 배경/글자색 매핑
+const THEME_COLORS: Record<PptTheme, { bg: string; text: string }> = {
+  // 검정 배경 + 흰 글자 — 일반적 예배 슬라이드
+  'black': { bg: '000000', text: 'FFFFFF' },
+  // 흰 배경 + 검정 글자 — 밝은 환경 / 노트 출력용
+  'white': { bg: 'FFFFFF', text: '1F1B16' },
+  // 종이 베이지 배경 + 잉크 — 따뜻한 톤 (콘티노트 디자인과 일치)
+  'paper': { bg: 'FAF5EC', text: '1F1B16' },
+};
+
 // 한 슬라이드의 입력 — 이미 줄바꿈으로 분리된 lines
 export type PptSlide = {
   lines: string[]; // 각 항목이 한 줄
@@ -64,7 +83,8 @@ export function validateSlide(slide: PptSlide): PptValidation {
 export async function exportToPptx(
   slides: PptSlide[],
   font: PptFont,
-  fileName: string
+  fileName: string,
+  theme: PptTheme = 'black'
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
@@ -72,10 +92,12 @@ export async function exportToPptx(
   const pres = new pptxgen();
   pres.layout = 'LAYOUT_WIDE';
 
+  // 테마에 맞는 배경/글자색 선택
+  const colors = THEME_COLORS[theme];
+
   for (const pptSlide of slides) {
     const slide = pres.addSlide();
-    // 배경은 검정 단색 — 사용자 요청. 별 배경 이미지 사용 시 텍스트 가독성 저하 + 파일 용량 증가 문제가 있어 단순화.
-    slide.background = { color: '000000' };
+    slide.background = { color: colors.bg };
 
     const validation = validateSlide(pptSlide);
 
@@ -88,7 +110,7 @@ export async function exportToPptx(
       h: 6.5,
       align: 'center',
       valign: 'middle',
-      color: 'FFFFFF',
+      color: colors.text,
       fontFace: FONT_FACE_MAP[font],
       fontSize: validation.ok ? validation.fontSize : 32,
       paraSpaceAfter: 8,
