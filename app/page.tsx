@@ -56,6 +56,7 @@ import SectionChip from '@/components/SectionChip';
 // section:    섹션 칩 + 편집 가능한 가사 본문
 // spacer:     블록 사이 빈 줄 (시각적 호흡)
 // slidebreak: PPT 슬라이드 분리자. 한 콘티 안에서 슬라이드 단위를 사용자가 자유롭게 자른다.
+// memo:       광고·기도제목·축도자 같은 자유 텍스트 슬라이드
 type Block =
   | { kind: 'title'; text: string }
   | {
@@ -67,7 +68,8 @@ type Block =
       body: string;
     }
   | { kind: 'spacer' }
-  | { kind: 'slidebreak' };
+  | { kind: 'slidebreak' }
+  | { kind: 'memo'; body: string };
 
 // CSS 커스텀 프로퍼티(--gap)를 React style에 쓰기 위한 헬퍼
 // TS가 기본 CSSProperties에 -- 시작 키를 안 받으므로 캐스팅 필요
@@ -153,12 +155,84 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoStackRef = useRef<{ songs: Song[]; doc: Block[] }[]>([]);
+  const redoStackRef = useRef<{ songs: Song[]; doc: Block[] }[]>([]);
+  const lastSnapshotRef = useRef<string>('');
+  const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingMemoFocusRef = useRef(false);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(''), 2400);
   }, []);
+
+  useEffect(() => {
+    const snapshot = JSON.stringify({ songs, doc });
+    if (snapshot === lastSnapshotRef.current) return;
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    snapshotTimerRef.current = setTimeout(() => {
+      if (snapshot === lastSnapshotRef.current) return;
+      // 변경 직전 상태만 undo 스택에 저장해서 Ctrl+Z가 바로 이전 콘티로 돌아가게 한다.
+      if (lastSnapshotRef.current) {
+        undoStackRef.current.push(JSON.parse(lastSnapshotRef.current));
+        if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+        redoStackRef.current = [];
+      }
+      lastSnapshotRef.current = snapshot;
+    }, 300);
+    return () => {
+      if (snapshotTimerRef.current) {
+        clearTimeout(snapshotTimerRef.current);
+        snapshotTimerRef.current = null;
+      }
+    };
+  }, [songs, doc]);
+
+  const handleUndo = useCallback(() => {
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    const snapshot = JSON.stringify({ songs, doc });
+    if (snapshot !== lastSnapshotRef.current && lastSnapshotRef.current) {
+      undoStackRef.current.push(JSON.parse(lastSnapshotRef.current));
+      if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+      lastSnapshotRef.current = snapshot;
+    }
+    const prev = undoStackRef.current.pop();
+    if (!prev) {
+      showToast('되돌릴 게 없어요');
+      return;
+    }
+    redoStackRef.current.push({ songs, doc });
+    if (redoStackRef.current.length > 50) redoStackRef.current.shift();
+    setSongs(prev.songs);
+    setDoc(prev.doc);
+    lastSnapshotRef.current = JSON.stringify(prev);
+    showToast('되돌리기');
+  }, [doc, showToast, songs]);
+
+  const handleRedo = useCallback(() => {
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    const next = redoStackRef.current.pop();
+    if (!next) {
+      showToast('다시 실행할 게 없어요');
+      return;
+    }
+    undoStackRef.current.push({ songs, doc });
+    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+    setSongs(next.songs);
+    setDoc(next.doc);
+    lastSnapshotRef.current = JSON.stringify(next);
+    showToast('다시 실행');
+  }, [doc, showToast, songs]);
 
   // ----- 파일 처리 -----
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,6 +399,13 @@ export default function Home() {
     });
   };
 
+  const addMemoBlock = () => {
+    // 예배 순서가 교회마다 달라서 사용자가 자유 텍스트 슬라이드를 직접 넣게 한다.
+    pendingMemoFocusRef.current = true;
+    setDoc((d) => [...d, { kind: 'memo', body: '' }]);
+    showToast('메모 슬라이드 추가됨');
+  };
+
   // 곡 단위 삭제 — songs에서 해당 곡 제거 + 콘티 편집창에서도 해당 곡 관련 블록 정리.
   // sectionId가 "songIdx-secIdx" 인덱스 기반이므로, 삭제 후 남은 곡들의 sectionId도 reindex 한다.
   const removeSong = (targetIdx: number) => {
@@ -408,7 +489,7 @@ export default function Home() {
     });
   };
 
-  // spacer는 시각적 여백을 담당하므로 위치를 유지하고, 실제 콘텐츠인 title/section만 교환한다.
+  // spacer는 시각적 여백을 담당하므로 위치를 유지하고, 실제 콘텐츠인 title/section/memo만 교환한다.
   // 이렇게 해야 이동 후에도 블록 사이 빈 줄 흐름이 자연스럽게 유지된다.
   const moveBlockUp = (idx: number) => {
     setDoc((d) => {
@@ -426,7 +507,7 @@ export default function Home() {
     });
   };
 
-  // spacer는 그대로 두고 콘텐츠만 아래쪽의 다음 title/section과 바꿔 시각적 간격을 보존한다.
+  // spacer는 그대로 두고 콘텐츠만 아래쪽의 다음 title/section/memo와 바꿔 시각적 간격을 보존한다.
   // 마지막 콘텐츠 뒤에는 교환 대상이 없으므로 원본 배열을 그대로 반환한다.
   const moveBlockDown = (idx: number) => {
     setDoc((d) => {
@@ -466,9 +547,11 @@ export default function Home() {
   // 콘티 편집창에서 section 본문 맨 앞 Backspace → 위 section과 합치기.
   // doc 안에서 idx 위쪽의 가장 가까운 section을 찾아 body를 이어 붙이고, 사이의 spacer/현재 section은 제거한다.
   // title을 만나면 멈춤 (제목과 가사를 합치지 않는다).
+  // memo는 독립 슬라이드 의미라 section 병합 대상에서 제외한다.
   const mergeWithPrev = (idx: number) => {
     setDoc((d) => {
       if (idx <= 0) return d;
+      if (d[idx]?.kind !== 'section') return d;
       let prevIdx = -1;
       for (let i = idx - 1; i >= 0; i--) {
         const b = d[i];
@@ -538,6 +621,7 @@ export default function Home() {
       .map((b) => {
         if (b.kind === 'title') return `━━━ ${b.text} ━━━\n`;
         if (b.kind === 'section') return b.body;
+        if (b.kind === 'memo') return b.body;
         // spacer/slidebreak는 텍스트 변환에서는 빈 줄로 처리한다.
         return '';
       })
@@ -631,6 +715,13 @@ export default function Home() {
           if (trimmed) buf.push(trimmed);
           else flush();
         }
+      } else if (b.kind === 'memo') {
+        flush();
+        const memoLines = b.body
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (memoLines.length > 0) slides.push({ lines: memoLines });
       } else if (b.kind === 'slidebreak') {
         flush();
       }
@@ -743,20 +834,44 @@ export default function Home() {
     };
   }, []);
 
-  // ⌘+Enter / Ctrl+Enter 단축키로 추출
-  // ref 패턴으로 stale closure 회피 — handleExtract가 항상 최신 state(files, pasted 등)를 봄
-  // 이전 코드는 deps 배열 없어서 매 렌더마다 리스너 재등록 + 첫 마운트 때의 함수만 캡처해서 버그
+  // ⌘/Ctrl 단축키: 저장 모달, 가사 추출, 콘티 undo/redo를 전역에서 처리한다.
+  // ref 패턴으로 stale closure 회피 — handleExtract가 항상 최신 state(files, pasted 등)를 봄.
   const handleExtractRef = useRef(handleExtract);
   useEffect(() => {
     handleExtractRef.current = handleExtract;
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleExtractRef.current();
+      const isMac = navigator.userAgent.includes('Mac');
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+      const active = document.activeElement as HTMLElement | null;
+      const isEditing =
+        active?.tagName === 'INPUT' ||
+        active?.tagName === 'TEXTAREA' ||
+        Boolean(active?.isContentEditable);
+
+      if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setShowSets(true);
+        return;
+      }
+
+      if (e.key === 'Enter' && !isEditing) {
+        e.preventDefault();
+        if (!extracting) handleExtractRef.current();
+        return;
+      }
+
+      if ((e.key === 'z' || e.key === 'Z') && !isEditing) {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [extracting, handleRedo, handleUndo]);
 
   // ----- 카드 인라인 수정 헬퍼 -----
   // 카드 한 개씩만 편집 모드 진입. draft에 변경사항 보관 후 저장 시 songs에 반영
@@ -1782,21 +1897,27 @@ export default function Home() {
                     가사 안에서 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 PPT 슬라이드가 거기서 나뉩니다.
                   </div>
                 </div>
-                {!isEmpty && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {/* 슬라이드 구분 추가 — 콘티 끝에 점선 분리자가 들어가고, ↑↓로 위치 조정 가능 */}
-                    <button
-                      className="btn-ghost"
-                      onClick={addSlidebreak}
-                      title="여기 위치에 슬라이드 분리자 추가 (PPT에서 페이지 구분)"
-                    >
-                      + 슬라이드 구분
-                    </button>
-                    <button className="btn-ghost" onClick={onClear}>
-                      전체 비우기
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn-ghost"
+                    onClick={addMemoBlock}
+                    title="광고·기도제목 같은 자유 텍스트 슬라이드 추가"
+                  >
+                    + 메모 슬라이드
+                  </button>
+                  {/* 슬라이드 구분 추가 — 콘티 끝에 점선 분리자가 들어가고, ↑↓로 위치 조정 가능 */}
+                  <button
+                    className="btn-ghost"
+                    onClick={addSlidebreak}
+                    disabled={isEmpty}
+                    title="여기 위치에 슬라이드 분리자 추가 (PPT에서 페이지 구분)"
+                  >
+                    + 슬라이드 구분
+                  </button>
+                  <button className="btn-ghost" onClick={onClear} disabled={isEmpty}>
+                    전체 비우기
+                  </button>
+                </div>
               </header>
 
               {/* editor-body — 내용이 길어지면 여기서만 내부 스크롤 (aside 자체는 잘리지 않음)
@@ -1852,6 +1973,14 @@ export default function Home() {
                               canMoveUp={findPrevContentIdx(i) !== -1}
                               canMoveDown={findNextContentIdx(i) !== -1}
                               onMergeWithPrev={() => mergeWithPrev(i)}
+                              shouldFocus={
+                                pendingMemoFocusRef.current &&
+                                b.kind === 'memo' &&
+                                i === doc.length - 1
+                              }
+                              onFocused={() => {
+                                pendingMemoFocusRef.current = false;
+                              }}
                             />
                           </SortableBlock>
                         ))}
@@ -2540,6 +2669,8 @@ function EditorBlockView({
   canMoveUp,
   canMoveDown,
   onMergeWithPrev,
+  shouldFocus,
+  onFocused,
 }: {
   block: Block;
   onUpdate: (next: Block) => void;
@@ -2550,23 +2681,41 @@ function EditorBlockView({
   canMoveDown: boolean;
   // 커서가 section 본문 맨 앞 + Backspace → 위 section과 합치기 트리거
   onMergeWithPrev?: () => void;
+  shouldFocus?: boolean;
+  onFocused?: () => void;
 }) {
   // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
   const editableRef = useRef<HTMLElement | null>(null);
   const sectionFocusTextRef = useRef('');
   const [isSectionHovered, setIsSectionHovered] = useState(false);
+  const [isMemoEmpty, setIsMemoEmpty] = useState(block.kind === 'memo' && !block.body);
 
   // block 텍스트가 외부에서 바뀐 경우(블록 추가, 다른 곳 편집)에만 DOM 갱신
   // 사용자가 그냥 타이핑 중일 땐 DOM = state라서 if 조건이 false → 건들지 않음
   useEffect(() => {
-    if (block.kind !== 'section' && block.kind !== 'title') return;
+    if (block.kind !== 'section' && block.kind !== 'title' && block.kind !== 'memo') return;
     const el = editableRef.current;
     if (!el) return;
     const expected = block.kind === 'title' ? block.text : block.body;
     if (el.innerText !== expected) {
       el.innerText = expected;
     }
+    if (block.kind === 'memo') setIsMemoEmpty(!expected);
   }, [block]);
+
+  useEffect(() => {
+    if (!shouldFocus || block.kind !== 'memo') return;
+    const el = editableRef.current;
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    onFocused?.();
+  }, [block.kind, onFocused, shouldFocus]);
 
   if (block.kind === 'spacer') {
     return <div style={{ height: 14 }} />;
@@ -2752,6 +2901,140 @@ function EditorBlockView({
         >
           제거
         </button>
+      </div>
+    );
+  }
+
+  if (block.kind === 'memo') {
+    return (
+      <div
+        style={{
+          position: 'relative',
+          marginBottom: 14,
+          padding: '18px 18px 16px',
+          background: '#fff',
+          border: '1px dashed color-mix(in oklab, var(--ink-3) 55%, white)',
+          borderRadius: 4,
+        }}
+        onMouseEnter={() => setIsSectionHovered(true)}
+        onMouseLeave={() => setIsSectionHovered(false)}
+      >
+        <div
+          className="mono"
+          style={{
+            marginBottom: 8,
+            color: 'var(--ink-3)',
+            fontSize: 10.5,
+            letterSpacing: '0.16em',
+          }}
+        >
+          메모
+        </div>
+        <button
+          onClick={onMoveUp}
+          disabled={!canMoveUp}
+          aria-label="위로 이동"
+          title="위로 이동"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 88,
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-3)',
+            cursor: canMoveUp ? 'pointer' : 'not-allowed',
+            fontSize: 11,
+            padding: '2px 8px',
+            borderRadius: 99,
+            opacity: isSectionHovered ? (canMoveUp ? 1 : 0.3) : 0,
+            transition: 'opacity .15s ease',
+          }}
+        >
+          ↑
+        </button>
+        <button
+          onClick={onMoveDown}
+          disabled={!canMoveDown}
+          aria-label="아래로 이동"
+          title="아래로 이동"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 54,
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-3)',
+            cursor: canMoveDown ? 'pointer' : 'not-allowed',
+            fontSize: 11,
+            padding: '2px 8px',
+            borderRadius: 99,
+            opacity: isSectionHovered ? (canMoveDown ? 1 : 0.3) : 0,
+            transition: 'opacity .15s ease',
+          }}
+        >
+          ↓
+        </button>
+        <button
+          onClick={onRemove}
+          title="메모 제거"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            background: 'var(--paper)',
+            border: '1px solid var(--rule)',
+            color: 'var(--ink-3)',
+            cursor: 'pointer',
+            fontSize: 11,
+            padding: '2px 8px',
+            borderRadius: 99,
+            opacity: isSectionHovered ? 1 : 0,
+            transition: 'opacity .15s ease',
+          }}
+        >
+          제거
+        </button>
+        <div style={{ position: 'relative' }}>
+          {isMemoEmpty && (
+            <div
+              className="lyric"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                color: 'var(--ink-3)',
+                opacity: 0.65,
+                fontSize: 17,
+                lineHeight: 1.75,
+              }}
+            >
+              광고, 기도제목 같은 자유 텍스트…
+            </div>
+          )}
+          <div
+            ref={editableRef as React.RefObject<HTMLDivElement>}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={(e) => {
+              const nextBody = (e.currentTarget as HTMLDivElement).innerText;
+              setIsMemoEmpty(!nextBody);
+              onUpdate({ ...block, body: nextBody });
+            }}
+            onBlur={(e) => {
+              const nextBody = e.currentTarget.innerText;
+              setIsMemoEmpty(!nextBody);
+              onUpdate({ ...block, body: nextBody });
+            }}
+            className="lyric"
+            style={{
+              minHeight: 32,
+              outline: 'none',
+              whiteSpace: 'pre-wrap',
+              fontSize: 17,
+              lineHeight: 1.75,
+            }}
+          />
+        </div>
       </div>
     );
   }

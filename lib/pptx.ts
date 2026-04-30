@@ -45,6 +45,13 @@ export type PptSlide = {
   lines: string[]; // 각 항목이 한 줄
 };
 
+export type PptCopyrightInfo = {
+  // 사용자가 입력하지 않으면 곡 제목만 자동 표기
+  songTitles: string[];
+  ccliNumber?: string;
+  licenseLabel?: string;
+};
+
 // 검증/사이징 결과
 export type PptValidation =
   | { ok: true; fontSize: number; lineCount: number }
@@ -112,7 +119,8 @@ export async function exportToPptx(
   slides: PptSlide[],
   font: PptFont,
   fileName: string,
-  theme: PptTheme = 'black'
+  theme: PptTheme = 'black',
+  copyright?: PptCopyrightInfo
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
@@ -131,8 +139,7 @@ export async function exportToPptx(
     }
   }
 
-  for (const pptSlide of slides) {
-    const slide = pres.addSlide();
+  const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>) => {
     if (config.kind === 'solid') {
       slide.background = { color: config.bg };
     } else if (bgData) {
@@ -151,7 +158,11 @@ export async function exportToPptx(
       // 이미지 로드 실패 시 검정 글자가 보이도록 흰색 단색 fallback을 사용한다.
       slide.background = { color: 'FFFFFF' };
     }
+  };
 
+  for (const pptSlide of slides) {
+    const slide = pres.addSlide();
+    applyThemeBackground(slide);
     const validation = validateSlide(pptSlide);
 
     // 검증 실패 슬라이드도 파일 생성을 막지 않고, 사용자가 내용을 확인할 수 있게
@@ -170,6 +181,34 @@ export async function exportToPptx(
       bold: false,
       // 한도 통과 후에도 폰트마다 미세하게 박스를 넘는 케이스가 있어
       // PowerPoint의 자동 축소(shrink-to-fit)를 켜서 한 줄에 들어가게 보장한다.
+      fit: 'shrink',
+    });
+  }
+
+  if (copyright && copyright.songTitles.length > 0) {
+    const slide = pres.addSlide();
+    applyThemeBackground(slide);
+    const licenseInfo = [
+      copyright.ccliNumber ? `CCLI ${copyright.ccliNumber}` : '',
+      copyright.licenseLabel ?? '',
+    ].filter(Boolean).join(' · ');
+    const text = licenseInfo
+      ? `${copyright.songTitles.join('\n')}\n${licenseInfo}`
+      : copyright.songTitles.join('\n');
+
+    // 한국 교회 관행상 PPT 마지막에 곡 정보 표기. 사용자가 입력 안 하면 자동으로 곡 제목만
+    slide.addText(text, {
+      x: 0.5,
+      y: 0.5,
+      w: 12.333,
+      h: 6.5,
+      align: 'center',
+      valign: 'middle',
+      color: config.text,
+      fontFace: FONT_FACE_MAP[font],
+      fontSize: 18,
+      paraSpaceAfter: 8,
+      bold: false,
       fit: 'shrink',
     });
   }
