@@ -45,6 +45,13 @@ import {
   type ChurchTemplate,
 } from '@/lib/template-storage';
 import {
+  listLibrary,
+  addToLibrary,
+  removeFromLibrary,
+  searchLibrary,
+  type LibrarySong,
+} from '@/lib/song-library';
+import {
   exportToPptx,
   validateSlide,
   PPT_FONT_LABELS,
@@ -54,6 +61,7 @@ import {
   type PptSlide,
   type PptTheme,
 } from '@/lib/pptx';
+import { buildPlainSlidesTxt, buildOpenSongXml, downloadText } from '@/lib/export-formats';
 import type { Song, Section, SectionType } from '@/lib/types';
 import Mascot from '@/components/Mascot';
 import SectionChip from '@/components/SectionChip';
@@ -165,6 +173,8 @@ export default function Home() {
   const [showSets, setShowSets] = useState(false);
   // 교회 템플릿 저장/적용 모달
   const [showTemplates, setShowTemplates] = useState(false);
+  // 곡 라이브러리 모달 — 추출된 곡을 자동 누적해 재사용한다.
+  const [showLibrary, setShowLibrary] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -291,6 +301,7 @@ export default function Home() {
           showToast('가사를 찾을 수 없어요');
         } else {
           setSongs((prev) => [...prev, ...data.songs]);
+          addToLibrary(data.songs);
           setPasted('');
           showToast(`${data.songs.length}곡 추출됨`);
         }
@@ -356,6 +367,7 @@ export default function Home() {
         showToast('가사를 찾을 수 없어요');
       } else {
         setSongs((prev) => [...prev, ...data.songs]);
+        addToLibrary(data.songs);
         showToast(`${data.songs.length}곡 추출됨`);
       }
     } catch (err: any) {
@@ -774,6 +786,35 @@ export default function Home() {
     }
   };
 
+  // Plain Slides 텍스트 export — ProPresenter / EasyWorship 텍스트 import용.
+  const handleSavePlainSlides = () => {
+    const slides = docToSlides();
+    if (slides.length === 0) {
+      showToast('콘티가 비어있어요');
+      return;
+    }
+    downloadText(
+      buildPlainSlidesTxt({ slides, songTitles: songs.map((s) => s.title) }),
+      `contionote-${Date.now()}.txt`
+    );
+    showToast('Plain Slides 다운로드 시작');
+  };
+
+  // OpenSong XML export — OpenSong / OpenLP / ProPresenter import 호환용.
+  const handleSaveOpenSong = () => {
+    const slides = docToSlides();
+    if (slides.length === 0) {
+      showToast('콘티가 비어있어요');
+      return;
+    }
+    downloadText(
+      buildOpenSongXml({ slides, songTitles: songs.map((s) => s.title) }),
+      `contionote-${Date.now()}.xml`,
+      'application/xml;charset=utf-8'
+    );
+    showToast('OpenSong 다운로드 시작');
+  };
+
   const onClear = () => {
     if (confirm('편집창을 모두 비울까요?')) setDoc([]);
   };
@@ -1034,6 +1075,16 @@ export default function Home() {
             style={{ padding: '6px 12px', fontSize: 13 }}
           >
             콘티 모음
+          </button>
+          {/* 곡 라이브러리 — 한 번 추출한 곡을 다시 불러와 재사용 */}
+          <button
+            type="button"
+            onClick={() => setShowLibrary(true)}
+            aria-label="곡 라이브러리"
+            className="btn-ghost"
+            style={{ padding: '6px 12px', fontSize: 13 }}
+          >
+            곡 라이브러리
           </button>
           {/* 교회 템플릿 — 매주 반복되는 PPT 기본값 저장/적용 */}
           <button
@@ -2118,6 +2169,22 @@ export default function Home() {
               <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
                 PPT 다운로드 (.pptx)
               </button>
+              <button
+                className="btn-text"
+                onClick={handleSavePlainSlides}
+                disabled={isEmpty}
+                title="ProPresenter / EasyWorship 텍스트 import 호환"
+              >
+                Plain Slides (.txt)
+              </button>
+              <button
+                className="btn-text"
+                onClick={handleSaveOpenSong}
+                disabled={isEmpty}
+                title="OpenSong / OpenLP / ProPresenter import 호환"
+              >
+                OpenSong (.xml)
+              </button>
             </div>
 
             {/* 저작권 슬라이드 — 곡 제목은 자동 수집하고 CCLI 정보만 선택 입력한다. */}
@@ -2311,6 +2378,18 @@ export default function Home() {
           }}
           onSaved={(s) => {
             showToast(`"${s.name}" 콘티 저장 완료`);
+          }}
+        />
+      )}
+
+      {/* 곡 라이브러리 모달 — 자동 누적된 곡 검색/추가/삭제 */}
+      {showLibrary && (
+        <SongLibraryModal
+          onClose={() => setShowLibrary(false)}
+          onAdd={(song) => {
+            setSongs((prev) => [...prev, { title: song.title, sections: song.sections }]);
+            showToast(`"${song.title || 'Untitled'}" 곡 추가됨`);
+            setShowLibrary(false);
           }}
         />
       )}
@@ -2733,6 +2812,189 @@ function SavedSetsModal({
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============== 곡 라이브러리 모달 ==============
+// 추출할 때 자동 저장된 곡을 제목/가사로 검색해 현재 추출 결과에 다시 추가한다.
+function SongLibraryModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (song: LibrarySong) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [library, setLibrary] = useState<LibrarySong[]>([]);
+
+  // 모달 마운트 및 검색어 변경마다 localStorage의 최신 곡 목록을 다시 읽는다.
+  useEffect(() => {
+    setLibrary(query.trim() ? searchLibrary(query) : listLibrary());
+  }, [query]);
+
+  // ESC로 닫기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const formatLibrarySavedAt = (ms: number) =>
+    new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(ms));
+
+  const handleRemove = (id: string) => {
+    removeFromLibrary(id);
+    setLibrary(query.trim() ? searchLibrary(query) : listLibrary());
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="곡 라이브러리"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(31, 27, 22, 0.55)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--paper)',
+          maxWidth: 620,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          borderRadius: 4,
+          padding: '32px 28px 24px',
+          position: 'relative',
+          boxShadow: '0 20px 60px -10px rgba(0,0,0,0.3)',
+          border: '1px solid var(--rule)',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="닫기"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid var(--rule)',
+            background: 'var(--paper)',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          ✕
+        </button>
+
+        <h2 className="h-song" style={{ margin: '0 0 6px', fontSize: 22 }}>
+          곡 라이브러리
+        </h2>
+        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 18 }}>
+          한 번 추출한 곡은 브라우저에 자동 저장됩니다. 제목과 가사 내용으로 검색할 수 있어요.
+        </p>
+
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="곡 제목 또는 가사 검색"
+          autoFocus
+          style={{ fontSize: 14, marginBottom: 18 }}
+        />
+
+        {library.length === 0 ? (
+          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
+            아직 라이브러리에 곡이 없어요. 가사 추출하면 자동으로 모입니다.
+          </div>
+        ) : (
+          <div className="stack" style={cssVar('--gap', '10px')}>
+            {library.map((song) => (
+              <div
+                key={song.id}
+                style={{
+                  border: '1px solid var(--rule)',
+                  borderLeft: '2px solid var(--accent)',
+                  padding: '14px 14px 12px',
+                  borderRadius: 2,
+                  background: 'color-mix(in oklab, var(--paper) 65%, white)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--serif)',
+                        fontWeight: 600,
+                        fontSize: 18,
+                        color: 'var(--ink)',
+                        lineHeight: 1.35,
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {song.title || 'Untitled'}
+                    </div>
+                    <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                      섹션 {song.sections.length}개 · {formatLibrarySavedAt(song.savedAt)}
+                    </div>
+                  </div>
+                  <button
+                    className="btn-text"
+                    onClick={() => onAdd(song)}
+                    style={{ padding: '6px 12px', fontSize: 13 }}
+                  >
+                    + 추가
+                  </button>
+                  <button
+                    onClick={() => handleRemove(song.id)}
+                    aria-label="라이브러리에서 삭제"
+                    title="라이브러리에서 삭제"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      border: '1px solid var(--rule)',
+                      background: 'var(--paper)',
+                      color: 'var(--ink-3)',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
