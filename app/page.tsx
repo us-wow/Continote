@@ -575,6 +575,26 @@ export default function Home() {
     setDoc((d) => arrayMove(d, oldIdx, newIdx));
   };
 
+  // section 본문에 빈 줄(\n\n)이 들어가면 자동으로 doc 안 두 section으로 split.
+  // 시각적으로도 카드가 분리되어 ↑↓/dnd로 각자 이동 가능.
+  // sectionId/label은 그대로 유지(같은 카드의 다른 부분처럼 동작) — 좌측 매칭 유지.
+  // blur 시점에 트리거 (입력 중간에 갑자기 분리되는 어색함 방지).
+  const autoSplitOnBlankLine = (idx: number) => {
+    setDoc((d) => {
+      const cur = d[idx];
+      if (!cur || cur.kind !== 'section') return d;
+      // \n\s*\n+ → 한 줄 이상의 빈 줄(공백만 있는 줄 포함)
+      const parts = cur.body.split(/\n\s*\n+/).map((p) => p.trim()).filter((p) => p);
+      if (parts.length < 2) return d;
+      const newBlocks: Block[] = [];
+      parts.forEach((p, i) => {
+        if (i > 0) newBlocks.push({ kind: 'spacer' });
+        newBlocks.push({ ...cur, body: p });
+      });
+      return [...d.slice(0, idx), ...newBlocks, ...d.slice(idx + 1)];
+    });
+  };
+
   // 콘티 편집창에서 section 본문 맨 앞 Backspace → 위 section과 합치기.
   // doc 안에서 idx 위쪽의 가장 가까운 section을 찾아 body를 이어 붙이고, 사이의 spacer/현재 section은 제거한다.
   // title을 만나면 멈춤 (제목과 가사를 합치지 않는다).
@@ -2070,6 +2090,7 @@ export default function Home() {
                               canMoveUp={findPrevContentIdx(i) !== -1}
                               canMoveDown={findNextContentIdx(i) !== -1}
                               onMergeWithPrev={() => mergeWithPrev(i)}
+                              onAutoSplit={() => autoSplitOnBlankLine(i)}
                               shouldFocus={
                                 pendingMemoFocusRef.current &&
                                 b.kind === 'memo' &&
@@ -3468,6 +3489,7 @@ function EditorBlockView({
   canMoveUp,
   canMoveDown,
   onMergeWithPrev,
+  onAutoSplit,
   shouldFocus,
   onFocused,
 }: {
@@ -3480,6 +3502,8 @@ function EditorBlockView({
   canMoveDown: boolean;
   // 커서가 section 본문 맨 앞 + Backspace → 위 section과 합치기 트리거
   onMergeWithPrev?: () => void;
+  // section 본문에 빈 줄(\n\n) 있을 때 doc에서 두 section으로 자동 분리
+  onAutoSplit?: () => void;
   shouldFocus?: boolean;
   onFocused?: () => void;
 }) {
@@ -3951,6 +3975,11 @@ function EditorBlockView({
               }
             }
           }
+          // ESC → blur (자동 split 트리거 — onBlur가 빈 줄 발견 시 분리)
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            (e.currentTarget as HTMLDivElement).blur();
+          }
         }}
         onInput={(e) => onUpdate({ ...block, body: (e.currentTarget as HTMLDivElement).innerText })}
         onBlur={(e) => {
@@ -3960,6 +3989,12 @@ function EditorBlockView({
             recordCorrection(sectionFocusTextRef.current, nextBody);
           }
           onUpdate({ ...block, body: nextBody });
+          // 빈 줄(\n\n)이 있으면 doc 안에서도 두 section으로 자동 분리.
+          // 분리되면 ↑↓/dnd가 각자 동작 (사용자 요청: "엔터치면 분리").
+          if (onAutoSplit && /\n\s*\n/.test(nextBody)) {
+            // 다음 tick에 호출 — onUpdate setDoc과 순서 정리
+            setTimeout(() => onAutoSplit(), 0);
+          }
         }}
         className="lyric"
         style={{
