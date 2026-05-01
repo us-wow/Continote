@@ -1072,61 +1072,48 @@ export default function Home() {
           >
             찬양팀·예배 사역자를 위한 AI 콘티 메이커
           </span>
-          {/* 메뉴 드롭다운 — 콘티 모음/곡 라이브러리/템플릿을 한 메뉴 안으로 통합 (토스 UI 패턴).
-              헤더 버튼이 너무 많아 보이는 문제를 해결하고, 사용법은 별도 자주 쓰니 메뉴 밖에 둔다. */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => setShowMenu((v) => !v)}
-              aria-label="메뉴 열기"
-              aria-expanded={showMenu}
-              className="btn-ghost"
-              style={{ padding: '6px 12px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              메뉴 <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
-            </button>
-            {showMenu && (
-              <>
-                {/* 배경 클릭으로 닫기 — 클릭 가로채는 투명 레이어 */}
-                <div
-                  onClick={() => setShowMenu(false)}
-                  style={{ position: 'fixed', inset: 0, zIndex: 50 }}
-                />
-                <div
-                  role="menu"
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 6px)',
-                    right: 0,
-                    minWidth: 180,
-                    background: 'var(--paper)',
-                    border: '1px solid var(--rule)',
-                    borderRadius: 6,
-                    boxShadow: '0 12px 32px -8px rgba(0,0,0,0.15)',
-                    padding: '6px 0',
-                    zIndex: 51,
-                    animation: 'menuSlide .16s ease-out',
-                  }}
-                >
-                  <MenuItem
-                    label="콘티 모음"
-                    sub="저장/불러오기"
-                    onClick={() => { setShowMenu(false); setShowSets(true); }}
-                  />
-                  <MenuItem
-                    label="곡 라이브러리"
-                    sub="추출한 곡 재사용"
-                    onClick={() => { setShowMenu(false); setShowLibrary(true); }}
-                  />
-                  <MenuItem
-                    label="교회 템플릿"
-                    sub="PPT 기본값 저장"
-                    onClick={() => { setShowMenu(false); setShowTemplates(true); }}
-                  />
-                </div>
-              </>
-            )}
-          </div>
+          {/* 햄버거 메뉴 — Google AI Studio 스타일 사이드 슬라이드 패널.
+              아이콘은 SVG 세 줄, 클릭 시 우측에서 슬라이드인 drawer가 열린다. */}
+          <button
+            type="button"
+            onClick={() => setShowMenu(true)}
+            aria-label="메뉴 열기"
+            aria-expanded={showMenu}
+            className="btn-ghost"
+            style={{
+              padding: '8px',
+              width: 36,
+              height: 36,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+              <line x1="3" y1="6" x2="17" y2="6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="3" y1="14" x2="17" y2="14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+          {showMenu && (
+            <MenuDrawer onClose={() => setShowMenu(false)}>
+              <MenuItem
+                label="콘티 모음"
+                sub="저장/불러오기"
+                onClick={() => { setShowMenu(false); setShowSets(true); }}
+              />
+              <MenuItem
+                label="곡 라이브러리"
+                sub="추출한 곡 재사용"
+                onClick={() => { setShowMenu(false); setShowLibrary(true); }}
+              />
+              <MenuItem
+                label="교회 템플릿"
+                sub="PPT 기본값 저장"
+                onClick={() => { setShowMenu(false); setShowTemplates(true); }}
+              />
+            </MenuDrawer>
+          )}
           {/* 사용법 버튼 — 자주 쓰는 단일 액션이라 메뉴 밖에 따로 둠 */}
           <button
             type="button"
@@ -2639,6 +2626,99 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         {children}
       </div>
     </div>
+  );
+}
+
+// 햄버거 메뉴 → 우측 슬라이드 패널 (drawer).
+// Google AI Studio처럼 사이드에서 슉 슬라이드인. 배경 dim + ESC + ✕로 닫힘.
+function MenuDrawer({
+  onClose,
+  children,
+}: {
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <>
+      {/* 배경 dim — 클릭 시 닫힘 */}
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(31, 27, 22, 0.4)',
+          zIndex: 150,
+          animation: 'fadeIn .18s ease-out',
+        }}
+      />
+      <div
+        role="menu"
+        aria-label="메뉴"
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          width: 'min(86vw, 320px)',
+          height: '100vh',
+          background: 'var(--paper)',
+          borderLeft: '1px solid var(--rule)',
+          boxShadow: '-12px 0 36px -10px rgba(0,0,0,0.18)',
+          zIndex: 151,
+          padding: '20px 0 24px',
+          animation: 'drawerSlideIn .22s ease-out',
+          overflowY: 'auto',
+        }}
+      >
+        {/* 패널 헤더 — 제목 + 닫기 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 20px 16px',
+            borderBottom: '1px solid var(--rule)',
+            marginBottom: 6,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'var(--serif)',
+              fontWeight: 600,
+              fontSize: 18,
+              color: 'var(--ink)',
+            }}
+          >
+            메뉴
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="닫기"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              border: '1px solid var(--rule)',
+              background: 'var(--paper)',
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+              fontSize: 14,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </>
   );
 }
 
