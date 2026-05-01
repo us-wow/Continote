@@ -17,14 +17,12 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
-  KeyboardSensor,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
   arrayMove,
-  sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
@@ -563,7 +561,9 @@ export default function Home() {
       // 드래그 시작 거리(8px)를 두는 이유 — 의도하지 않은 드래그 방지
       activationConstraint: { distance: 8 },
     }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    // KeyboardSensor는 의도적으로 제거: Enter/Space가 dnd 픽업 키로 동작해서
+    // contentEditable 안에서 가사 줄바꿈/띄어쓰기를 가로채는 충돌이 발생함.
+    // 키보드 접근성은 각 블록의 ↑↓ 버튼이 이미 제공하므로 충분.
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
