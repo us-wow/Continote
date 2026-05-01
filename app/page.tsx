@@ -39,11 +39,18 @@ import {
   type SavedSet,
 } from '@/lib/conti-storage';
 import {
+  listTemplates,
+  saveTemplate,
+  removeTemplate,
+  type ChurchTemplate,
+} from '@/lib/template-storage';
+import {
   exportToPptx,
   validateSlide,
   PPT_FONT_LABELS,
   PPT_THEME_LABELS,
   type PptFont,
+  type PptCopyrightInfo,
   type PptSlide,
   type PptTheme,
 } from '@/lib/pptx';
@@ -148,10 +155,16 @@ export default function Home() {
   const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
   // PPT 배경 테마 — 어두운 예배실 기본은 검정.
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
+  // 한국 교회 PPT 관행상 저작권 슬라이드는 기본으로 포함한다.
+  const [ccliNumber, setCcliNumber] = useState('');
+  const [licenseLabel, setLicenseLabel] = useState('');
+  const [includeCopyright, setIncludeCopyright] = useState(true);
   // 도움말 모달 — 헤더의 [사용법] 버튼으로 토글
   const [showHelp, setShowHelp] = useState(false);
   // 콘티 세트 저장/불러오기 모달
   const [showSets, setShowSets] = useState(false);
+  // 교회 템플릿 저장/적용 모달
+  const [showTemplates, setShowTemplates] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -749,7 +762,12 @@ export default function Home() {
     }
     try {
       const fname = `contionote-${Date.now()}.pptx`;
-      await exportToPptx(slides, pptFont, fname, pptTheme);
+      const copyright: PptCopyrightInfo | undefined = includeCopyright ? {
+        songTitles: songs.map((s) => s.title || 'Untitled'),
+        ccliNumber: ccliNumber.trim() || undefined,
+        licenseLabel: licenseLabel.trim() || undefined,
+      } : undefined;
+      await exportToPptx(slides, pptFont, fname, pptTheme, copyright);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -1016,6 +1034,16 @@ export default function Home() {
             style={{ padding: '6px 12px', fontSize: 13 }}
           >
             콘티 모음
+          </button>
+          {/* 교회 템플릿 — 매주 반복되는 PPT 기본값 저장/적용 */}
+          <button
+            type="button"
+            onClick={() => setShowTemplates(true)}
+            aria-label="교회 템플릿"
+            className="btn-ghost"
+            style={{ padding: '6px 12px', fontSize: 13 }}
+          >
+            템플릿
           </button>
           {/* 사용법 버튼 — 모바일·데스크톱 모두 노출 (topbar-meta는 모바일에서 숨김 처리) */}
           <button
@@ -2092,6 +2120,53 @@ export default function Home() {
               </button>
             </div>
 
+            {/* 저작권 슬라이드 — 곡 제목은 자동 수집하고 CCLI 정보만 선택 입력한다. */}
+            <div className="stack" style={cssVar('--gap', '10px')}>
+              <button
+                type="button"
+                role="switch"
+                className="toggle"
+                data-on={includeCopyright}
+                aria-checked={includeCopyright}
+                onClick={() => setIncludeCopyright((v) => !v)}
+                style={{ padding: 0 }}
+              >
+                <span className="track" />
+                <span>저작권 슬라이드 자동 추가</span>
+              </button>
+              {includeCopyright && (
+                <div className="stack" style={cssVar('--gap', '8px')}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gap: 8,
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={ccliNumber}
+                      onChange={(e) => setCcliNumber(e.target.value)}
+                      placeholder="CCLI #####"
+                      aria-label="CCLI 번호"
+                      style={{ padding: '9px 12px', fontSize: 13.5 }}
+                    />
+                    <input
+                      type="text"
+                      value={licenseLabel}
+                      onChange={(e) => setLicenseLabel(e.target.value)}
+                      placeholder="예: CCLI Worship License"
+                      aria-label="라이선스 라벨"
+                      style={{ padding: '9px 12px', fontSize: 13.5 }}
+                    />
+                  </div>
+                  <div className="caption" style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+                    곡 제목은 자동으로 들어갑니다. CCLI 번호와 라벨은 선택사항이에요.
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
                 16:9 비율로 실제 PPT 모양처럼 보여주고 선택한 테마 배경을 그대로 적용한다.
                 한도 초과 시 빨강 테두리. */}
@@ -2239,6 +2314,22 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* 교회 템플릿 모달 — PPT 기본값(폰트/배경/저작권)을 저장하고 매주 적용 */}
+      {showTemplates && (
+        <ChurchTemplateModal
+          pptFont={pptFont}
+          pptTheme={pptTheme}
+          ccliNumber={ccliNumber}
+          licenseLabel={licenseLabel}
+          setPptFont={setPptFont}
+          setPptTheme={setPptTheme}
+          setCcliNumber={setCcliNumber}
+          setLicenseLabel={setLicenseLabel}
+          showToast={showToast}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2369,6 +2460,23 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             <li><b>TXT</b> — 콘티 텍스트만 (제목은 ━━━ 강조)</li>
             <li><b>DOCX</b> — 워드 문서 (제목 가운데 헤딩)</li>
             <li><b>클립보드 복사</b> — 콘티 전체 텍스트</li>
+          </ul>
+        </Section>
+
+        <Section title="단축키 (Mac은 ⌘, Windows/Linux는 Ctrl)">
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li><b>Ctrl/⌘ + S</b> — 콘티 모음 (저장/불러오기) 열기</li>
+            <li><b>Ctrl/⌘ + Enter</b> — 가사 추출 (편집 중 아닐 때)</li>
+            <li><b>Ctrl/⌘ + Z</b> — 되돌리기</li>
+            <li><b>Ctrl/⌘ + Shift + Z</b> — 다시 실행</li>
+          </ul>
+        </Section>
+
+        <Section title="저장 위치 안내">
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li><b>콘티 모음</b> — <span style={{ color: 'var(--ink-3)' }}>본인 브라우저(localStorage)에만 저장</span>. 다른 사람과 공유 X</li>
+            <li><b>교회 템플릿</b> — <span style={{ color: 'var(--ink-3)' }}>본인 브라우저에만 저장</span></li>
+            <li><b>공유 링크 복사</b> — <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>URL에 콘티 인코딩</span>. 링크 받은 누구나 그 콘티 복원 가능 (외부 서버 X)</li>
           </ul>
         </Section>
 
@@ -2625,6 +2733,255 @@ function SavedSetsModal({
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============== 교회 템플릿 모달 ==============
+// 매주 반복 입력하는 PPT 기본값(폰트/배경/저작권)을 localStorage에 저장하고 바로 적용한다.
+function ChurchTemplateModal({
+  pptFont,
+  pptTheme,
+  ccliNumber,
+  licenseLabel,
+  setPptFont,
+  setPptTheme,
+  setCcliNumber,
+  setLicenseLabel,
+  showToast,
+  onClose,
+}: {
+  pptFont: PptFont;
+  pptTheme: PptTheme;
+  ccliNumber: string;
+  licenseLabel: string;
+  setPptFont: React.Dispatch<React.SetStateAction<PptFont>>;
+  setPptTheme: React.Dispatch<React.SetStateAction<PptTheme>>;
+  setCcliNumber: React.Dispatch<React.SetStateAction<string>>;
+  setLicenseLabel: React.Dispatch<React.SetStateAction<string>>;
+  showToast: (msg: string) => void;
+  onClose: () => void;
+}) {
+  // 모달 마운트마다 최신 교회 템플릿 목록을 다시 읽는다.
+  const [templates, setTemplates] = useState<ChurchTemplate[]>([]);
+  const [name, setName] = useState('');
+
+  useEffect(() => {
+    setTemplates(listTemplates());
+  }, []);
+
+  // ESC로 닫기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const formatTemplateCreatedAt = (ms: number) =>
+    new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(ms));
+
+  const handleSave = () => {
+    const saved = saveTemplate({
+      name,
+      font: pptFont,
+      theme: pptTheme,
+      ccliNumber: ccliNumber.trim() || undefined,
+      licenseLabel: licenseLabel.trim() || undefined,
+    });
+    setTemplates(listTemplates());
+    setName('');
+    showToast(`"${saved.name}" 템플릿 저장 완료`);
+  };
+
+  const handleApply = (template: ChurchTemplate) => {
+    setPptFont(template.font);
+    setPptTheme(template.theme);
+    setCcliNumber(template.ccliNumber ?? '');
+    setLicenseLabel(template.licenseLabel ?? '');
+    showToast(`"${template.name}" 템플릿을 적용했어요`);
+  };
+
+  const handleRemove = (id: string) => {
+    if (!window.confirm('이 템플릿을 삭제할까요?')) return;
+    removeTemplate(id);
+    setTemplates(listTemplates());
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="교회 템플릿"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(31, 27, 22, 0.55)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--paper)',
+          maxWidth: 600,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          borderRadius: 4,
+          padding: '32px 28px 24px',
+          position: 'relative',
+          boxShadow: '0 20px 60px -10px rgba(0,0,0,0.3)',
+          border: '1px solid var(--rule)',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="닫기"
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '1px solid var(--rule)',
+            background: 'var(--paper)',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          ✕
+        </button>
+
+        <h2 className="h-song" style={{ margin: '0 0 6px', fontSize: 22 }}>
+          교회 템플릿
+        </h2>
+        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 18 }}>
+          교회별로 매주 반복되는 PPT 폰트, 배경, CCLI 정보를 저장해두고 다시 적용합니다.
+        </p>
+
+        {/* 현재 설정 저장 영역 */}
+        <div
+          style={{
+            border: '1px solid var(--rule)',
+            borderRadius: 4,
+            padding: 14,
+            marginBottom: 20,
+            background: 'color-mix(in oklab, var(--paper) 70%, white)',
+          }}
+        >
+          <div className="label" style={{ marginBottom: 8 }}>현재 설정 저장</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+              }}
+              placeholder="예: OO교회 청년부 PPT"
+              style={{ flex: 1, fontSize: 14 }}
+            />
+            <button
+              className="btn-primary"
+              onClick={handleSave}
+              style={{ padding: '10px 16px', fontSize: 14 }}
+            >
+              저장
+            </button>
+          </div>
+          <div className="caption" style={{ color: 'var(--ink-3)', marginTop: 8 }}>
+            {PPT_FONT_LABELS[pptFont]} · {PPT_THEME_LABELS[pptTheme]}
+            {ccliNumber.trim() ? ` · CCLI ${ccliNumber.trim()}` : ''}
+            {licenseLabel.trim() ? ` · ${licenseLabel.trim()}` : ''}
+          </div>
+        </div>
+
+        {/* 저장된 템플릿 리스트 */}
+        <div className="label" style={{ marginBottom: 8 }}>
+          저장된 템플릿 ({templates.length})
+        </div>
+        {templates.length === 0 ? (
+          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
+            아직 저장된 템플릿이 없어요.
+          </div>
+        ) : (
+          <div className="stack" style={cssVar('--gap', '8px')}>
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                style={{
+                  border: '1px solid var(--rule)',
+                  borderLeft: '2px solid var(--accent)',
+                  padding: '12px 14px',
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  background: 'color-mix(in oklab, var(--paper) 65%, white)',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--serif)',
+                      fontWeight: 600,
+                      fontSize: 16,
+                      color: 'var(--ink)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {template.name}
+                  </div>
+                  <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                    {formatTemplateCreatedAt(template.createdAt)} · {PPT_FONT_LABELS[template.font]} · {PPT_THEME_LABELS[template.theme]}
+                  </div>
+                </div>
+                <button
+                  className="btn-text"
+                  onClick={() => handleApply(template)}
+                  style={{ padding: '6px 12px', fontSize: 13 }}
+                >
+                  적용
+                </button>
+                <button
+                  onClick={() => handleRemove(template.id)}
+                  aria-label="삭제"
+                  title="삭제"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: '50%',
+                    border: '1px solid var(--rule)',
+                    background: 'var(--paper)',
+                    color: 'var(--ink-3)',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
