@@ -166,9 +166,15 @@ export default function Home() {
   // 한국 교회 PPT 관행상 저작권 슬라이드는 기본으로 포함한다.
   const [ccliNumber, setCcliNumber] = useState('');
   const [licenseLabel, setLicenseLabel] = useState('');
-  const [includeCopyright, setIncludeCopyright] = useState(true);
+  // 사용자 요청: 기본은 OFF. 필요한 사람만 토글로 켬.
+  const [includeCopyright, setIncludeCopyright] = useState(false);
+  // 외부 도구 export(Plain Slides / OpenSong)는 일반 사용자에겐 과해서 숨겨둠.
+  // ProPresenter / EasyWorship / OpenLP 사용자가 필요할 때만 펼침.
+  const [showExternalExports, setShowExternalExports] = useState(false);
   // 도움말 모달 — 헤더의 [사용법] 버튼으로 토글
   const [showHelp, setShowHelp] = useState(false);
+  // 헤더 메뉴 드롭다운 (콘티 모음/곡 라이브러리/템플릿) — 토스 UI 스타일
+  const [showMenu, setShowMenu] = useState(false);
   // 콘티 세트 저장/불러오기 모달
   const [showSets, setShowSets] = useState(false);
   // 교회 템플릿 저장/적용 모달
@@ -1066,37 +1072,62 @@ export default function Home() {
           >
             찬양팀·예배 사역자를 위한 AI 콘티 메이커
           </span>
-          {/* 콘티 모음 — 저장/불러오기 메뉴 */}
-          <button
-            type="button"
-            onClick={() => setShowSets(true)}
-            aria-label="콘티 모음 (저장/불러오기)"
-            className="btn-ghost"
-            style={{ padding: '6px 12px', fontSize: 13 }}
-          >
-            콘티 모음
-          </button>
-          {/* 곡 라이브러리 — 한 번 추출한 곡을 다시 불러와 재사용 */}
-          <button
-            type="button"
-            onClick={() => setShowLibrary(true)}
-            aria-label="곡 라이브러리"
-            className="btn-ghost"
-            style={{ padding: '6px 12px', fontSize: 13 }}
-          >
-            곡 라이브러리
-          </button>
-          {/* 교회 템플릿 — 매주 반복되는 PPT 기본값 저장/적용 */}
-          <button
-            type="button"
-            onClick={() => setShowTemplates(true)}
-            aria-label="교회 템플릿"
-            className="btn-ghost"
-            style={{ padding: '6px 12px', fontSize: 13 }}
-          >
-            템플릿
-          </button>
-          {/* 사용법 버튼 — 모바일·데스크톱 모두 노출 (topbar-meta는 모바일에서 숨김 처리) */}
+          {/* 메뉴 드롭다운 — 콘티 모음/곡 라이브러리/템플릿을 한 메뉴 안으로 통합 (토스 UI 패턴).
+              헤더 버튼이 너무 많아 보이는 문제를 해결하고, 사용법은 별도 자주 쓰니 메뉴 밖에 둔다. */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowMenu((v) => !v)}
+              aria-label="메뉴 열기"
+              aria-expanded={showMenu}
+              className="btn-ghost"
+              style={{ padding: '6px 12px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              메뉴 <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+            </button>
+            {showMenu && (
+              <>
+                {/* 배경 클릭으로 닫기 — 클릭 가로채는 투명 레이어 */}
+                <div
+                  onClick={() => setShowMenu(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 50 }}
+                />
+                <div
+                  role="menu"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    minWidth: 180,
+                    background: 'var(--paper)',
+                    border: '1px solid var(--rule)',
+                    borderRadius: 6,
+                    boxShadow: '0 12px 32px -8px rgba(0,0,0,0.15)',
+                    padding: '6px 0',
+                    zIndex: 51,
+                    animation: 'menuSlide .16s ease-out',
+                  }}
+                >
+                  <MenuItem
+                    label="콘티 모음"
+                    sub="저장/불러오기"
+                    onClick={() => { setShowMenu(false); setShowSets(true); }}
+                  />
+                  <MenuItem
+                    label="곡 라이브러리"
+                    sub="추출한 곡 재사용"
+                    onClick={() => { setShowMenu(false); setShowLibrary(true); }}
+                  />
+                  <MenuItem
+                    label="교회 템플릿"
+                    sub="PPT 기본값 저장"
+                    onClick={() => { setShowMenu(false); setShowTemplates(true); }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          {/* 사용법 버튼 — 자주 쓰는 단일 액션이라 메뉴 밖에 따로 둠 */}
           <button
             type="button"
             onClick={() => setShowHelp(true)}
@@ -2169,23 +2200,51 @@ export default function Home() {
               <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
                 PPT 다운로드 (.pptx)
               </button>
+              {/* 외부 도구 형식은 ProPresenter/EasyWorship 사용자에게만 필요 — 더보기로 숨김 */}
               <button
-                className="btn-text"
-                onClick={handleSavePlainSlides}
-                disabled={isEmpty}
-                title="ProPresenter / EasyWorship 텍스트 import 호환"
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowExternalExports((v) => !v)}
+                aria-expanded={showExternalExports}
+                style={{ padding: '6px 10px', fontSize: 12 }}
+                title="ProPresenter, EasyWorship, OpenLP 등 다른 슬라이드 도구로 가져갈 형식"
               >
-                Plain Slides (.txt)
-              </button>
-              <button
-                className="btn-text"
-                onClick={handleSaveOpenSong}
-                disabled={isEmpty}
-                title="OpenSong / OpenLP / ProPresenter import 호환"
-              >
-                OpenSong (.xml)
+                다른 도구로 내보내기 <span style={{ fontSize: 10, opacity: 0.6 }}>{showExternalExports ? '▴' : '▾'}</span>
               </button>
             </div>
+
+            {showExternalExports && (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  padding: '10px 12px',
+                  border: '1px dashed var(--rule)',
+                  borderRadius: 4,
+                  background: 'color-mix(in oklab, var(--paper) 80%, white)',
+                }}
+              >
+                <button
+                  className="btn-text"
+                  onClick={handleSavePlainSlides}
+                  disabled={isEmpty}
+                  title="ProPresenter / EasyWorship 텍스트 import 호환"
+                  style={{ padding: '6px 10px', fontSize: 13 }}
+                >
+                  Plain Slides (.txt)
+                </button>
+                <button
+                  className="btn-text"
+                  onClick={handleSaveOpenSong}
+                  disabled={isEmpty}
+                  title="OpenSong / OpenLP / ProPresenter import 호환"
+                  style={{ padding: '6px 10px', fontSize: 13 }}
+                >
+                  OpenSong (.xml)
+                </button>
+              </div>
+            )}
 
             {/* 저작권 슬라이드 — 곡 제목은 자동 수집하고 CCLI 정보만 선택 입력한다. */}
             <div className="stack" style={cssVar('--gap', '10px')}>
@@ -2580,6 +2639,47 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         {children}
       </div>
     </div>
+  );
+}
+
+// 헤더 메뉴 항목 — 토스 스타일(메인 라벨 + 작은 sub 캡션)
+function MenuItem({
+  label,
+  sub,
+  onClick,
+}: {
+  label: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      role="menuitem"
+      onClick={onClick}
+      style={{
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '10px 16px',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        fontFamily: 'var(--sans)',
+        color: 'var(--ink)',
+        transition: 'background .12s ease',
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'var(--paper-2)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 500 }}>{label}</div>
+      <div className="caption" style={{ color: 'var(--ink-3)', marginTop: 2, fontSize: 11.5 }}>
+        {sub}
+      </div>
+    </button>
   );
 }
 
