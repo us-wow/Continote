@@ -30,12 +30,15 @@ import { exportToDocx } from '@/lib/docx';
 import { encodeStateToHash, decodeHashToState } from '@/lib/url-sync';
 import { recordCorrection, buildCorrectionHint } from '@/lib/ocr-learning';
 import {
-  listSavedSets,
-  saveSet,
-  removeSet,
   formatSavedAt,
   type SavedSet,
 } from '@/lib/conti-storage';
+import {
+  listSetsAsync,
+  saveSetAsync,
+  removeSetAsync,
+  migrateLocalToCloud,
+} from '@/lib/conti-cloud';
 import {
   listTemplates,
   saveTemplate,
@@ -214,15 +217,26 @@ export default function Home() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user ?? null);
+      // SIGNED_IN 이벤트 + localStorage에 콘티가 있으면 클라우드로 자동 업로드.
+      // 클라우드가 비어있을 때만 옮겨 덮어쓰기 방지(로직은 conti-cloud.migrateLocalToCloud 안).
+      if (event === 'SIGNED_IN' && session?.user) {
+        migrateLocalToCloud()
+          .then((result) => {
+            if (result.migrated > 0) {
+              showToast(`이전에 저장한 콘티 ${result.migrated}개를 클라우드로 옮겼어요`);
+            }
+          })
+          .catch((err) => console.error('[migrate] 실패:', err));
+      }
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [showToast]);
 
   // OAuth 콜백 라우트가 ?auth_error=... 로 보내면 사용자에게 안내 토스트만 띄운다.
   useEffect(() => {
@@ -1262,7 +1276,8 @@ export default function Home() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {authUser.email ?? '로그인됨'}
+                  {/* 이메일에서 @ 앞부분만 표시해 헤더가 깔끔. 전체 이메일은 title hover로 확인 가능. */}
+                  {authUser.email?.split('@')[0] ?? '로그인됨'}
                 </span>
                 <button
                   type="button"
@@ -2585,6 +2600,7 @@ export default function Home() {
           currentSongs={songs}
           currentDoc={doc}
           isCurrentEmpty={isEmpty}
+          isCloudUser={Boolean(authUser)}
           onClose={() => setShowSets(false)}
           onLoad={(s) => {
             setSongs(s.songs);
@@ -3056,12 +3072,13 @@ function FAQ({ q, a }: { q: string; a: string }) {
 }
 
 // ============== 콘티 모음 모달 ==============
-// 사용자가 명시적으로 저장한 콘티들을 localStorage에서 불러와 리스트로 보여주고,
-// 새 저장 또는 과거 콘티 불러오기/삭제를 처리한다.
+// 로그인 상태면 Supabase conti_sets, 비로그인이면 localStorage에서 콘티 리스트를 가져온다.
+// 새 저장 / 불러오기 / 삭제는 모두 conti-cloud의 async API로 통일.
 function SavedSetsModal({
   currentSongs,
   currentDoc,
   isCurrentEmpty,
+  isCloudUser,
   onClose,
   onLoad,
   onSaved,
@@ -3069,17 +3086,32 @@ function SavedSetsModal({
   currentSongs: Song[];
   currentDoc: Block[];
   isCurrentEmpty: boolean;
+  // 로그인 상태인지 — UI에 "클라우드에 저장됨" 안내 표기용
+  isCloudUser: boolean;
   onClose: () => void;
   onLoad: (set: SavedSet) => void;
   onSaved: (set: SavedSet) => void;
 }) {
-  // 모달 마운트마다 최신 리스트 로드
   const [sets, setSets] = useState<SavedSet[]>([]);
   const [name, setName] = useState('');
+  const [loading, setLoading] = useState(true);
+  // saving/removing 동안 버튼 disabled — 중복 클릭 방지
+  const [busy, setBusy] = useState(false);
+
+  // 모달 열릴 때 리스트 로드 (async). 이후 저장/삭제 후에도 갱신.
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await listSetsAsync();
+      setSets(next);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setSets(listSavedSets());
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   // ESC로 닫기
   useEffect(() => {
@@ -3090,18 +3122,35 @@ function SavedSetsModal({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const handleSave = () => {
-    if (isCurrentEmpty) return;
-    const saved = saveSet(name, currentSongs, currentDoc);
-    setSets(listSavedSets());
-    setName('');
-    onSaved(saved);
+  const handleSave = async () => {
+    if (isCurrentEmpty || busy) return;
+    setBusy(true);
+    try {
+      const saved = await saveSetAsync(name, currentSongs, currentDoc);
+      await refresh();
+      setName('');
+      onSaved(saved);
+    } catch (err) {
+      console.error(err);
+      alert('저장에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
+    if (busy) return;
     if (!window.confirm('이 콘티를 삭제할까요?')) return;
-    removeSet(id);
-    setSets(listSavedSets());
+    setBusy(true);
+    try {
+      await removeSetAsync(id);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      alert('삭제에 실패했어요.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -3189,10 +3238,10 @@ function SavedSetsModal({
             <button
               className="btn-primary"
               onClick={handleSave}
-              disabled={isCurrentEmpty}
+              disabled={isCurrentEmpty || busy}
               style={{ padding: '10px 16px', fontSize: 14 }}
             >
-              저장
+              {busy ? '저장 중…' : '저장'}
             </button>
           </div>
           {isCurrentEmpty && (
@@ -3202,11 +3251,39 @@ function SavedSetsModal({
           )}
         </div>
 
+        {/* 저장 위치 안내 — 로그인 여부에 따라 클라우드/로컬 표시.
+            로그인 상태면 다른 기기에서도 그대로 보임을 강조해 사용자가 가치를 체감하게 한다. */}
+        <div
+          className="caption"
+          style={{
+            color: 'var(--ink-3)',
+            marginBottom: 12,
+            padding: '8px 10px',
+            background: 'color-mix(in oklab, var(--paper) 70%, white)',
+            border: '1px solid var(--rule)',
+            borderRadius: 2,
+          }}
+        >
+          {isCloudUser ? (
+            <>
+              <strong style={{ color: 'var(--accent-ink)' }}>☁ 클라우드 저장 중</strong> — 다른 컴퓨터·휴대폰에서도 같은 계정으로 로그인하면 이 콘티들을 볼 수 있어요.
+            </>
+          ) : (
+            <>
+              <strong>💾 이 브라우저에만 저장</strong> — 로그인하면 클라우드로 자동 옮겨져 다른 기기에서도 볼 수 있어요.
+            </>
+          )}
+        </div>
+
         {/* 저장된 콘티 리스트 */}
         <div className="label" style={{ marginBottom: 8 }}>
           저장된 콘티 ({sets.length})
         </div>
-        {sets.length === 0 ? (
+        {loading ? (
+          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
+            불러오는 중…
+          </div>
+        ) : sets.length === 0 ? (
           <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
             아직 저장된 콘티가 없어요.
           </div>
