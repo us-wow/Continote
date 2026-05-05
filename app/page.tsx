@@ -60,6 +60,8 @@ import {
   type PptTheme,
 } from '@/lib/pptx';
 import { buildPlainSlidesTxt, buildOpenSongXml, downloadText } from '@/lib/export-formats';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import type { Song, Section, SectionType } from '@/lib/types';
 import Mascot from '@/components/Mascot';
 import SectionChip from '@/components/SectionChip';
@@ -179,6 +181,10 @@ export default function Home() {
   const [showTemplates, setShowTemplates] = useState(false);
   // 곡 라이브러리 모달 — 추출된 곡을 자동 누적해 재사용한다.
   const [showLibrary, setShowLibrary] = useState(false);
+  // Supabase 로그인 상태 — null이면 비로그인. supabase 미설정 환경에서도 null 유지.
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  // 로그인/로그아웃 진행 중 표시 — 버튼 중복 클릭 방지.
+  const [authBusy, setAuthBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -193,6 +199,83 @@ export default function Home() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(''), 2400);
   }, []);
+
+  // ----- Supabase 로그인 상태 구독 -----
+  // 마운트 시 현재 세션 1회 조회 + auth state 변경(SIGNED_IN/OUT/TOKEN_REFRESHED) 구독.
+  // supabase 미설정 환경(env 비어있음)에서는 클라이언트가 null이라 그냥 비로그인 상태로 동작.
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setAuthUser(data.user ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // OAuth 콜백 라우트가 ?auth_error=... 로 보내면 사용자에게 안내 토스트만 띄운다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('auth_error');
+    if (!err) return;
+    showToast(
+      err === 'no_code'
+        ? '로그인 응답이 비어 있어요. 다시 시도해주세요.'
+        : '로그인에 실패했어요. 다시 시도해주세요.'
+    );
+    // URL에서 ?auth_error 파라미터를 제거 — 새로고침 시 토스트가 또 뜨는 걸 방지.
+    const cleaned = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, '', cleaned);
+  }, []);
+
+  // Google OAuth 시작. redirectTo는 OAuth 성공 후 Supabase가 사용자를 다시 보낼 우리 콜백 URL.
+  // window.location.origin으로 잡아 로컬(localhost:3000)/프로덕션(vercel) 양쪽 자동 처리.
+  const handleSignIn = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      showToast('로그인 기능이 설정되지 않았어요');
+      return;
+    }
+    setAuthBusy(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      console.error('signIn 실패:', error.message);
+      showToast('로그인 시작에 실패했어요');
+      setAuthBusy(false);
+    }
+    // 성공 시 브라우저가 Google로 리다이렉트되므로 setAuthBusy(false)는 굳이 호출하지 않는다.
+  };
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    setAuthBusy(true);
+    const { error } = await supabase.auth.signOut();
+    setAuthBusy(false);
+    if (error) {
+      console.error('signOut 실패:', error.message);
+      showToast('로그아웃에 실패했어요');
+      return;
+    }
+    showToast('로그아웃 됐어요');
+  };
 
   useEffect(() => {
     const snapshot = JSON.stringify({ songs, doc });
@@ -387,6 +470,20 @@ export default function Home() {
   // 곡별 섹션 ID — 어느 곡의 몇 번째 섹션인지 추적용
   const sectionId = (songIdx: number, secIdx: number) => `${songIdx}-${secIdx}`;
 
+  // 섹션 본문을 "2줄씩 한 슬라이드" 기본값으로 그룹핑한다.
+  // 줄 사이에 빈 줄을 넣어두면 docToSlides가 슬라이드 경계로 자동 처리하므로
+  // 사용자는 PPT 다운로드 전에 따로 자르는 작업을 할 필요가 없다.
+  // 사용자가 합치고 싶으면 빈 줄만 지우면 두 줄이 다시 4줄짜리 한 슬라이드가 된다.
+  const groupLinesByTwo = (text: string): string => {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const groups: string[] = [];
+    for (let i = 0; i < lines.length; i += 2) {
+      groups.push(lines.slice(i, i + 2).join('\n'));
+    }
+    // 그룹 사이에 빈 줄(== \n\n) 한 칸을 둬 PPT 슬라이드를 분리한다.
+    return groups.join('\n\n');
+  };
+
   // 곡 제목 클릭 → title 블록 추가 (이미 있으면 중복 방지)
   // 사용자 요청: 위에 끼어들지 말고 섹션처럼 맨 아래에 추가
   // (여러 곡 섞어 콘티 만들 때 자연스러움 — 제목→섹션 순서로 흐름 유지)
@@ -422,7 +519,10 @@ export default function Home() {
         type: section.type,
         label: section.label,
         verseNum: section.verseNum,
-        body: section.text,
+        // PPT 기본값을 "2줄=1슬라이드"로 만들기 위해 2줄마다 빈 줄을 끼워둔다.
+        // docToSlides는 빈 줄을 슬라이드 분리 신호로 처리하므로,
+        // 사용자가 별도 작업 없이도 깔끔한 PPT가 되고, 합치고 싶으면 빈 줄만 지우면 된다.
+        body: groupLinesByTwo(section.text),
       });
       return [...d, ...next];
     });
@@ -565,15 +665,6 @@ export default function Home() {
     // contentEditable 안에서 가사 줄바꿈/띄어쓰기를 가로채는 충돌이 발생함.
     // 키보드 접근성은 각 블록의 ↑↓ 버튼이 이미 제공하므로 충분.
   );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIdx = blockIds.indexOf(active.id as string);
-    const newIdx = blockIds.indexOf(over.id as string);
-    if (oldIdx === -1 || newIdx === -1) return;
-    setDoc((d) => arrayMove(d, oldIdx, newIdx));
-  };
 
   // section 본문에 빈 줄(\n\n)이 들어가면 자동으로 doc 안 두 section으로 split.
   // 시각적으로도 카드가 분리되어 ↑↓/dnd로 각자 이동 가능.
@@ -1144,6 +1235,71 @@ export default function Home() {
           >
             사용법
           </button>
+
+          {/* 로그인/로그아웃 — supabase 설정된 경우에만 노출.
+              비로그인: "Google 로그인" 버튼.
+              로그인됨: 이메일(축약) + 로그아웃. */}
+          {isSupabaseConfigured() && (
+            authUser ? (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '4px 4px 4px 10px',
+                  border: '1px solid var(--rule)',
+                  borderRadius: 999,
+                  fontSize: 12.5,
+                  color: 'var(--ink-2)',
+                }}
+                title={authUser.email ?? ''}
+              >
+                <span
+                  style={{
+                    maxWidth: 140,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {authUser.email ?? '로그인됨'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={authBusy}
+                  className="btn-ghost"
+                  style={{ padding: '4px 10px', fontSize: 12 }}
+                >
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSignIn}
+                disabled={authBusy}
+                aria-label="Google 계정으로 로그인"
+                className="btn-ghost"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 13,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {/* Google G 로고 — 인지도가 가장 높은 식별자 */}
+                <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
+                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                  <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                  <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                  <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                </svg>
+                {authBusy ? '연결 중…' : '로그인'}
+              </button>
+            )
+          )}
         </div>
       </header>
 
@@ -2072,38 +2228,31 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
+                  // 콘티 편집 블록 정렬은 ↑↓ 버튼만 사용한다.
+                  // 드래그앤드롭은 contentEditable Enter/blur 로직과 자꾸 충돌해서 제거.
                   <div>
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
-                        {doc.map((b, i) => (
-                          <SortableBlock key={blockIds[i]} id={blockIds[i]}>
-                            <EditorBlockView
-                              block={b}
-                              onUpdate={(next) => updateBlock(i, next)}
-                              onRemove={() => removeBlock(i)}
-                              onMoveUp={() => moveBlockUp(i)}
-                              onMoveDown={() => moveBlockDown(i)}
-                              canMoveUp={findPrevContentIdx(i) !== -1}
-                              canMoveDown={findNextContentIdx(i) !== -1}
-                              onMergeWithPrev={() => mergeWithPrev(i)}
-                              onAutoSplit={() => autoSplitOnBlankLine(i)}
-                              shouldFocus={
-                                pendingMemoFocusRef.current &&
-                                b.kind === 'memo' &&
-                                i === doc.length - 1
-                              }
-                              onFocused={() => {
-                                pendingMemoFocusRef.current = false;
-                              }}
-                            />
-                          </SortableBlock>
-                        ))}
-                      </SortableContext>
-                    </DndContext>
+                    {doc.map((b, i) => (
+                      <EditorBlockView
+                        key={blockIds[i]}
+                        block={b}
+                        onUpdate={(next) => updateBlock(i, next)}
+                        onRemove={() => removeBlock(i)}
+                        onMoveUp={() => moveBlockUp(i)}
+                        onMoveDown={() => moveBlockDown(i)}
+                        canMoveUp={findPrevContentIdx(i) !== -1}
+                        canMoveDown={findNextContentIdx(i) !== -1}
+                        onMergeWithPrev={() => mergeWithPrev(i)}
+                        onAutoSplit={() => autoSplitOnBlankLine(i)}
+                        shouldFocus={
+                          pendingMemoFocusRef.current &&
+                          b.kind === 'memo' &&
+                          i === doc.length - 1
+                        }
+                        onFocused={() => {
+                          pendingMemoFocusRef.current = false;
+                        }}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -2553,76 +2702,189 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 
         <Section title="빠른 시작 (5단계)">
           <ol style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
-            <li>악보 업로드 (JPG/PNG/PDF, 최대 12개)</li>
-            <li><b>가사 추출하기</b> 클릭</li>
-            <li>좌측 결과에서 곡 제목 + 섹션 카드 클릭 → 우측 콘티에 추가</li>
-            <li>가사 안에서 <b>Enter 두 번</b>(빈 줄)으로 슬라이드 분리</li>
-            <li><b>PPT 다운로드 (.pptx)</b></li>
+            <li>악보 사진/PDF 업로드 (한 번에 12개까지)</li>
+            <li><b>가사 추출하기</b> 버튼 누르기</li>
+            <li>왼쪽에 나온 곡 제목·섹션(Verse/후렴) 카드를 클릭하면 오른쪽 콘티에 추가됨</li>
+            <li>가사 안에서 <b>Enter 두 번</b>(빈 줄 만들기)으로 슬라이드를 잘라요</li>
+            <li>아래 <b>PPT 다운로드</b> 버튼 누르면 끝</li>
           </ol>
         </Section>
 
-        <Section title="슬라이드 분리 4가지 방법">
+        <Section title="이 버튼들 뭐예요? (메뉴 · 주요 기능 안내)">
+          <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 10 }}>
+            오른쪽 위 ☰ (세 줄 아이콘) 메뉴 안 항목들과, 화면 곳곳의 버튼들을 풀어서 설명해요.
+          </p>
+
+          <h4 style={{ fontSize: 13, color: 'var(--ink)', margin: '14px 0 6px', fontWeight: 600 }}>
+            ☰ 메뉴 안 (오른쪽 위)
+          </h4>
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
             <li>
-              <b>Enter 두 번</b>(가장 직관적) — 가사 안에서 빈 줄 만들면 거기서 분리. 백스페이스로 빈 줄 지우면 즉시 합쳐짐.
+              <b>콘티 모음</b> — 만든 콘티에 이름 붙여서 저장. 다음에 똑같이 불러올 수 있어요.
+              <span style={{ color: 'var(--ink-3)' }}> (내 브라우저 안에만 저장됨)</span>
             </li>
-            <li><b>섹션 경계</b> — Verse 다음에 후렴이면 자동 분리</li>
-            <li><b>+ 슬라이드 구분</b> 버튼 — 콘티 헤더에서 명시적 분리자 추가</li>
-            <li><b>합치기</b> — Enter 한 번(줄바꿈)만 하면 같은 슬라이드 안 여러 줄</li>
+            <li>
+              <b>곡 라이브러리</b> — 한 번 추출한 곡은 여기 자동으로 모여요. 다음 주에 같은 곡 또 쓰면 검색해서 바로 추가.
+            </li>
+            <li>
+              <b>교회 템플릿</b> — 우리 교회 기본 폰트·배경·CCLI 번호를 저장. 매번 같은 설정 다시 안 골라도 돼요.
+            </li>
+          </ul>
+
+          <h4 style={{ fontSize: 13, color: 'var(--ink)', margin: '14px 0 6px', fontWeight: 600 }}>
+            1번 영역 — 악보 업로드
+          </h4>
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>
+              <b>정확도 우선</b> 토글 — 흐릿하거나 글씨 작은 악보일 때만 켜기. 더 신중하게 읽어주는 대신 시간 살짝 더 걸려요.
+            </li>
+            <li>
+              <b>가사 추출하기</b> — 업로드한 악보에서 가사만 골라서 뽑아주는 메인 버튼.
+            </li>
+          </ul>
+
+          <h4 style={{ fontSize: 13, color: 'var(--ink)', margin: '14px 0 6px', fontWeight: 600 }}>
+            2번 영역 — 추출된 곡 (왼쪽 결과)
+          </h4>
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>
+              <b>곡 제목 카드 클릭</b> → 오른쪽 콘티에 그 곡의 제목 슬라이드 추가
+            </li>
+            <li>
+              <b>섹션 카드 클릭</b> (Verse, 후렴, Bridge 등) → 그 섹션 가사가 콘티에 추가
+            </li>
+            <li>
+              곡 카드 우측 <b>↑↓</b> — 곡 순서 바꾸기 / <b>✕</b> — 그 곡 삭제 (콘티에 추가했던 것도 같이 빠짐)
+            </li>
+            <li>
+              섹션 카드의 <b>↑↓</b> — 그 곡 안에서 섹션 순서 바꾸기 (예: 후렴을 Verse 1 위로)
+            </li>
+          </ul>
+
+          <h4 style={{ fontSize: 13, color: 'var(--ink)', margin: '14px 0 6px', fontWeight: 600 }}>
+            3번 영역 — 콘티 편집 (오른쪽)
+          </h4>
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>
+              <b>+ 메모 슬라이드</b> — 광고, 기도제목, 축도자 이름처럼 가사가 아닌 자유 텍스트 슬라이드 만들기.
+            </li>
+            <li>
+              <b>+ 슬라이드 구분</b> — 슬라이드를 정확히 여기서 자르고 싶을 때 명시적으로 분리자 추가.
+              <span style={{ color: 'var(--ink-3)' }}> (보통은 Enter 두 번이면 충분)</span>
+            </li>
+            <li>
+              <b>공유 링크 복사</b> — 지금 만든 콘티를 통째로 URL에 담아서 복사. 링크 받은 사람이 열면 똑같은 콘티가 보여요.
+              <span style={{ color: 'var(--ink-3)' }}> (외부 서버에 저장되는 거 아님)</span>
+            </li>
+            <li>
+              블록 안의 <b>↑↓</b> — 위·아래로 이동 / <b>✎</b> — 가사 직접 고치기 / <b>✕</b> — 삭제
+            </li>
+          </ul>
+
+          <h4 style={{ fontSize: 13, color: 'var(--ink)', margin: '14px 0 6px', fontWeight: 600 }}>
+            4번 영역 — PPT 만들기
+          </h4>
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>
+              <b>폰트</b> — 4종 중 선택. <b>본명조 Pro</b>가 모든 컴퓨터에서 가장 잘 보여서 추천.
+            </li>
+            <li>
+              <b>배경</b> — 검정/흰색/종이톤 + 실제 사진 3종(초원·십자가·성경책). 어두운 예배실은 검정, 밝으면 흰색.
+            </li>
+            <li>
+              <b>저작권/CCLI 슬라이드</b> — PPT 맨 끝에 "오늘 부른 곡 + CCLI 번호" 슬라이드 자동 추가. CCLI 번호는 안 적어도 됨.
+            </li>
+            <li>
+              <b>다른 도구로 내보내기 ▾</b> — Plain Slides(다른 PPT 도구용 .txt), OpenSong(찬양 전용 프로그램용 .xml).
+              <span style={{ color: 'var(--ink-3)' }}> 평소에 PowerPoint만 쓰면 무시해도 됨.</span>
+            </li>
           </ul>
         </Section>
 
-        <Section title="글자수 / 사이즈 한도 (자동 적용)">
+        <Section title="슬라이드 분리하는 법 (4가지)">
+          <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
+            <li>
+              <b>Enter 두 번</b>(가장 쉬움) — 가사 안에서 빈 줄 만들면 거기서부터 새 슬라이드. 빈 줄 지우면 다시 합쳐짐.
+            </li>
+            <li>
+              <b>섹션이 바뀔 때</b> — Verse 다음에 후렴이 오면 자동으로 다른 슬라이드.
+            </li>
+            <li>
+              <b>+ 슬라이드 구분</b> — 정확히 여기서 자르고 싶을 때 콘티 편집 헤더에서 추가.
+            </li>
+            <li>
+              <b>합치고 싶을 때</b> — Enter 한 번(줄바꿈)만 하면 같은 슬라이드 안에서 두 줄 됨.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="한 슬라이드에 들어가는 글자 수 (자동 조정됨)">
+          <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 10 }}>
+            줄 수에 따라 글씨 크기가 자동으로 정해져요. 한도 넘으면 빨간 알림이 떠요.
+          </p>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--rule)' }}>
                 <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>줄 수</th>
-                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>폰트 사이즈</th>
-                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>줄당 글자(띄어쓰기 포함)</th>
+                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>글씨 크기</th>
+                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>한 줄 글자 수</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>64pt</td><td style={{ padding: '6px 4px' }}>17자</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>54pt</td><td style={{ padding: '6px 4px' }}>21자</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>44pt</td><td style={{ padding: '6px 4px' }}>26자</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>36pt</td><td style={{ padding: '6px 4px' }}>32자</td></tr>
-              <tr><td style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>5줄+</td><td colSpan={2} style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>분리 필요 (빨강 알림)</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>64pt</td><td style={{ padding: '6px 4px' }}>17자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>54pt</td><td style={{ padding: '6px 4px' }}>21자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>44pt</td><td style={{ padding: '6px 4px' }}>26자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>36pt</td><td style={{ padding: '6px 4px' }}>32자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>5줄 이상</td><td colSpan={2} style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>슬라이드를 두 개로 나눠야 해요</td></tr>
             </tbody>
           </table>
-          <p className="caption" style={{ color: 'var(--ink-3)', marginTop: 8 }}>
-            한도 통과 후에도 미세하게 박스 넘으면 PowerPoint가 자동으로 살짝 축소해서 한 줄에 맞춥니다.
-          </p>
         </Section>
 
         <Section title="자주 묻는 질문">
-          <FAQ q="정확도 우선과 기본 모드 차이?" a="정확도 ON은 PDF를 고화질(scale 2)로 변환하고 AI가 더 신중히 동작. 흐릿한 PDF에서 효과적이고 시간은 살짝 더 걸립니다." />
-          <FAQ q="가사가 빠지거나 잘못 추출됐어요." a="정확도 우선 토글 켜고 다시 추출. 그래도 안 되면 ✎ 버튼으로 직접 수정." />
-          <FAQ q="곡 카드의 ✕로 곡을 지우면 콘티에도 영향?" a="네, 그 곡과 연결된 콘티 블록도 함께 삭제됩니다. confirm으로 미리 확인합니다." />
-          <FAQ q="PPT 폰트가 다른 걸로 보여요." a="시스템에 그 폰트가 설치돼 있어야 정확히 표시됩니다. 본명조 Pro(Noto Serif KR)가 호환성이 가장 좋아 추천." />
+          <FAQ
+            q="'정확도 우선' 켜면 뭐가 달라져요?"
+            a="흐릿한 PDF/사진을 더 선명하게 처리하고, AI가 가사를 더 천천히·신중히 읽어요. 깔끔한 악보면 굳이 안 켜도 되고, 글씨가 작거나 흐릿하면 켜는 걸 추천해요. 시간이 살짝 더 걸려요."
+          />
+          <FAQ
+            q="가사가 빠지거나 이상하게 나왔어요."
+            a="① '정확도 우선' 켜고 다시 추출하기. ② 그래도 안 되면 콘티 블록 옆 ✎ 버튼으로 직접 고치기. (한 번 고친 패턴은 다음 추출 때 AI가 참고해요)"
+          />
+          <FAQ
+            q="곡 카드 ✕ 누르면 콘티에 추가한 것도 사라져요?"
+            a="네, 그 곡으로 추가했던 콘티 블록도 같이 사라져요. 누를 때 한 번 더 물어봐요."
+          />
+          <FAQ
+            q="PPT 열었더니 글씨체가 다르게 보여요."
+            a="그 컴퓨터에 해당 폰트가 설치되어 있어야 똑같이 보여요. '본명조 Pro'가 가장 호환성 좋아서 추천."
+          />
+          <FAQ
+            q="저장한 콘티는 어디 있나요?"
+            a="내 브라우저(이 컴퓨터, 이 크롬/사파리)에만 저장돼요. 다른 컴퓨터·다른 사람한테는 안 보여요. 공유하려면 '공유 링크 복사'를 쓰세요."
+          />
         </Section>
 
         <Section title="다른 다운로드 형식">
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
-            <li><b>TXT</b> — 콘티 텍스트만 (제목은 ━━━ 강조)</li>
-            <li><b>DOCX</b> — 워드 문서 (제목 가운데 헤딩)</li>
-            <li><b>클립보드 복사</b> — 콘티 전체 텍스트</li>
+            <li><b>TXT</b> — 콘티 텍스트만 메모장 파일로 (제목은 ━━━ 강조)</li>
+            <li><b>DOCX</b> — Word 문서</li>
+            <li><b>클립보드 복사</b> — 콘티 전체 텍스트를 카톡·메모 앱에 바로 붙여넣을 수 있게</li>
           </ul>
         </Section>
 
-        <Section title="단축키 (Mac은 ⌘, Windows/Linux는 Ctrl)">
+        <Section title="단축키 (Mac은 ⌘, Windows는 Ctrl)">
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
             <li><b>Ctrl/⌘ + S</b> — 콘티 모음 (저장/불러오기) 열기</li>
-            <li><b>Ctrl/⌘ + Enter</b> — 가사 추출 (편집 중 아닐 때)</li>
-            <li><b>Ctrl/⌘ + Z</b> — 되돌리기</li>
-            <li><b>Ctrl/⌘ + Shift + Z</b> — 다시 실행</li>
+            <li><b>Ctrl/⌘ + Enter</b> — 가사 추출하기 (편집 중 아닐 때)</li>
+            <li><b>Ctrl/⌘ + Z</b> — 방금 한 거 되돌리기</li>
+            <li><b>Ctrl/⌘ + Shift + Z</b> — 되돌린 거 다시 실행</li>
           </ul>
         </Section>
 
-        <Section title="저장 위치 안내">
+        <Section title="저장 위치 (개인정보 안내)">
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
-            <li><b>콘티 모음</b> — <span style={{ color: 'var(--ink-3)' }}>본인 브라우저(localStorage)에만 저장</span>. 다른 사람과 공유 X</li>
-            <li><b>교회 템플릿</b> — <span style={{ color: 'var(--ink-3)' }}>본인 브라우저에만 저장</span></li>
-            <li><b>공유 링크 복사</b> — <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>URL에 콘티 인코딩</span>. 링크 받은 누구나 그 콘티 복원 가능 (외부 서버 X)</li>
+            <li><b>콘티 모음 / 곡 라이브러리 / 교회 템플릿</b> — <span style={{ color: 'var(--ink-3)' }}>전부 내 브라우저 안에만 저장 (서버 X)</span>. 다른 컴퓨터 가면 안 보여요.</li>
+            <li><b>공유 링크 복사</b> — <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>URL 자체에 콘티가 통째로 담겨있음</span>. 링크 받은 누구나 그 콘티 볼 수 있어요. (서버에 저장되는 게 아니에요)</li>
+            <li><b>악보 이미지/PDF</b> — 가사 추출할 때만 잠깐 AI(Gemini)에 보내고, 추출 끝나면 우리 서버엔 안 남아요.</li>
           </ul>
         </Section>
 
