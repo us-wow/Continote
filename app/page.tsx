@@ -39,19 +39,20 @@ import {
   removeSetAsync,
   migrateLocalToCloud,
 } from '@/lib/conti-cloud';
+import { type ChurchTemplate } from '@/lib/template-storage';
 import {
-  listTemplates,
-  saveTemplate,
-  removeTemplate,
-  type ChurchTemplate,
-} from '@/lib/template-storage';
+  listTemplatesAsync,
+  saveTemplateAsync,
+  removeTemplateAsync,
+  migrateTemplatesToCloud,
+} from '@/lib/template-cloud';
+import { type LibrarySong } from '@/lib/song-library';
 import {
-  listLibrary,
-  addToLibrary,
-  removeFromLibrary,
-  searchLibrary,
-  type LibrarySong,
-} from '@/lib/song-library';
+  listLibraryAsync,
+  addToLibraryAsync,
+  removeFromLibraryAsync,
+  migrateSongLibraryToCloud,
+} from '@/lib/song-library-cloud';
 import {
   exportToPptx,
   validateSlide,
@@ -219,13 +220,21 @@ export default function Home() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user ?? null);
-      // SIGNED_IN 이벤트 + localStorage에 콘티가 있으면 클라우드로 자동 업로드.
-      // 클라우드가 비어있을 때만 옮겨 덮어쓰기 방지(로직은 conti-cloud.migrateLocalToCloud 안).
+      // SIGNED_IN 이벤트 + localStorage에 데이터가 있으면 세 종류 모두 클라우드로 자동 업로드.
+      // 클라우드가 비어있을 때만 옮겨 덮어쓰기 방지(로직은 각 cloud 모듈 안).
+      // Promise.all로 동시 처리해 첫 로그인 후 즉시 화면이 클라우드 데이터로 갱신되게 한다.
       if (event === 'SIGNED_IN' && session?.user) {
-        migrateLocalToCloud()
-          .then((result) => {
-            if (result.migrated > 0) {
-              showToast(`이전에 저장한 콘티 ${result.migrated}개를 클라우드로 옮겼어요`);
+        Promise.all([
+          migrateLocalToCloud(),
+          migrateSongLibraryToCloud(),
+          migrateTemplatesToCloud(),
+        ])
+          .then(([conti, songs, templates]) => {
+            const total = conti.migrated + songs.migrated + templates.migrated;
+            if (total > 0) {
+              showToast(
+                `이전 데이터를 클라우드로 옮겼어요 — 콘티 ${conti.migrated} / 곡 ${songs.migrated} / 템플릿 ${templates.migrated}`
+              );
             }
           })
           .catch((err) => console.error('[migrate] 실패:', err));
@@ -402,7 +411,9 @@ export default function Home() {
           showToast('가사를 찾을 수 없어요');
         } else {
           setSongs((prev) => [...prev, ...data.songs]);
-          addToLibrary(data.songs);
+          // 라이브러리 누적은 fire-and-forget — 사용자가 결과를 보는 흐름은 막지 않는다.
+          // 실패 시 console에 남고 토스트는 별도로 안 띄움(부수 효과라 덜 중요).
+          void addToLibraryAsync(data.songs);
           setPasted('');
           showToast(`${data.songs.length}곡 추출됨`);
         }
@@ -468,7 +479,8 @@ export default function Home() {
         showToast('가사를 찾을 수 없어요');
       } else {
         setSongs((prev) => [...prev, ...data.songs]);
-        addToLibrary(data.songs);
+        // 라이브러리 누적은 fire-and-forget — 결과 표시를 막지 않는다.
+        void addToLibraryAsync(data.songs);
         showToast(`${data.songs.length}곡 추출됨`);
       }
     } catch (err: any) {
@@ -2617,6 +2629,7 @@ export default function Home() {
       {/* 곡 라이브러리 모달 — 자동 누적된 곡 검색/추가/삭제 */}
       {showLibrary && (
         <SongLibraryModal
+          isCloudUser={Boolean(authUser)}
           onClose={() => setShowLibrary(false)}
           onAdd={(song) => {
             setSongs((prev) => [...prev, { title: song.title, sections: song.sections }]);
@@ -2629,6 +2642,7 @@ export default function Home() {
       {/* 교회 템플릿 모달 — PPT 기본값(폰트/배경/저작권)을 저장하고 매주 적용 */}
       {showTemplates && (
         <ChurchTemplateModal
+          isCloudUser={Boolean(authUser)}
           pptFont={pptFont}
           pptTheme={pptTheme}
           ccliNumber={ccliNumber}
@@ -3360,21 +3374,50 @@ function SavedSetsModal({
 }
 
 // ============== 곡 라이브러리 모달 ==============
-// 추출할 때 자동 저장된 곡을 제목/가사로 검색해 현재 추출 결과에 다시 추가한다.
+// 자동 저장된 곡(로그인이면 클라우드, 비로그인이면 localStorage)을 제목/가사로 검색해 다시 추가한다.
+// 검색은 client-side 필터링이라 서버 부하 없이 즉시 반응.
 function SongLibraryModal({
+  isCloudUser,
   onClose,
   onAdd,
 }: {
+  isCloudUser: boolean;
   onClose: () => void;
   onAdd: (song: LibrarySong) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [library, setLibrary] = useState<LibrarySong[]>([]);
+  const [allLibrary, setAllLibrary] = useState<LibrarySong[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 모달 마운트 및 검색어 변경마다 localStorage의 최신 곡 목록을 다시 읽는다.
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await listLibraryAsync();
+      setAllLibrary(next);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    setLibrary(query.trim() ? searchLibrary(query) : listLibrary());
-  }, [query]);
+    void refresh();
+  }, [refresh]);
+
+  // 검색은 fetch 없이 client-side 필터링 — 입력할 때마다 즉시 반영.
+  const library = useMemo(() => {
+    const q = query.trim().toLowerCase().replace(/\s+/g, '');
+    if (!q) return allLibrary;
+    return allLibrary.filter((s) => {
+      if (s.title.toLowerCase().replace(/\s+/g, '').includes(q)) return true;
+      if (
+        s.sections.some((sec) =>
+          sec.text.toLowerCase().replace(/\s+/g, '').includes(q)
+        )
+      )
+        return true;
+      return false;
+    });
+  }, [query, allLibrary]);
 
   // ESC로 닫기
   useEffect(() => {
@@ -3394,9 +3437,9 @@ function SongLibraryModal({
       minute: '2-digit',
     }).format(new Date(ms));
 
-  const handleRemove = (id: string) => {
-    removeFromLibrary(id);
-    setLibrary(query.trim() ? searchLibrary(query) : listLibrary());
+  const handleRemove = async (id: string) => {
+    await removeFromLibraryAsync(id);
+    await refresh();
   };
 
   return (
@@ -3454,9 +3497,32 @@ function SongLibraryModal({
         <h2 className="h-song" style={{ margin: '0 0 6px', fontSize: 22 }}>
           곡 라이브러리
         </h2>
-        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 18 }}>
-          한 번 추출한 곡은 브라우저에 자동 저장됩니다. 제목과 가사 내용으로 검색할 수 있어요.
+        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 12 }}>
+          한 번 추출한 곡은 자동으로 모여요. 제목과 가사 내용으로 검색할 수 있어요.
         </p>
+
+        {/* 저장 위치 안내 — 로그인 여부에 따라 클라우드/로컬 표시. */}
+        <div
+          className="caption"
+          style={{
+            color: 'var(--ink-3)',
+            marginBottom: 14,
+            padding: '8px 10px',
+            background: 'color-mix(in oklab, var(--paper) 70%, white)',
+            border: '1px solid var(--rule)',
+            borderRadius: 2,
+          }}
+        >
+          {isCloudUser ? (
+            <>
+              <strong style={{ color: 'var(--accent-ink)' }}>☁ 클라우드 저장 중</strong> — 다른 기기에서도 같은 계정으로 로그인하면 이 곡들을 그대로 쓸 수 있어요.
+            </>
+          ) : (
+            <>
+              <strong>💾 이 브라우저에만 저장</strong> — 로그인하면 클라우드로 자동 옮겨져 다른 기기에서도 보여요.
+            </>
+          )}
+        </div>
 
         <input
           type="search"
@@ -3467,7 +3533,11 @@ function SongLibraryModal({
           style={{ fontSize: 14, marginBottom: 18 }}
         />
 
-        {library.length === 0 ? (
+        {loading ? (
+          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
+            불러오는 중…
+          </div>
+        ) : library.length === 0 ? (
           <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
             아직 라이브러리에 곡이 없어요. 가사 추출하면 자동으로 모입니다.
           </div>
@@ -3543,8 +3613,10 @@ function SongLibraryModal({
 }
 
 // ============== 교회 템플릿 모달 ==============
-// 매주 반복 입력하는 PPT 기본값(폰트/배경/저작권)을 localStorage에 저장하고 바로 적용한다.
+// 매주 반복 입력하는 PPT 기본값(폰트/배경/저작권)을 저장하고 바로 적용한다.
+// 로그인이면 Supabase templates 테이블, 비로그인이면 localStorage.
 function ChurchTemplateModal({
+  isCloudUser,
   pptFont,
   pptTheme,
   ccliNumber,
@@ -3556,6 +3628,7 @@ function ChurchTemplateModal({
   showToast,
   onClose,
 }: {
+  isCloudUser: boolean;
   pptFont: PptFont;
   pptTheme: PptTheme;
   ccliNumber: string;
@@ -3567,13 +3640,24 @@ function ChurchTemplateModal({
   showToast: (msg: string) => void;
   onClose: () => void;
 }) {
-  // 모달 마운트마다 최신 교회 템플릿 목록을 다시 읽는다.
   const [templates, setTemplates] = useState<ChurchTemplate[]>([]);
   const [name, setName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await listTemplatesAsync();
+      setTemplates(next);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTemplates(listTemplates());
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   // ESC로 닫기
   useEffect(() => {
@@ -3593,17 +3677,26 @@ function ChurchTemplateModal({
       minute: '2-digit',
     }).format(new Date(ms));
 
-  const handleSave = () => {
-    const saved = saveTemplate({
-      name,
-      font: pptFont,
-      theme: pptTheme,
-      ccliNumber: ccliNumber.trim() || undefined,
-      licenseLabel: licenseLabel.trim() || undefined,
-    });
-    setTemplates(listTemplates());
-    setName('');
-    showToast(`"${saved.name}" 템플릿 저장 완료`);
+  const handleSave = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const saved = await saveTemplateAsync({
+        name,
+        font: pptFont,
+        theme: pptTheme,
+        ccliNumber: ccliNumber.trim() || undefined,
+        licenseLabel: licenseLabel.trim() || undefined,
+      });
+      await refresh();
+      setName('');
+      showToast(`"${saved.name}" 템플릿 저장 완료`);
+    } catch (err) {
+      console.error(err);
+      alert('저장에 실패했어요.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleApply = (template: ChurchTemplate) => {
@@ -3614,10 +3707,19 @@ function ChurchTemplateModal({
     showToast(`"${template.name}" 템플릿을 적용했어요`);
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
+    if (busy) return;
     if (!window.confirm('이 템플릿을 삭제할까요?')) return;
-    removeTemplate(id);
-    setTemplates(listTemplates());
+    setBusy(true);
+    try {
+      await removeTemplateAsync(id);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      alert('삭제에 실패했어요.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -3675,9 +3777,32 @@ function ChurchTemplateModal({
         <h2 className="h-song" style={{ margin: '0 0 6px', fontSize: 22 }}>
           교회 템플릿
         </h2>
-        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 18 }}>
+        <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 12 }}>
           교회별로 매주 반복되는 PPT 폰트, 배경, CCLI 정보를 저장해두고 다시 적용합니다.
         </p>
+
+        {/* 저장 위치 안내 — 로그인 여부에 따라 클라우드/로컬 표시. */}
+        <div
+          className="caption"
+          style={{
+            color: 'var(--ink-3)',
+            marginBottom: 14,
+            padding: '8px 10px',
+            background: 'color-mix(in oklab, var(--paper) 70%, white)',
+            border: '1px solid var(--rule)',
+            borderRadius: 2,
+          }}
+        >
+          {isCloudUser ? (
+            <>
+              <strong style={{ color: 'var(--accent-ink)' }}>☁ 클라우드 저장 중</strong> — 다른 컴퓨터에서도 이 템플릿을 그대로 쓸 수 있어요.
+            </>
+          ) : (
+            <>
+              <strong>💾 이 브라우저에만 저장</strong> — 로그인하면 클라우드로 자동 옮겨져 다른 기기에서도 보여요.
+            </>
+          )}
+        </div>
 
         {/* 현재 설정 저장 영역 */}
         <div
@@ -3704,9 +3829,10 @@ function ChurchTemplateModal({
             <button
               className="btn-primary"
               onClick={handleSave}
+              disabled={busy}
               style={{ padding: '10px 16px', fontSize: 14 }}
             >
-              저장
+              {busy ? '저장 중…' : '저장'}
             </button>
           </div>
           <div className="caption" style={{ color: 'var(--ink-3)', marginTop: 8 }}>
@@ -3720,7 +3846,11 @@ function ChurchTemplateModal({
         <div className="label" style={{ marginBottom: 8 }}>
           저장된 템플릿 ({templates.length})
         </div>
-        {templates.length === 0 ? (
+        {loading ? (
+          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
+            불러오는 중…
+          </div>
+        ) : templates.length === 0 ? (
           <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
             아직 저장된 템플릿이 없어요.
           </div>
