@@ -1,21 +1,120 @@
 /* 콘티노트 — Editorial Worship 디자인 시스템
- * Claude Design 핸드오프(2026-04-26) 기준
- * 종이 베이지 #FAF5EC + 잉크 차콜 #1F1B16 + 테라코타 #C77A56
+ * Claude Design 핸드오프(2026-04-26) 기준 + 2026-05-16 mockup 2.0
+ *
+ * 두 디자인 시스템을 [data-theme] 속성으로 토글:
+ *   - paper (기본)  : 종이 베이지 #FAF5EC + 잉크 차콜 + 테라코타. 한국 교회 PRD 기본.
+ *   - wanted        : 흰색 + 일렉트릭 블루. Wanted Sans 적용. 현대적 산세리프 톤.
+ *
+ * 헤더 "디자인 변경" 버튼이 document.documentElement.dataset.theme 을 교체한다.
  */
 
-:root {
-  --paper: #FAF5EC;
-  --paper-2: #F4ECDD;
-  --ink: #1F1B16;
-  --ink-2: #5C544A;
-  --ink-3: #8B8276;
-  --rule: #E5DBC8;
-  --accent: #C77A56;
-  --accent-ink: #8E4F33;
-  /* 한글 본문/헤드라인 모두 자연스럽게 표시되도록 한글 폰트 우선 배치 */
-  --serif: 'Noto Serif KR', ui-serif, Georgia, serif;
-  --sans: 'Pretendard Variable', 'Pretendard', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+/* ── PAPER (기본) ───────────────────────────────────────────
+ * 호환을 위해 :root에도 같은 값을 둠. 명시적으로 [data-theme="paper"] 도 지원. */
+:root,
+[data-theme="paper"] {
+  /* 표면 컬러 — paper-3와 surface는 mockup에서 추가된 톤 */
+  --paper:        #FAF5EC;
+  --paper-2:      #F4ECDD;
+  --paper-3:      #EFE5D2;
+  --surface:      #FFFCF6;
+
+  /* 잉크(텍스트) */
+  --ink:          #1F1B16;
+  --ink-2:        #5C544A;
+  --ink-3:        #8B8276;
+
+  /* 구분선 */
+  --rule:         #E5DBC8;
+  --rule-2:       #D6C9AF;
+
+  /* 강조 — 테라코타 */
+  --accent:       #C77A56;
+  --accent-strong:#A85F3E;
+  --accent-ink:   #8E4F33;
+  --accent-tint:  #F4DBC8;
+
+  /* 상태 */
+  --positive:     #4F8A53;
+  --positive-tint:#E1EEDE;
+  --danger:       #B14A3A;
+
+  /* 타이포 — paper 테마: 명조 + Pretendard */
+  --serif:        'Noto Serif KR', 'Apple SD Gothic Neo', ui-serif, Georgia, serif;
+  --sans:         'Pretendard Variable', 'Pretendard', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono:         'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* display는 헤드라인용 — serif와 동일 (paper 테마는 명조 헤드라인) */
+  --font-display: var(--serif);
+  --font-body:    var(--sans);
+  --font-mono:    var(--mono);
+
+  /* 반경 */
+  --radius-xs:   6px;
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  --radius-pill: 9999px;
+
+  /* 그림자 */
+  --shadow-1: 0 1px 0 rgba(31,27,22,0.04), 0 2px 6px rgba(31,27,22,0.05);
+  --shadow-2: 0 2px 4px rgba(31,27,22,0.06), 0 16px 36px rgba(31,27,22,0.08);
+  --shadow-3: 0 12px 28px rgba(31,27,22,0.12), 0 30px 80px rgba(31,27,22,0.18);
+
+  /* 라벨 자간 — paper는 한글 명조라 약간 넓게 */
+  --label-track: 0.14em;
+
+  /* btn-primary 텍스트 색 — paper에선 흰 텍스트가 테라코타 위에서 AA 미달이라 잉크로 가야 가독성 확보됨 */
+  --btn-primary-text: var(--ink);
+}
+
+/* ── WANTED ──────────────────────────────────────────────── */
+[data-theme="wanted"] {
+  --paper:        #FFFFFF;
+  --paper-2:      #F7F7F8;
+  --paper-3:      #F4F4F5;
+  --surface:      #FFFFFF;
+
+  --ink:          #17171a;
+  --ink-2:        #46474c;
+  --ink-3:        rgba(55, 56, 60, 0.61);
+
+  --rule:         rgba(112, 115, 124, 0.22);
+  --rule-2:       rgba(112, 115, 124, 0.40);
+
+  --accent:       #0066FF;
+  --accent-strong:#0048b5;
+  --accent-ink:   #0048b5;
+  --accent-tint:  #eaf2fe;
+
+  --positive:     #00bf40;
+  --positive-tint:#e5f9ec;
+  --danger:       #e52222;
+
+  /* Wanted 테마 타이포 — Wanted Sans 헤드라인 + Pretendard JP 본문 */
+  --serif:        'Wanted Sans Variable', 'Wanted Sans', 'Pretendard JP Variable', system-ui, sans-serif;
+  --sans:         'Pretendard JP Variable', 'Pretendard Variable', system-ui, sans-serif;
+  --mono:         'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: var(--serif);
+  --font-body:    var(--sans);
+  --font-mono:    var(--mono);
+
+  /* Wanted는 살짝 작은 반경 */
+  --radius-xs:   6px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+  --radius-pill: 9999px;
+
+  --shadow-1: 0 1px 0 rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.05);
+  --shadow-2: 0 2px 4px rgba(0,0,0,0.06), 0 16px 36px rgba(0,0,0,0.08);
+  --shadow-3: 0 12px 28px rgba(0,0,0,0.12), 0 30px 80px rgba(0,0,0,0.18);
+
+  /* Wanted는 라틴 산세리프라 자간 좁게 */
+  --label-track: 0.04em;
+
+  /* Wanted의 accent(#0066FF)는 흰 텍스트와 AA 통과해 일반적인 SaaS 톤 적용 */
+  --btn-primary-text: #fff;
 }
 
 * { box-sizing: border-box; }
@@ -45,8 +144,9 @@ a:focus-visible {
   border-radius: inherit;
 }
 
-/* 종이 텍스처 — 매우 미세한 점 패턴 (배경 전면 깔림) */
-body::before {
+/* 종이 텍스처 — paper 테마에서만 노출 (Wanted는 깔끔한 흰색이라 텍스처 X) */
+[data-theme="paper"] body::before,
+:root:not([data-theme]) body::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -61,8 +161,9 @@ body::before {
   opacity: 0.55;
 }
 
-/* 노트북 가로줄 — 매우 옅게 32px 간격으로 깔리는 가는 선 */
-body::after {
+/* 노트북 가로줄 — paper 테마에서만 (32px 간격) */
+[data-theme="paper"] body::after,
+:root:not([data-theme]) body::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -132,24 +233,24 @@ body::after {
 
 /* ----- 컴포넌트 ----- */
 
-/* 드롭존 — 파일 끌어다 놓는 영역 */
+/* 드롭존 — 파일 끌어다 놓는 영역. mockup의 accent-tint hover로 강화. */
 .dropzone {
-  border: 1.5px dashed var(--rule);
-  background: color-mix(in oklab, var(--paper) 70%, white);
-  border-radius: 4px;
+  border: 1.5px dashed var(--rule-2);
+  background: var(--paper);
+  border-radius: var(--radius-lg);
   transition: border-color .25s ease, background .25s ease, transform .2s ease;
 }
+.dropzone:hover,
 .dropzone[data-active='true'] {
-  border-style: solid;
   border-color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 6%, var(--paper));
+  background: var(--accent-tint);
 }
+.dropzone[data-active='true'] { border-style: solid; }
 
-/* 메인 추출 버튼 */
+/* 메인 추출 버튼 — paper 테마는 --btn-primary-text가 ink, wanted는 #fff */
 .btn-primary {
   background: var(--accent);
-  /* 흰 텍스트는 accent 위에서 AA 미달이라 잉크 색으로 변경. 톤 유지하면서 가독성 ↑ */
-  color: var(--ink);
+  color: var(--btn-primary-text);
   font-family: var(--sans);
   font-weight: 600;
   font-size: 16px;
@@ -162,10 +263,56 @@ body::after {
   box-shadow: 0 1px 0 rgba(0,0,0,0.04), inset 0 -1.5px 0 rgba(0,0,0,0.12);
 }
 .btn-primary:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--accent) 90%, black);
+  background: var(--accent-strong);
   transform: translateY(-1px);
 }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── mockup의 통합 .btn 베이스 클래스 (Phase 2 컴포넌트에서 .btn .btn-primary 형태로 사용)
+ *    기존 standalone .btn-primary 와 충돌하지 않고 보완 역할만 한다. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: background 160ms cubic-bezier(.2,0,0,1),
+              color 160ms cubic-bezier(.2,0,0,1),
+              border-color 160ms cubic-bezier(.2,0,0,1),
+              transform 80ms ease;
+  user-select: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* .btn .btn-primary — 베이스 + 메인 버튼 결합 (mockup 스타일) */
+.btn.btn-primary {
+  padding: 10px 16px; /* 베이스 패딩 사용. 기존 standalone .btn-primary의 18px은 큰 버튼에만 적용 */
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset, var(--shadow-1);
+}
+
+/* .btn 크기 모디파이어 */
+.btn-lg { padding: 14px 22px; font-size: 15px; border-radius: var(--radius-lg); }
+.btn-sm { padding: 7px 12px; font-size: 13px; border-radius: var(--radius-sm); }
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+}
+.btn-icon:hover { background: var(--paper-2); color: var(--ink); }
 
 /* 텍스트 버튼 (밑줄 강조) — TXT/DOCX/복사용 */
 .btn-text {
@@ -292,6 +439,960 @@ textarea:focus, input[type='text']:focus {
 
 .divider { height: 1px; background: var(--rule); border: none; margin: 0; }
 
+/* ── mockup 카드/패널 ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+}
+
+/* ── mockup 칩 (작은 라벨/배지) ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+.chip-accent { background: var(--accent-tint); color: var(--accent-ink); }
+.chip-positive { background: var(--positive-tint); color: var(--positive); }
+
+/* ── 키보드 입력 표시 (사용법 모달 등에서) ── */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid var(--rule-2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  background: var(--surface);
+}
+
+/* ── 스크롤 영역 (편집기 등) ── */
+.scroll-y { overflow-y: auto; }
+.scroll-y::-webkit-scrollbar { width: 10px; }
+.scroll-y::-webkit-scrollbar-track { background: transparent; }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 9999px; border: 3px solid var(--paper); }
+.scroll-y::-webkit-scrollbar-thumb:hover { background: var(--rule-2); }
+
+/* ── mockup의 버튼-only 토글 (label 없이 트랙만)
+ *    기존 .toggle은 라벨+트랙 구조로 다르므로, 마크업으로 구분되도록 button[role="switch"].toggle-pill 사용 */
+button.toggle-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--rule-2);
+  cursor: pointer;
+  transition: background 160ms;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+button.toggle-pill[data-on="true"] { background: var(--accent); }
+button.toggle-pill::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: transform 160ms cubic-bezier(.2,0,0,1);
+}
+button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
+
+/* ── Header (Header.tsx 전용) ── */
+.cn-header {
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.cn-header-inner {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.cn-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.cn-header .brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cn-header .brand-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.cn-header .brand-sub {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.01em;
+}
+.cn-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.cn-nav .btn { flex-shrink: 0; white-space: nowrap; }
+.cn-header .nav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--rule);
+  margin: 0 6px;
+}
+.cn-header .login-btn { padding-left: 10px; }
+.cn-header .g-mark { display: inline-flex; align-items: center; }
+.cn-header .theme-switch-btn { gap: 6px; }
+.cn-header .auth-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.cn-header .auth-pill-email {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cn-header .auth-logout {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .cn-header-inner { padding: 12px 16px; }
+  .cn-header .brand-sub { display: none; }
+  .cn-header .theme-switch-btn span { display: none; }
+}
+
+/* ── 메인 3-row 레이아웃 (Row1=Upload / Row2=Extracted+Editor 좌우 / Row3=PPT) ── */
+.work-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 18px;
+}
+.work-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+.work-grid > * {
+  min-width: 0;
+}
+.work-grid .ed-panel {
+  min-height: 480px;
+}
+@media (max-width: 900px) {
+  .work-grid {
+    grid-template-columns: 1fr;
+  }
+  /* 모바일 데스크탑 같은 페이지에서 좌우→상하 적층 시 02·03 순서 유지
+     (02 추출된 곡 먼저, 그다음 03 콘티 편집) */
+}
+
+/* ── ExtractedSection (2번 추출된 곡 — 카드 + 섹션 칩) ── */
+.ex-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+}
+.ex-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px 20px;
+  text-align: center;
+  gap: 16px;
+  flex: 1;
+}
+.ex-empty-text {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.ex-empty-text strong {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.ex-extracting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 12px 12px;
+  gap: 14px;
+}
+.ex-extracting-title {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  color: var(--ink);
+}
+.ex-progress {
+  width: 100%;
+  max-width: 240px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--rule);
+  overflow: hidden;
+  margin: 4px auto;
+}
+.ex-progress-bar {
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  border-radius: 4px;
+  animation: progress-slide 1.6s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.ex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.song-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  padding: 16px;
+}
+.song-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.song-card-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.song-card-title {
+  margin: 0;
+  font-size: 19px;
+  color: var(--ink);
+}
+.song-card-meta {
+  margin-top: 3px;
+  font-size: 11px;
+}
+.song-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 160ms;
+  font-size: 10px;
+}
+.song-toggle:hover {
+  background: var(--paper);
+}
+.song-add {
+  flex-shrink: 0;
+}
+.song-remove {
+  flex-shrink: 0;
+}
+.song-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+.sec-chip {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 160ms, transform 80ms, background 160ms;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: inherit;
+}
+.sec-chip:hover {
+  border-color: var(--accent);
+  background: var(--paper);
+}
+.sec-chip:active {
+  transform: translateY(1px);
+}
+.sec-chip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.sec-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.sec-chorus .sec-label { color: var(--accent-ink); }
+.sec-bridge .sec-label { color: #7a5a36; }
+.sec-ending .sec-label { color: var(--ink-3); }
+.sec-prechorus .sec-label { color: #8a5fa6; }
+.sec-add-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--btn-primary-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 160ms;
+}
+.sec-chip:hover .sec-add-icon {
+  opacity: 1;
+}
+.sec-preview {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.sec-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sec-line-empty {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.sec-more {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.sec-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sec-edit-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms, background 140ms, color 140ms;
+  font-size: 10px;
+}
+.sec-chip:hover .sec-edit-btn { opacity: 0.85; }
+.sec-edit-btn:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+  opacity: 1;
+}
+
+/* 색상 모디파이어 — 6종 섹션 타입 */
+.sec-intro .sec-label { color: #3d8c92; }
+
+/* 곡 제목 인라인 편집 input */
+.song-card-title {
+  cursor: text;
+}
+.song-card-title:hover {
+  color: var(--accent-ink);
+}
+.song-card-title-input {
+  width: 100%;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--accent);
+  padding: 2px 0;
+  outline: none;
+  letter-spacing: -0.02em;
+}
+.song-title-edit {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.song-title-edit:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 편집 모드 칩 (인라인 텍스트영역) */
+.sec-chip-editing {
+  cursor: default;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent-tint);
+  grid-column: 1 / -1;
+  padding: 12px 14px 10px;
+}
+.sec-chip-editing:hover {
+  transform: none;
+  background: var(--surface);
+}
+.sec-chip-head-editing {
+  gap: 8px;
+}
+.sec-label-input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--accent);
+  padding: 2px 0;
+  outline: none;
+  min-width: 0;
+}
+.sec-edit-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sec-act {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 140ms;
+  font-size: 12px;
+}
+.sec-act:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.sec-act-save {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--btn-primary-text);
+}
+.sec-act-save:hover {
+  background: var(--accent-strong);
+  color: var(--btn-primary-text);
+}
+.sec-act-danger:hover {
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.sec-edit-textarea {
+  margin-top: 8px;
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: -0.012em;
+  outline: none;
+  resize: vertical;
+}
+.sec-edit-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-tint);
+}
+.sec-edit-hint {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 4px;
+  letter-spacing: 0;
+}
+
+/* + 새 곡 추가 — ExtractedSection 맨 아래 */
+.btn-add-song {
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px 12px;
+  border: 1.5px dashed var(--rule-2);
+  background: transparent;
+  color: var(--ink-2);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: all 160ms;
+}
+.btn-add-song:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* + 새 섹션 추가 영역 */
+.song-add-section {
+  margin-top: 10px;
+}
+.btn-add-section {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px dashed var(--rule-2);
+  background: transparent;
+  color: var(--ink-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 160ms;
+}
+.btn-add-section:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.sec-add-menu {
+  border: 1.5px solid var(--accent);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 12px 14px 10px;
+  box-shadow: 0 0 0 2px var(--accent-tint);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sec-add-menu-head {
+  color: var(--ink-2);
+  letter-spacing: var(--label-track);
+}
+.sec-add-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.sec-add-opt {
+  padding: 8px 6px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  transition: all 140ms;
+}
+.sec-add-opt:hover {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+.sec-add-cancel {
+  align-self: flex-end;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* ── PptSection (4번 PPT 만들기) ── */
+.ppt-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ppt-meta {
+  color: var(--ink-3);
+}
+.ppt-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ppt-ctrl-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ppt-ctrl-label {
+  letter-spacing: var(--label-track);
+}
+
+/* 테마 swatch 6개 그리드 */
+.ppt-themes {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+@media (max-width: 1100px) {
+  .ppt-themes {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.theme-sw {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.theme-sw-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--rule);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 160ms, transform 80ms;
+}
+.theme-sw:hover .theme-sw-preview {
+  border-color: var(--rule-2);
+}
+.theme-sw.is-active .theme-sw-preview {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-tint);
+}
+.theme-sw-letter {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.theme-sw-hint {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 10px;
+  opacity: 0.5;
+}
+.theme-sw-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-align: center;
+}
+.theme-sw.is-active .theme-sw-name {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.theme-sw-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--btn-primary-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+/* 폰트 카드 4개 */
+.ppt-fonts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+@media (min-width: 760px) {
+  .ppt-fonts {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.ppt-font {
+  position: relative;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms, background 160ms;
+}
+.ppt-font:hover {
+  background: var(--paper);
+}
+.ppt-font.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.ppt-font-name {
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.ppt-font-rec {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--positive-tint);
+  color: var(--positive);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* 저작권 토글 — 라벨 + 부제 + pill 토글 */
+.ppt-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+}
+.ppt-toggle-text {
+  flex: 1;
+}
+.ppt-toggle-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ppt-toggle-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+/* 액션 영역 (미리보기 + PPT 다운로드) */
+.ppt-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ppt-download {
+  flex: 1;
+}
+.ppt-actions .btn-ghost {
+  flex-shrink: 0;
+}
+
+/* "다른 형식으로 내보내기" 토글 영역 */
+.ppt-more {
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+}
+.ppt-more summary {
+  font-size: 12px;
+  color: var(--ink-3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  user-select: none;
+}
+.ppt-more summary::-webkit-details-marker {
+  display: none;
+}
+.ppt-more-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 4px;
+  margin-top: 10px;
+}
+
+/* ── EditorSection (3번 콘티 편집 — textarea 단일 모델) ── */
+.ed-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  min-height: 480px;
+}
+.ed-head {
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: color-mix(in oklab, var(--paper) 60%, white);
+}
+.ed-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ed-head-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+.ed-head-actions {
+  display: flex;
+  gap: 4px;
+}
+.ed-textarea {
+  flex: 1;
+  min-height: 360px;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1.7;
+  letter-spacing: -0.008em;
+  padding: 22px 28px;
+  resize: vertical;
+  border-radius: 0;
+}
+.ed-textarea::placeholder {
+  color: var(--ink-3);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.ed-foot {
+  padding: 12px 22px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: color-mix(in oklab, var(--paper) 60%, white);
+}
+.ed-foot-meta {
+  color: var(--ink-3);
+}
+.ed-foot-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* ── 섹션 헤드 패턴 (02 추출된 곡 / 03 콘티 편집 / 04 PPT 만들기) ── */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.section-head .left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.section-head h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+.step-num-inline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
 /* 마스코트 호흡 애니메이션 — 위아래로 살짝 떠다님 */
 @keyframes floatY {
   0%, 100% { transform: translateY(0); }
@@ -375,6 +1476,166 @@ textarea:focus, input[type='text']:focus {
   .hero-mascot {
     display: none;
   }
+}
+
+/* ── Mobile wizard (/m 라우트 — 4단계 풀스크린) ── */
+.m-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--paper);
+  position: relative;
+}
+.m-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.m-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-brand-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.m-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-icon-btn:hover { color: var(--ink); border-color: var(--rule-2); }
+.m-desktop-swap { font-size: 16px; }
+.m-login-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 단계 indicator */
+.m-steps {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+.m-step-pill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 140ms;
+}
+.m-step-pill .m-step-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.m-step-pill .m-step-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.m-step-pill.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.m-step-pill.is-active .m-step-num,
+.m-step-pill.is-active .m-step-label {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.m-step-pill.is-done {
+  background: var(--positive-tint);
+  border-color: color-mix(in oklab, var(--positive) 30%, transparent);
+}
+.m-step-pill.is-done .m-step-num,
+.m-step-pill.is-done .m-step-label {
+  color: var(--positive);
+}
+
+/* 본문 — 한 섹션만 표시 */
+.m-main {
+  flex: 1;
+  padding: 18px 16px 90px; /* 하단 nav 바 가려지지 않게 */
+  overflow-y: auto;
+}
+/* 본문 안 panel들은 모바일에선 패딩 줄임 */
+.m-main .panel {
+  padding: 18px 16px;
+  border-radius: var(--radius-lg);
+}
+.m-main .ed-panel {
+  min-height: 360px;
+}
+
+/* 하단 단계 이동 바 */
+.m-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  padding: 14px 16px max(env(safe-area-inset-bottom), 16px);
+  border-top: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 96%, transparent);
+  backdrop-filter: blur(8px);
+}
+.m-nav-back {
+  flex: 0 0 auto;
+  padding: 12px 18px;
+}
+.m-nav-next {
+  flex: 1;
+  padding: 13px 18px;
+}
+
+/* 모바일에선 데스크탑 work-grid 비활성 — m-main이 따로 처리하므로 */
+.m-app .work-grid {
+  display: block;
 }
 
 /* 텍스트 선택 영역 */

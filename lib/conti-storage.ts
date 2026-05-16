@@ -3,36 +3,44 @@
 // "불러오기"로 과거 콘티를 다시 끌어다 쓸 수 있게 한다.
 
 import type { Song } from './types';
+import { ensureText } from './text-doc';
 
 // localStorage 키 — 콘티노트 전용 namespace
 const STORAGE_KEY = 'contionote-saved-sets';
 
-// 저장되는 한 콘티의 형태 (page.tsx의 Block 타입과 호환되도록 광역 타입으로 둔다)
+// 저장되는 한 콘티의 형태.
+// Phase 3에서 doc 모델이 Block[] → string으로 바뀜.
+// 기존 사용자가 저장해둔 Block[] 형태는 ensureText로 자동 변환하여 호환 유지.
 export type SavedSet = {
-  id: string; // 고유 식별자 (저장 시각 ms 기반)
-  name: string; // 사용자가 입력한 이름 (예배명 / 날짜 등)
-  savedAt: number; // 저장 시각 ms (정렬용)
+  id: string;
+  name: string;
+  savedAt: number;
   songs: Song[];
-  doc: any[]; // Block[] — circular import 회피를 위해 any로 둠
+  // 콘티 본문 — 텍스트 단일 string. 빈 줄=슬라이드 분리.
+  // 기존 Block[] 데이터는 ensureText()에서 자동 변환됨.
+  doc: string;
 };
 
-// 모든 저장 세트를 시각 역순으로 반환 (최근 순)
+// 모든 저장 세트를 시각 역순으로 반환 (최근 순).
+// 기존 Block[] 데이터 자동 마이그레이션 포함.
 export function listSavedSets(): SavedSet[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as SavedSet[];
+    const parsed = JSON.parse(raw) as Array<Omit<SavedSet, 'doc'> & { doc: unknown }>;
     if (!Array.isArray(parsed)) return [];
-    // 최근 저장 순 정렬
-    return [...parsed].sort((a, b) => b.savedAt - a.savedAt);
+    // 최근 저장 순 정렬 + doc 형태 자동 변환 (string 또는 Block[])
+    return [...parsed]
+      .sort((a, b) => b.savedAt - a.savedAt)
+      .map((s) => ({ ...s, doc: ensureText(s.doc) }));
   } catch {
     return [];
   }
 }
 
 // 새 콘티 세트 저장 (id 자동 생성)
-export function saveSet(name: string, songs: Song[], doc: any[]): SavedSet {
+export function saveSet(name: string, songs: Song[], doc: string): SavedSet {
   const set: SavedSet = {
     id: `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: name.trim() || '제목 없음',

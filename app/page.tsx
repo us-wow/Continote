@@ -10,21 +10,8 @@
 // 4. 섹션 카드 클릭 → 칩 + 가사 블록으로 추가 (중복 허용 — 후렴은 여러 번 들어가야 함)
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import {
-  DndContext,
-  closestCenter,
-  type DragEndEvent,
-  useSensor,
-  useSensors,
-  PointerSensor,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+// dnd-kit은 Phase 3에서 인라인 2번 영역 dnd가 사라지면서 더 이상 page.tsx에서 안 쓰임.
+// Phase 4에서 ExtractedSection 안 섹션 정렬이 필요해지면 거기서 직접 import 한다.
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
 import { encodeStateToHash, decodeHashToState } from '@/lib/url-sync';
@@ -68,7 +55,21 @@ import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Song, Section, SectionType } from '@/lib/types';
 import Mascot from '@/components/Mascot';
-import SectionChip from '@/components/SectionChip';
+// SectionChip은 Phase 3에서 ExtractedSection 컴포넌트 내부로 이관됨 — page.tsx에선 import 안 함.
+import Header, { type DesignTheme } from '@/components/Header';
+import UploadSection from '@/components/UploadSection';
+import ExtractedSection from '@/components/ExtractedSection';
+import EditorSection from '@/components/EditorSection';
+import PptSection from '@/components/PptSection';
+import PreviewModal from '@/components/PreviewModal';
+import {
+  buildSlidesFromText,
+  songToText,
+  sectionToText,
+  appendText,
+  docHasSongTitle,
+  memoToText,
+} from '@/lib/text-doc';
 
 // 편집창 블록 모델
 // title:      곡 제목 (큰 헤더)
@@ -118,6 +119,7 @@ const TYPE_BASE_LABEL: Record<SectionType, string> = {
   chorus: '후렴',
   bridge: 'Bridge',
   ending: 'Ending',
+  intro: 'Intro',
 };
 
 // 같은 type끼리의 순서를 보고 자동으로 라벨 생성
@@ -152,7 +154,8 @@ export default function Home() {
   // 곡 제목 인라인 수정용
   const [editingTitleIdx, setEditingTitleIdx] = useState<number | null>(null);
   const [titleDraft, setTitleDraft] = useState<string>('');
-  const [doc, setDoc] = useState<Block[]>([]);
+  // Phase 3: 콘티는 단일 string으로. 빈 줄=슬라이드 분리, # 제목, > 메모 접두사.
+  const [text, setText] = useState<string>('');
   const [pasteMode, setPasteMode] = useState(false);
   const [pasted, setPasted] = useState('');
   const [extracting, setExtracting] = useState(false);
@@ -189,11 +192,17 @@ export default function Home() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   // 로그인/로그아웃 진행 중 표시 — 버튼 중복 클릭 방지.
   const [authBusy, setAuthBusy] = useState(false);
+  // 디자인 시스템 — wanted(기본) ↔ paper. localStorage에 저장해 새로고침해도 유지.
+  // 사용자 요청(2026-05-16): Wanted를 메인으로, 종이톤을 옵션으로.
+  const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
+  // 04 PPT 만들기의 "전체 미리보기" 모달 상태
+  const [previewOpen, setPreviewOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const undoStackRef = useRef<{ songs: Song[]; doc: Block[] }[]>([]);
-  const redoStackRef = useRef<{ songs: Song[]; doc: Block[] }[]>([]);
+  // undo/redo 스냅샷도 text 모델로 — Block[] → string 한 줄짜리 변경
+  const undoStackRef = useRef<{ songs: Song[]; text: string }[]>([]);
+  const redoStackRef = useRef<{ songs: Song[]; text: string }[]>([]);
   const lastSnapshotRef = useRef<string>('');
   const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingMemoFocusRef = useRef(false);
@@ -246,6 +255,66 @@ export default function Home() {
       subscription.unsubscribe();
     };
   }, [showToast]);
+
+  // 저장된 디자인 테마 복원 (mount 시 1회). 이후 변경은 아래 effect가 자동 동기화.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem('conti-design-theme');
+      if (saved === 'wanted' || saved === 'paper') {
+        setDesignTheme(saved);
+      }
+    } catch {
+      /* localStorage 차단 환경 무시 */
+    }
+  }, []);
+
+  // 데스크탑 ↔ 모바일 자동 라우팅 (양방향).
+  // - 폰이면 /m으로, 데스크탑이면 /로 (mismatch만 이동)
+  // - ?view=desktop|mobile|auto 쿼리로 강제 가능 (localStorage 영속화)
+  // - PRD "고정" 사항 #9
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const force = new URL(window.location.href).searchParams.get('view');
+      if (force === 'desktop' || force === 'mobile') {
+        window.localStorage.setItem('conti-view', force);
+      } else if (force === 'auto') {
+        window.localStorage.removeItem('conti-view');
+      }
+      const pref = window.localStorage.getItem('conti-view');
+      let isMobile: boolean;
+      if (pref === 'mobile') isMobile = true;
+      else if (pref === 'desktop') isMobile = false;
+      else {
+        isMobile =
+          /iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent
+          ) || window.matchMedia('(max-width: 768px)').matches;
+      }
+      const onMobilePath = window.location.pathname === '/m';
+      // 모바일이면 /m, 데스크탑이면 / 로 양방향 정리
+      if (isMobile && !onMobilePath) {
+        window.location.replace('/m');
+      } else if (!isMobile && onMobilePath) {
+        window.location.replace('/');
+      }
+    } catch {
+      /* 라우팅 실패 시 현재 경로 유지 */
+    }
+  }, []);
+
+  // designTheme 변할 때 <html data-theme> 갱신 + localStorage 저장.
+  // CSS [data-theme="wanted"] selector가 토큰을 wanted 세트로 스왑한다.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.dataset.theme = designTheme;
+    try {
+      window.localStorage.setItem('conti-design-theme', designTheme);
+    } catch {
+      /* 무시 */
+    }
+  }, [designTheme]);
 
   // OAuth 콜백 라우트가 ?auth_error=... 로 보내면 사용자에게 안내 토스트만 띄운다.
   useEffect(() => {
@@ -301,7 +370,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const snapshot = JSON.stringify({ songs, doc });
+    const snapshot = JSON.stringify({ songs, text });
     if (snapshot === lastSnapshotRef.current) return;
     if (snapshotTimerRef.current) {
       clearTimeout(snapshotTimerRef.current);
@@ -309,7 +378,6 @@ export default function Home() {
     }
     snapshotTimerRef.current = setTimeout(() => {
       if (snapshot === lastSnapshotRef.current) return;
-      // 변경 직전 상태만 undo 스택에 저장해서 Ctrl+Z가 바로 이전 콘티로 돌아가게 한다.
       if (lastSnapshotRef.current) {
         undoStackRef.current.push(JSON.parse(lastSnapshotRef.current));
         if (undoStackRef.current.length > 50) undoStackRef.current.shift();
@@ -323,14 +391,14 @@ export default function Home() {
         snapshotTimerRef.current = null;
       }
     };
-  }, [songs, doc]);
+  }, [songs, text]);
 
   const handleUndo = useCallback(() => {
     if (snapshotTimerRef.current) {
       clearTimeout(snapshotTimerRef.current);
       snapshotTimerRef.current = null;
     }
-    const snapshot = JSON.stringify({ songs, doc });
+    const snapshot = JSON.stringify({ songs, text });
     if (snapshot !== lastSnapshotRef.current && lastSnapshotRef.current) {
       undoStackRef.current.push(JSON.parse(lastSnapshotRef.current));
       if (undoStackRef.current.length > 50) undoStackRef.current.shift();
@@ -341,13 +409,13 @@ export default function Home() {
       showToast('되돌릴 게 없어요');
       return;
     }
-    redoStackRef.current.push({ songs, doc });
+    redoStackRef.current.push({ songs, text });
     if (redoStackRef.current.length > 50) redoStackRef.current.shift();
     setSongs(prev.songs);
-    setDoc(prev.doc);
+    setText(prev.text);
     lastSnapshotRef.current = JSON.stringify(prev);
     showToast('되돌리기');
-  }, [doc, showToast, songs]);
+  }, [text, showToast, songs]);
 
   const handleRedo = useCallback(() => {
     if (snapshotTimerRef.current) {
@@ -359,13 +427,13 @@ export default function Home() {
       showToast('다시 실행할 게 없어요');
       return;
     }
-    undoStackRef.current.push({ songs, doc });
+    undoStackRef.current.push({ songs, text });
     if (undoStackRef.current.length > 50) undoStackRef.current.shift();
     setSongs(next.songs);
-    setDoc(next.doc);
+    setText(next.text);
     lastSnapshotRef.current = JSON.stringify(next);
     showToast('다시 실행');
-  }, [doc, showToast, songs]);
+  }, [text, showToast, songs]);
 
   // ----- 파일 처리 -----
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -491,318 +559,40 @@ export default function Home() {
     }
   };
 
-  // ----- 편집창 블록 조작 -----
+  // ----- 곡(songs) 조작 — 2번 영역 카드용. text 모델과 무관 -----
 
-  // 곡별 섹션 ID — 어느 곡의 몇 번째 섹션인지 추적용
-  const sectionId = (songIdx: number, secIdx: number) => `${songIdx}-${secIdx}`;
-
-  // 섹션 본문을 "2줄씩 한 슬라이드" 기본값으로 그룹핑한다.
-  // 줄 사이에 빈 줄을 넣어두면 docToSlides가 슬라이드 경계로 자동 처리하므로
-  // 사용자는 PPT 다운로드 전에 따로 자르는 작업을 할 필요가 없다.
-  // 사용자가 합치고 싶으면 빈 줄만 지우면 두 줄이 다시 4줄짜리 한 슬라이드가 된다.
-  const groupLinesByTwo = (text: string): string => {
-    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-    const groups: string[] = [];
-    for (let i = 0; i < lines.length; i += 2) {
-      groups.push(lines.slice(i, i + 2).join('\n'));
-    }
-    // 그룹 사이에 빈 줄(== \n\n) 한 칸을 둬 PPT 슬라이드를 분리한다.
-    return groups.join('\n\n');
-  };
-
-  // 곡 제목 클릭 → title 블록 추가 (이미 있으면 중복 방지)
-  // 사용자 요청: 위에 끼어들지 말고 섹션처럼 맨 아래에 추가
-  // (여러 곡 섞어 콘티 만들 때 자연스러움 — 제목→섹션 순서로 흐름 유지)
-  const insertTitle = (song: Song) => {
-    if (doc.some((b) => b.kind === 'title' && b.text === song.title)) {
-      showToast('이미 추가된 제목');
-      return;
-    }
-    setDoc((d) => {
-      if (d.length === 0) return [{ kind: 'title', text: song.title }];
-      const next: Block[] = [];
-      // 마지막 블록이 spacer가 아니면 빈 줄 한 칸 띄우고 추가
-      if (d[d.length - 1].kind !== 'spacer') {
-        next.push({ kind: 'spacer' });
-      }
-      next.push({ kind: 'title', text: song.title });
-      return [...d, ...next];
-    });
-  };
-
-  // 섹션 카드 클릭 → 칩 + 본문 블록 추가
-  // 후렴은 여러 번 들어가야 하므로 중복 허용 (몇 번 추가됐는지 카운터만 표시)
-  const insertSection = (section: Section, songIdx: number, secIdx: number) => {
-    setDoc((d) => {
-      const next: Block[] = [];
-      // 마지막 블록이 spacer가 아니면 빈 줄 한 칸 띄우기
-      if (d.length > 0 && d[d.length - 1].kind !== 'spacer') {
-        next.push({ kind: 'spacer' });
-      }
-      next.push({
-        kind: 'section',
-        sectionId: sectionId(songIdx, secIdx),
-        type: section.type,
-        label: section.label,
-        verseNum: section.verseNum,
-        // PPT 기본값을 "2줄=1슬라이드"로 만들기 위해 2줄마다 빈 줄을 끼워둔다.
-        // docToSlides는 빈 줄을 슬라이드 분리 신호로 처리하므로,
-        // 사용자가 별도 작업 없이도 깔끔한 PPT가 되고, 합치고 싶으면 빈 줄만 지우면 된다.
-        body: groupLinesByTwo(section.text),
-      });
-      return [...d, ...next];
-    });
-  };
-
-  const addMemoBlock = () => {
-    // 예배 순서가 교회마다 달라서 사용자가 자유 텍스트 슬라이드를 직접 넣게 한다.
-    pendingMemoFocusRef.current = true;
-    setDoc((d) => [...d, { kind: 'memo', body: '' }]);
-    showToast('메모 슬라이드 추가됨');
-  };
-
-  // 곡 단위 삭제 — songs에서 해당 곡 제거 + 콘티 편집창에서도 해당 곡 관련 블록 정리.
-  // sectionId가 "songIdx-secIdx" 인덱스 기반이므로, 삭제 후 남은 곡들의 sectionId도 reindex 한다.
+  // 곡 단위 삭제 — songs[]에서만 제거 (text는 사용자가 직접 정리).
   const removeSong = (targetIdx: number) => {
-    const target = songs[targetIdx];
-    if (!target) return;
-    const ok = window.confirm(
-      `"${target.title || 'Untitled'}" 곡을 삭제할까요?\n이미 콘티에 추가한 같은 곡 블록도 함께 사라집니다.`
-    );
-    if (!ok) return;
-
-    // 1) 콘티 편집창(doc) 정리: 같은 곡 제목 블록과 sectionId가 targetIdx로 시작하는 섹션 제거,
-    //    남은 곡 블록 중 songIdx가 targetIdx보다 큰 건 인덱스 한 칸 당김.
-    setDoc((d) => {
-      const filtered = d.filter((b) => {
-        if (b.kind === 'title' && b.text === target.title) return false;
-        if (b.kind === 'section') {
-          const songIdxStr = b.sectionId.split('-')[0];
-          if (Number(songIdxStr) === targetIdx) return false;
-        }
-        return true;
-      });
-      const reindexed = filtered.map((b) => {
-        if (b.kind !== 'section') return b;
-        const [songIdxStr, secIdxStr] = b.sectionId.split('-');
-        const songIdx = Number(songIdxStr);
-        if (songIdx > targetIdx) {
-          return { ...b, sectionId: `${songIdx - 1}-${secIdxStr}` };
-        }
-        return b;
-      });
-      // 양 끝/연속 spacer 정리 (removeBlock과 동일 패턴)
-      return reindexed.filter(
-        (b, i, arr) =>
-          !(
-            b.kind === 'spacer' &&
-            (i === 0 || i === arr.length - 1 || arr[i - 1]?.kind === 'spacer')
-          )
-      );
-    });
-
-    // 2) songs에서 제거
     setSongs((prev) => prev.filter((_, i) => i !== targetIdx));
+    showToast('곡 제거됨');
   };
 
-  // 추출된 곡 카드 안에서 섹션 순서 위/아래로 한 칸 이동.
-  // 같은 곡(songIdx) 안에서만 swap. deriveLabel은 자동 갱신되므로 라벨은 자연스럽게 따라온다.
-  const moveSectionInSong = (
-    songIdx: number,
-    secIdx: number,
-    dir: 'up' | 'down'
-  ) => {
+  // 빈 곡 추가 — 추출 없이 사용자가 직접 가사를 입력하는 경로.
+  // 자동으로 카드가 펼쳐지고 제목 편집 모드로 시작하도록 ExtractedSection 안에서 처리.
+  const addEmptySong = () => {
+    setSongs((prev) => [...prev, { title: '새 곡', sections: [] }]);
+    showToast('빈 곡 추가됨 — 제목을 클릭해 수정하세요');
+  };
+
+  // 곡 단위 갱신 — ExtractedSection 안 인라인 편집(제목/섹션/+추가/삭제)에서 호출.
+  // 사용자가 가사를 직접 수정한 경우 OCR 학습 힌트에 패턴을 기록한다.
+  const updateSong = (idx: number, next: Song) => {
     setSongs((prev) =>
       prev.map((s, i) => {
-        if (i !== songIdx) return s;
-        const newIdx = dir === 'up' ? secIdx - 1 : secIdx + 1;
-        if (newIdx < 0 || newIdx >= s.sections.length) return s;
-        const sections = [...s.sections];
-        [sections[newIdx], sections[secIdx]] = [sections[secIdx], sections[newIdx]];
-        return { ...s, sections };
+        if (i !== idx) return s;
+        // 같은 secIdx 기준으로 텍스트가 바뀐 섹션만 골라 학습 힌트에 기록
+        s.sections.forEach((origSec, secIdx) => {
+          const nextSec = next.sections[secIdx];
+          if (nextSec && origSec.text.trim() !== nextSec.text.trim()) {
+            recordCorrection(origSec.text, nextSec.text);
+          }
+        });
+        return next;
       })
     );
   };
 
-  // 블록 인라인 수정 (contentEditable blur 시 호출)
-  const updateBlock = (idx: number, next: Block) => {
-    setDoc((d) => d.map((b, i) => (i === idx ? next : b)));
-  };
-
-  // 블록 제거 — 인접 spacer 자동 정리
-  const removeBlock = (idx: number) => {
-    setDoc((d) => {
-      const out = d.filter((_, i) => i !== idx);
-      // 양 끝의 spacer, 연속된 spacer 제거 (시각적으로 깔끔하게)
-      return out.filter(
-        (b, i) =>
-          !(
-            b.kind === 'spacer' &&
-            (i === 0 || i === out.length - 1 || out[i - 1]?.kind === 'spacer')
-          )
-      );
-    });
-  };
-
-  // spacer는 시각적 여백을 담당하므로 위치를 유지하고, 실제 콘텐츠인 title/section/memo만 교환한다.
-  // 이렇게 해야 이동 후에도 블록 사이 빈 줄 흐름이 자연스럽게 유지된다.
-  const moveBlockUp = (idx: number) => {
-    setDoc((d) => {
-      if (d[idx]?.kind === 'spacer') return d;
-      const targetIdx = (() => {
-        for (let i = idx - 1; i >= 0; i--) {
-          if (d[i].kind !== 'spacer') return i;
-        }
-        return -1;
-      })();
-      if (targetIdx === -1) return d;
-      const next = [...d];
-      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
-      return next;
-    });
-  };
-
-  // spacer는 그대로 두고 콘텐츠만 아래쪽의 다음 title/section/memo와 바꿔 시각적 간격을 보존한다.
-  // 마지막 콘텐츠 뒤에는 교환 대상이 없으므로 원본 배열을 그대로 반환한다.
-  const moveBlockDown = (idx: number) => {
-    setDoc((d) => {
-      if (d[idx]?.kind === 'spacer') return d;
-      const targetIdx = (() => {
-        for (let i = idx + 1; i < d.length; i++) {
-          if (d[i].kind !== 'spacer') return i;
-        }
-        return -1;
-      })();
-      if (targetIdx === -1) return d;
-      const next = [...d];
-      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
-      return next;
-    });
-  };
-
-  const blockIds = useMemo(() => doc.map((_, i) => `block-${i}`), [doc]);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      // 드래그 시작 거리(8px)를 두는 이유 — 의도하지 않은 드래그 방지
-      activationConstraint: { distance: 8 },
-    }),
-    // KeyboardSensor는 의도적으로 제거: Enter/Space가 dnd 픽업 키로 동작해서
-    // contentEditable 안에서 가사 줄바꿈/띄어쓰기를 가로채는 충돌이 발생함.
-    // 키보드 접근성은 각 블록의 ↑↓ 버튼이 이미 제공하므로 충분.
-  );
-
-  // section 본문에 빈 줄(\n\n)이 들어가면 자동으로 doc 안 두 section으로 split.
-  // 시각적으로도 카드가 분리되어 ↑↓/dnd로 각자 이동 가능.
-  // sectionId/label은 그대로 유지(같은 카드의 다른 부분처럼 동작) — 좌측 매칭 유지.
-  // blur 시점에 트리거 (입력 중간에 갑자기 분리되는 어색함 방지).
-  const autoSplitOnBlankLine = (idx: number) => {
-    setDoc((d) => {
-      const cur = d[idx];
-      if (!cur || cur.kind !== 'section') return d;
-      // \n\s*\n+ → 한 줄 이상의 빈 줄(공백만 있는 줄 포함)
-      const parts = cur.body.split(/\n\s*\n+/).map((p) => p.trim()).filter((p) => p);
-      if (parts.length < 2) return d;
-      const newBlocks: Block[] = [];
-      parts.forEach((p, i) => {
-        if (i > 0) newBlocks.push({ kind: 'spacer' });
-        newBlocks.push({ ...cur, body: p });
-      });
-      return [...d.slice(0, idx), ...newBlocks, ...d.slice(idx + 1)];
-    });
-  };
-
-  // 콘티 편집창에서 section 본문 맨 앞 Backspace → 위 section과 합치기.
-  // doc 안에서 idx 위쪽의 가장 가까운 section을 찾아 body를 이어 붙이고, 사이의 spacer/현재 section은 제거한다.
-  // title을 만나면 멈춤 (제목과 가사를 합치지 않는다).
-  // memo는 독립 슬라이드 의미라 section 병합 대상에서 제외한다.
-  const mergeWithPrev = (idx: number) => {
-    setDoc((d) => {
-      if (idx <= 0) return d;
-      if (d[idx]?.kind !== 'section') return d;
-      let prevIdx = -1;
-      for (let i = idx - 1; i >= 0; i--) {
-        const b = d[i];
-        if (b.kind === 'title') return d; // title 위에선 합치지 않음
-        if (b.kind === 'section') {
-          prevIdx = i;
-          break;
-        }
-      }
-      if (prevIdx === -1) return d;
-      const prev = d[prevIdx];
-      const cur = d[idx];
-      if (prev.kind !== 'section' || cur.kind !== 'section') return d;
-      // 두 본문 사이에 빈 줄을 넣지 않고 자연스럽게 이어붙임 (사용자가 의도하면 다시 Enter로 빈 줄 추가).
-      const merged = {
-        ...prev,
-        body: prev.body && cur.body ? `${prev.body}\n${cur.body}` : prev.body || cur.body,
-      };
-      // prevIdx 위치만 merged로 교체, prevIdx 다음부터 idx까지(spacer + 현재 section) 제거
-      return d.flatMap((b, i) => {
-        if (i === prevIdx) return [merged];
-        if (i > prevIdx && i <= idx) return [];
-        return [b];
-      });
-    });
-  };
-
-  // "2. 추출된 곡" 영역의 섹션 카드 드래그 — 같은 곡 안 song.sections를 재정렬한다.
-  // 다른 곡으로 이동은 막아서(같은 SortableContext만) 라벨 자동 갱신과 충돌 없게 한다.
-  const handleSectionDragEnd = (event: DragEndEvent, songIdx: number) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const sections = songs[songIdx]?.sections;
-    if (!sections) return;
-    const ids = sections.map((_, i) => `sec-${songIdx}-${i}`);
-    const oldIdx = ids.indexOf(active.id as string);
-    const newIdx = ids.indexOf(over.id as string);
-    if (oldIdx === -1 || newIdx === -1) return;
-    setSongs((prev) =>
-      prev.map((s, i) =>
-        i === songIdx ? { ...s, sections: arrayMove(s.sections, oldIdx, newIdx) } : s
-      )
-    );
-  };
-
-  const findPrevContentIdx = useCallback((idx: number) => {
-    for (let i = idx - 1; i >= 0; i--) {
-      if (doc[i].kind !== 'spacer') return i;
-    }
-    return -1;
-  }, [doc]);
-
-  const findNextContentIdx = useCallback((idx: number) => {
-    for (let i = idx + 1; i < doc.length; i++) {
-      if (doc[i].kind !== 'spacer') return i;
-    }
-    return -1;
-  }, [doc]);
-
-  // ----- 직렬화 (TXT/DOCX/복사용) -----
-  // 사용자 요청: "verse 처럼 분류는 콘티 편집 부분에 안들어갔으면" → 라벨 출력에서 제거
-  // title:   ━━━ 제목 ━━━ (DOCX에서 가운데 정렬 헤딩으로 변환됨, TXT에서도 시각적 구분)
-  // section: 가사 본문만 (라벨 없음)
-  // spacer:  빈 줄
-  const serializeDoc = useMemo(() => {
-    return doc
-      .map((b) => {
-        if (b.kind === 'title') return `━━━ ${b.text} ━━━\n`;
-        if (b.kind === 'section') return b.body;
-        if (b.kind === 'memo') return b.body;
-        // spacer/slidebreak는 텍스트 변환에서는 빈 줄로 처리한다.
-        return '';
-      })
-      .join('\n');
-  }, [doc]);
-
-  // 콘티 끝에 슬라이드 구분자 추가. 사용자가 ↑↓로 위치 조정 가능.
-  // PPT 변환 시 이 마커를 기준으로 슬라이드가 나뉜다.
-  const addSlidebreak = () => {
-    setDoc((d) => [...d, { kind: 'slidebreak' }]);
-    showToast('슬라이드 구분 추가됨');
-  };
-
+  // ----- 텍스트 모델 직렬화/다운로드 -----
 
   // 파일명에 들어갈 오늘 날짜 (콘티_20260426.txt 같은 식)
   const dateStr = () => {
@@ -810,27 +600,48 @@ export default function Home() {
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   };
 
+  // 클립보드 복사 — text를 그대로 (제목은 # 그대로 두기보단 ━━━ 변환).
+  const textForExport = (): string => {
+    return text
+      .split(/\n\n+/)
+      .map((p) => {
+        const lines = p.split('\n');
+        const first = lines[0] ?? '';
+        if (first.startsWith('# ')) {
+          return `━━━ ${first.slice(2)} ━━━\n${lines.slice(1).join('\n')}`.trim();
+        }
+        if (first.startsWith('> ')) {
+          return lines.map((l) => l.replace(/^>\s?/, '')).join('\n');
+        }
+        return p;
+      })
+      .join('\n\n')
+      .trim();
+  };
+
   const handleCopy = async () => {
-    if (!serializeDoc.trim()) {
+    const out = textForExport();
+    if (!out) {
       showToast('비어있어요');
       return;
     }
-    await navigator.clipboard.writeText(serializeDoc.trim());
+    await navigator.clipboard.writeText(out);
     showToast('복사됨');
   };
 
   const handleCopyShareLink = () => {
-    const hash = encodeStateToHash({ songs, doc });
+    const hash = encodeStateToHash({ songs, text });
     const url = `${window.location.origin}${window.location.pathname}#${hash}`;
     navigator.clipboard.writeText(url).then(() => showToast('공유 링크 복사됨'));
   };
 
   const handleSaveTxt = () => {
-    if (!serializeDoc.trim()) {
+    const out = textForExport();
+    if (!out) {
       showToast('비어있어요');
       return;
     }
-    const blob = new Blob([serializeDoc.trim()], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([out], { type: 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `콘티_${dateStr()}.txt`;
@@ -840,73 +651,40 @@ export default function Home() {
   };
 
   const handleSaveDocx = async () => {
-    if (!serializeDoc.trim()) {
+    const out = textForExport();
+    if (!out) {
       showToast('비어있어요');
       return;
     }
     try {
-      await exportToDocx(serializeDoc.trim(), `콘티_${dateStr()}.docx`);
+      await exportToDocx(out, `콘티_${dateStr()}.docx`);
       showToast('.docx 저장됨');
     } catch (err: any) {
       showToast('저장 실패: ' + err.message);
     }
   };
 
-  // 콘티 편집창의 doc 블록 → PPT 슬라이드 배열로 변환.
-  // 슬라이드 분리 규칙(자연스러운 순서):
-  //   1) title 블록을 만나면 그 자체로 한 슬라이드 (보통 콘티 맨 앞에 들어가서 표지 역할)
-  //   2) section 안 빈 줄(Enter 두 번)을 만나면 거기서 자름
-  //   3) section 경계마다 자름 (verse 다음에 chorus면 자동으로 다른 슬라이드)
-  //   4) [+ 슬라이드 구분] 블록(slidebreak)도 자름
-  // spacer 블록은 PPT에서 제외.
-  const docToSlides = (): PptSlide[] => {
-    const slides: PptSlide[] = [];
-    let buf: string[] = [];
-    const flush = () => {
-      if (buf.length > 0) {
-        slides.push({ lines: buf });
-        buf = [];
+  // text → PptSlide[]
+  // text-doc.ts의 Slide는 {kind, ...} 형태인데 lib/pptx.ts의 PptSlide는 {lines: string[]}.
+  // 변환 시 title/memo/lyric을 모두 lines 배열로 단순화.
+  const buildPptSlides = (): PptSlide[] => {
+    return buildSlidesFromText(text).map((s) => {
+      if (s.kind === 'title') {
+        const lines = [s.title];
+        if (s.subtitle) lines.push(s.subtitle);
+        return { lines };
       }
-    };
-    for (const b of doc) {
-      if (b.kind === 'title') {
-        // 직전 슬라이드 닫고 제목을 한 줄짜리 슬라이드로 푸시.
-        flush();
-        const t = b.text.trim();
-        if (t) slides.push({ lines: [t] });
-      } else if (b.kind === 'section') {
-        // 새 section 시작 시 직전 슬라이드 닫음 → section 경계 = 자동 슬라이드 분리.
-        flush();
-        for (const line of b.body.split('\n')) {
-          const trimmed = line.trim();
-          // 빈 줄은 사용자의 명시적 슬라이드 구분 신호로 처리한다.
-          if (trimmed) buf.push(trimmed);
-          else flush();
-        }
-      } else if (b.kind === 'memo') {
-        flush();
-        const memoLines = b.body
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean);
-        if (memoLines.length > 0) slides.push({ lines: memoLines });
-      } else if (b.kind === 'slidebreak') {
-        flush();
-      }
-      // spacer는 무시
-    }
-    flush();
-    return slides;
+      if (s.kind === 'memo') return { lines: [s.text] };
+      return { lines: s.lines };
+    });
   };
 
-  // PPT 다운로드 — lib/pptx.ts 검증을 통과한 섹션 슬라이드만 내보낸다.
   const handleSavePptx = async () => {
-    const slides = docToSlides();
+    const slides = buildPptSlides();
     if (slides.length === 0) {
-      showToast('PPT로 만들 섹션이 없어요');
+      showToast('PPT로 만들 슬라이드가 없어요');
       return;
     }
-    // 5줄 이상 슬라이드는 자동 축소보다 분리 편집이 예배 콘티 가독성을 지키므로 차단한다.
     const overflow = slides.findIndex((s) => {
       const v = validateSlide(s);
       return !v.ok;
@@ -929,9 +707,8 @@ export default function Home() {
     }
   };
 
-  // Plain Slides 텍스트 export — ProPresenter / EasyWorship 텍스트 import용.
   const handleSavePlainSlides = () => {
-    const slides = docToSlides();
+    const slides = buildPptSlides();
     if (slides.length === 0) {
       showToast('콘티가 비어있어요');
       return;
@@ -943,9 +720,8 @@ export default function Home() {
     showToast('Plain Slides 다운로드 시작');
   };
 
-  // OpenSong XML export — OpenSong / OpenLP / ProPresenter import 호환용.
   const handleSaveOpenSong = () => {
-    const slides = docToSlides();
+    const slides = buildPptSlides();
     if (slides.length === 0) {
       showToast('콘티가 비어있어요');
       return;
@@ -959,31 +735,26 @@ export default function Home() {
   };
 
   const onClear = () => {
-    if (confirm('편집창을 모두 비울까요?')) setDoc([]);
+    if (confirm('콘티를 모두 비울까요?')) setText('');
   };
 
-  // 편집창에 블록 추가될 때마다 자동으로 맨 아래로 스크롤
-  // 사용자 요청: "추가하면 바로바로 맨 아래부분으로 가게"
-  useEffect(() => {
-    if (editorBodyRef.current) {
-      editorBodyRef.current.scrollTo({
-        top: editorBodyRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, [doc.length]);
-
-  // 공유 링크로 진입한 경우 URL hash에서 콘티 상태를 자동 복원한다.
+  // 공유 링크로 진입한 경우 URL hash에서 콘티 상태 자동 복원.
+  // 기존 Block[] 공유 링크도 호환 — ensureText가 자동 변환.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const hash = window.location.hash.replace(/^#/, '');
     if (!hash) return;
-    const restored = decodeHashToState<{ songs: Song[]; doc: Block[] }>(hash);
-    if (restored && Array.isArray(restored.songs) && Array.isArray(restored.doc)) {
+    const restored = decodeHashToState<{ songs: Song[]; text?: string; doc?: unknown }>(hash);
+    if (restored && Array.isArray(restored.songs)) {
       setSongs(restored.songs);
-      setDoc(restored.doc);
+      // 새 포맷: text 필드. 옛 포맷: doc 필드(Block[]). 둘 다 처리.
+      if (typeof restored.text === 'string') {
+        setText(restored.text);
+      } else if (restored.doc !== undefined) {
+        // ensureText는 lib/text-doc에서 export — Block[] → string 변환
+        import('@/lib/text-doc').then(({ ensureText }) => setText(ensureText(restored.doc)));
+      }
       showToast('공유 링크에서 콘티를 복원했어요');
-      // 복원 후 hash는 그대로 유지 (사용자가 다시 공유 가능)
     }
   }, []);
 
@@ -1163,172 +934,46 @@ export default function Home() {
     startCardEdit(songIdx, newSecIdx, newSec);
   };
 
-  // 결과 패널 UI 헬퍼
-  const isTitleInDoc = (title: string) =>
-    doc.some((b) => b.kind === 'title' && b.text === title);
-  const sectionInsertCount = (id: string) =>
-    doc.filter((b) => b.kind === 'section' && b.sectionId === id).length;
-
-  const isEmpty = doc.length === 0;
-  const blockCount = doc.filter((b) => b.kind === 'section').length;
+  // 결과 패널 UI 헬퍼 — text 모델 기준
+  const isTitleInDoc = (title: string) => docHasSongTitle(text, title);
+  const isEmpty = !text || !text.trim();
   const hasResult = songs.length > 0;
 
   // ============== 렌더 ==============
   return (
     <div className="app">
-      {/* ----- 상단 바 ----- */}
-      <header
-        style={{
-          borderBottom: '1px solid var(--rule)',
-          padding: '18px 32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          background: 'color-mix(in oklab, var(--paper) 70%, white)',
-        }}
-      >
-        {/* 헤더 — 텍스트 로고만. 미니 마스코트는 다른 곳에 더 큰 사이즈로 등장하므로 중복 제거 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              fontFamily: 'var(--serif)',
-              fontWeight: 600,
-              fontSize: 24,
-              letterSpacing: '-0.012em',
-              color: 'var(--ink)',
-            }}
-          >
-            콘티노트
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-          <span
-            className="caption topbar-meta"
-            style={{ color: 'var(--ink-2)' }}
-          >
-            찬양팀·예배 사역자를 위한 AI 콘티 메이커
-          </span>
-          {/* 햄버거 메뉴 — Google AI Studio 스타일 사이드 슬라이드 패널.
-              아이콘은 SVG 세 줄, 클릭 시 우측에서 슬라이드인 drawer가 열린다. */}
-          <button
-            type="button"
-            onClick={() => setShowMenu(true)}
-            aria-label="메뉴 열기"
-            aria-expanded={showMenu}
-            className="btn-ghost"
-            style={{
-              padding: '8px',
-              width: 36,
-              height: 36,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-              <line x1="3" y1="6" x2="17" y2="6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <line x1="3" y1="14" x2="17" y2="14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
-          {showMenu && (
-            <MenuDrawer onClose={() => setShowMenu(false)}>
-              <MenuItem
-                label="콘티 모음"
-                sub="저장/불러오기"
-                onClick={() => { setShowMenu(false); setShowSets(true); }}
-              />
-              <MenuItem
-                label="곡 라이브러리"
-                sub="추출한 곡 재사용"
-                onClick={() => { setShowMenu(false); setShowLibrary(true); }}
-              />
-              <MenuItem
-                label="교회 템플릿"
-                sub="PPT 기본값 저장"
-                onClick={() => { setShowMenu(false); setShowTemplates(true); }}
-              />
-            </MenuDrawer>
-          )}
-          {/* 사용법 버튼 — 자주 쓰는 단일 액션이라 메뉴 밖에 따로 둠 */}
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            aria-label="사용법 보기"
-            className="btn-ghost"
-            style={{ padding: '6px 12px', fontSize: 13 }}
-          >
-            사용법
-          </button>
-
-          {/* 로그인/로그아웃 — supabase 설정된 경우에만 노출.
-              비로그인: "Google 로그인" 버튼.
-              로그인됨: 이메일(축약) + 로그아웃. */}
-          {isSupabaseConfigured() && (
-            authUser ? (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '4px 4px 4px 10px',
-                  border: '1px solid var(--rule)',
-                  borderRadius: 999,
-                  fontSize: 12.5,
-                  color: 'var(--ink-2)',
-                }}
-                title={authUser.email ?? ''}
-              >
-                <span
-                  style={{
-                    maxWidth: 140,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {/* 이메일에서 @ 앞부분만 표시해 헤더가 깔끔. 전체 이메일은 title hover로 확인 가능. */}
-                  {authUser.email?.split('@')[0] ?? '로그인됨'}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={authBusy}
-                  className="btn-ghost"
-                  style={{ padding: '4px 10px', fontSize: 12 }}
-                >
-                  로그아웃
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSignIn}
-                disabled={authBusy}
-                aria-label="Google 계정으로 로그인"
-                className="btn-ghost"
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 13,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                {/* Google G 로고 — 인지도가 가장 높은 식별자 */}
-                <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
-                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-                  <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-                  <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-                  <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-                </svg>
-                {authBusy ? '연결 중…' : '로그인'}
-              </button>
-            )
-          )}
-        </div>
-      </header>
+      {/* ----- 상단 바 (Header 컴포넌트로 분리) ----- */}
+      <Header
+        theme={designTheme}
+        onChangeTheme={setDesignTheme}
+        onOpenMenu={() => setShowMenu(true)}
+        onOpenHelp={() => setShowHelp(true)}
+        supabaseEnabled={isSupabaseConfigured()}
+        authUser={authUser}
+        authBusy={authBusy}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+      />
+      {/* 헤더의 "내 보관함" 버튼이 트리거하는 드로어 — 콘티 모음/곡 라이브러리/교회 템플릿 3개 옵션 */}
+      {showMenu && (
+        <MenuDrawer onClose={() => setShowMenu(false)}>
+          <MenuItem
+            label="콘티 모음"
+            sub="저장/불러오기"
+            onClick={() => { setShowMenu(false); setShowSets(true); }}
+          />
+          <MenuItem
+            label="곡 라이브러리"
+            sub="추출한 곡 재사용"
+            onClick={() => { setShowMenu(false); setShowLibrary(true); }}
+          />
+          <MenuItem
+            label="교회 템플릿"
+            sub="PPT 기본값 저장"
+            onClick={() => { setShowMenu(false); setShowTemplates(true); }}
+          />
+        </MenuDrawer>
+      )}
 
       {/* ----- 히어로 ----- */}
       <section
@@ -1373,1205 +1018,82 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ----- 메인: 2단 레이아웃 ----- */}
-      <main style={{ maxWidth: 1320, margin: '0 auto', padding: '0 32px 56px' }}>
-        {/* grid-template-areas로 데스크톱·모바일 순서를 분리:
-            데스크톱: 좌측에 1·2·4가 위→아래, 우측에 3 (sticky)
-            모바일: 1 → 2 → 3 → 4 자연스러운 흐름 (CSS는 globals.css에서 처리) */}
-        <div
-          className="two-col"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(360px, 0.85fr) minmax(0, 1.15fr)',
-            gridTemplateAreas: `
-              "left right"
-              "ppt right"
-            `,
-            gap: 40,
-            alignItems: 'start',
+      {/* ----- 메인: 3-row 레이아웃 ----- */}
+      {/* Row 1: 1번 악보 업로드 (full width)
+          Row 2: 2번 추출된 곡 | 3번 콘티 편집 (1:1 equal width — 실시간 추가 확인)
+          Row 3: 4번 PPT 만들기 (full width — 슬라이드 필요한 사람만) */}
+      <main className="work-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px 56px' }}>
+        <UploadSection
+          dragging={dragging}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
           }}
-        >
-          {/* === 좌측: 업로드 + 추출 결과 (grid-area: left) === */}
-          <div className="stack" style={{ ...cssVar('--gap', '32px'), gridArea: 'left' }}>
-            {/* --- 1. 업로드 영역 --- */}
-            <div className="stack" style={cssVar('--gap', '20px')}>
-              <div>
-                <div className="label" style={{ marginBottom: 12 }}>
-                  1. 악보 업로드
-                </div>
-                {/* 키보드 접근성을 위해 클릭 가능한 div 대신 button을 사용한다.
-                    Enter/Space로 파일 선택을 열 수 있고 기존 drag/drop 이벤트도 그대로 받는다. */}
-                <button
-                  type="button"
-                  className="dropzone"
-                  data-active={dragging || files.length > 0}
-                  aria-label="악보 파일 업로드. 클릭하거나 끌어다 놓으세요"
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={onDrop}
-                  onClick={() => inputRef.current?.click()}
-                  style={{
-                    width: '100%',
-                    display: 'block',
-                    padding: '32px 24px 28px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    multiple
-                    accept="image/*,application/pdf"
-                    onChange={onPick}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ display: 'none' }}
-                  />
-                  <div
-                    style={{
-                      fontFamily: 'var(--serif)',
-                      fontSize: 19,
-                      lineHeight: 1.35,
-                      color: 'var(--ink)',
-                      letterSpacing: '-0.01em',
-                    }}
-                  >
-                    악보를 여기로 끌어다 놓으세요
-                  </div>
-                  <div className="caption" style={{ marginTop: 6 }}>
-                    또는{' '}
-                    <span style={{ color: 'var(--ink)', borderBottom: '1px solid var(--ink)' }}>
-                      파일 선택
-                    </span>
-                    <span style={{ margin: '0 8px', color: 'var(--ink-3)' }}>·</span>
-                    JPG · PNG · PDF
-                  </div>
-                </button>
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          onPick={onPick}
+          files={files}
+          thumbs={thumbs}
+          onRemoveFile={removeFile}
+          accuracyMode={accuracyMode}
+          setAccuracyMode={(v) => setAccuracyMode(v)}
+          pasteMode={pasteMode}
+          setPasteMode={(v) => setPasteMode(v)}
+          pasted={pasted}
+          setPasted={(v) => setPasted(v)}
+          extracting={extracting}
+          loadingMsg={loadingMsg}
+          progressStep={progressStep}
+          hasResult={hasResult}
+          onExtract={handleExtract}
+        />
 
-                {/* 정확도 모드는 1차 행동인 업로드를 가리지 않도록 드롭존 아래 고급 옵션으로 둔다.
-                    기존 토글 패턴을 재사용해 붙여넣기 토글과 조작감을 맞춘다. */}
-                <button
-                  type="button"
-                  role="switch"
-                  className="toggle"
-                  data-on={accuracyMode}
-                  aria-checked={accuracyMode}
-                  onClick={() => setAccuracyMode((v) => !v)}
-                  // padding: 0은 button 기본 패딩 제거 → 아래 '직접 가사 붙여넣기' div 토글과 X 시작점을 맞춘다.
-                  style={{ marginTop: 10, padding: 0 }}
-                >
-                  <span className="track" />
-                  {/* "정확도 우선"과 "(느려짐)"을 wrapper span 하나로 감싸서
-                      .toggle의 gap:10px이 둘 사이에 끼어들지 않게 한다. 보조 텍스트는 6px만 띄움. */}
-                  <span>
-                    정확도 우선
-                    <span style={{ marginLeft: 6, color: 'var(--ink-3)' }}>(느려짐)</span>
-                  </span>
-                </button>
-
-                {files.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 14,
-                      display: 'grid',
-                      // auto-fill + 최대 110px로 셀 크기 제한.
-                      // auto-fit + 1fr이었을 때 파일 1개면 컨테이너 전체로 늘어나 썸네일이 화면을 다 차지하는 문제 발생.
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 110px))',
-                      gap: 12,
-                      justifyContent: 'start',
-                    }}
-                  >
-                    {files.map((f, i) => (
-                      <div key={i} style={{ position: 'relative' }}>
-                        <div className="thumb">
-                          {thumbs[i] && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={thumbs[i]}
-                              alt=""
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          )}
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFile(i);
-                          }}
-                          title="제거"
-                          style={{
-                            position: 'absolute',
-                            top: -6,
-                            right: -6,
-                            width: 20,
-                            height: 20,
-                            borderRadius: '50%',
-                            border: '1px solid var(--rule)',
-                            background: 'var(--paper)',
-                            color: 'var(--ink-2)',
-                            cursor: 'pointer',
-                            fontSize: 11,
-                            lineHeight: 1,
-                          }}
-                        >
-                          ×
-                        </button>
-                        <div
-                          className="mono"
-                          style={{
-                            marginTop: 6,
-                            color: 'var(--ink-2)',
-                            textAlign: 'left',
-                            fontSize: 10.5,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {f.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 직접 가사 붙여넣기 토글 */}
-              <div>
-                <div
-                  className="toggle"
-                  data-on={pasteMode}
-                  onClick={() => setPasteMode(!pasteMode)}
-                >
-                  <span className="track" />
-                  <span>직접 가사 붙여넣기</span>
-                </div>
-                {pasteMode && (
-                  <textarea
-                    value={pasted}
-                    onChange={(e) => setPasted(e.target.value)}
-                    placeholder="여기에 가사를 붙여넣어 주세요"
-                    rows={6}
-                    style={{ marginTop: 10 }}
-                  />
-                )}
-              </div>
-
-              {/* 메인 추출 버튼 */}
-              <div>
-                <button
-                  className="btn-primary"
-                  onClick={handleExtract}
-                  disabled={extracting || (files.length === 0 && !pasted.trim())}
-                  title="가사 추출하기 (⌘+Enter)"
-                  style={{ width: '100%' }}
-                >
-                  {extracting ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
-                      <span>{loadingMsg || '가사 추출 중'}</span>
-                      <span style={{ display: 'inline-flex', gap: 4 }}>
-                        <span className="ink-dot" style={{ background: '#fff' }} />
-                        <span className="ink-dot" style={{ background: '#fff' }} />
-                        <span className="ink-dot" style={{ background: '#fff' }} />
-                      </span>
-                    </span>
-                  ) : hasResult ? (
-                    '다시 추출하기'
-                  ) : (
-                    '가사 추출하기'
-                  )}
-                </button>
-                {extracting && (
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10, fontSize: 11.5, color: 'var(--ink-3)' }}>
-                    {['파일 준비', '이미지 변환', 'AI 분석'].map((label, i) => {
-                      const stepIdx = i + 1;
-                      const active = progressStep === stepIdx;
-                      const done = progressStep > stepIdx;
-                      return (
-                        <div key={i} style={{
-                          flex: 1,
-                          padding: '6px 8px',
-                          borderRadius: 2,
-                          border: '1px solid ' + (active ? 'var(--accent)' : 'var(--rule)'),
-                          background: done ? 'color-mix(in oklab, var(--accent) 18%, var(--paper))' : 'var(--paper)',
-                          color: active || done ? 'var(--accent-ink)' : 'var(--ink-3)',
-                          textAlign: 'center',
-                          fontWeight: active ? 600 : 400,
-                        }}>
-                          {done ? '✓ ' : ''}{label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <hr className="divider" />
-
-            {/* --- 2. 추출된 곡 결과 --- */}
-            {/* 우선순위: 로딩 중 > 빈 상태 > 카드 (검토 단계 제거됨) */}
-            {extracting && songs.length === 0 ? (
-              // 로딩 상태 — listening 마스코트
-              <div
-                style={{
-                  border: '1px dashed var(--rule)',
-                  borderRadius: 3,
-                  padding: '44px 24px',
-                  textAlign: 'center',
-                  background: 'color-mix(in oklab, var(--paper) 80%, white)',
-                }}
-              >
-                <div
-                  className="mascot-float"
-                  style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}
-                >
-                  <Mascot pose="listening" size={140} />
-                </div>
-                <div className="h-song" style={{ fontSize: 22, marginBottom: 8 }}>
-                  가사를 옮겨 적는 중
-                </div>
-                <div className="caption">
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      gap: 6,
-                      verticalAlign: 'middle',
-                      marginRight: 8,
-                    }}
-                  >
-                    <span className="ink-dot" />
-                    <span className="ink-dot" />
-                    <span className="ink-dot" />
-                  </span>
-                  잠시만요
-                </div>
-              </div>
-            ) : songs.length === 0 ? (
-              // 빈 상태 — reading 마스코트
-              <div
-                style={{
-                  border: '1px dashed var(--rule)',
-                  borderRadius: 3,
-                  padding: '44px 24px',
-                  textAlign: 'center',
-                  background: 'color-mix(in oklab, var(--paper) 80%, white)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    marginBottom: 16,
-                    opacity: 0.85,
-                  }}
-                >
-                  <Mascot pose="reading" size={130} />
-                </div>
-                <div className="caption" style={{ maxWidth: 320, margin: '0 auto' }}>
-                  왼쪽에 악보를 올리고{' '}
-                  <span style={{ color: 'var(--ink)' }}>가사 추출하기</span>를 누르면 여기에
-                  결과가 나타납니다.
-                </div>
-              </div>
-            ) : (
-              // 결과 있음 — 곡 + 섹션 카드 리스트
-              <div className="stack" style={cssVar('--gap', '20px')}>
-                <div className="label">2. 추출된 곡</div>
-
-                {songs.map((song, songIdx) => (
-                  <div key={songIdx} className="stack" style={cssVar('--gap', '14px')}>
-                    {/* 곡 제목 카드 — 편집 모드면 input, 아니면 클릭 삽입 + ✎ 수정 버튼 */}
-                    {editingTitleIdx === songIdx ? (
-                      // ===== 제목 편집 모드 =====
-                      <div
-                        style={{
-                          border: '1px solid var(--accent)',
-                          borderLeft: '2px solid var(--accent)',
-                          padding: '16px 20px',
-                          background: '#fff',
-                          borderRadius: 2,
-                        }}
-                      >
-                        <div className="label" style={{ marginBottom: 8 }}>
-                          곡 제목 수정
-                        </div>
-                        <input
-                          type="text"
-                          value={titleDraft}
-                          onChange={(e) => setTitleDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveTitleEdit();
-                            if (e.key === 'Escape') cancelTitleEdit();
-                          }}
-                          autoFocus
-                          style={{
-                            fontSize: 20,
-                            fontWeight: 600,
-                            fontFamily: 'var(--serif)',
-                            padding: '10px 14px',
-                          }}
-                        />
-                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                          <button
-                            className="btn-primary"
-                            onClick={saveTitleEdit}
-                            style={{ padding: '8px 16px', fontSize: 14 }}
-                          >
-                            저장
-                          </button>
-                          <button className="btn-ghost" onClick={cancelTitleEdit}>
-                            취소
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      // ===== 제목 표시(기본) — 클릭으로 콘티에 삽입 + ✎ 수정 버튼 =====
-                      // 외부 div는 relative로 ✎ 버튼을 absolute 배치
-                      // 클릭 영역(div role=button)이 카드 본체, 우상단 ✎는 별도 button
-                      <div style={{ position: 'relative' }}>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => insertTitle(song)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              insertTitle(song);
-                            }
-                          }}
-                          style={{
-                            textAlign: 'left',
-                            border: '1px solid var(--rule)',
-                            borderLeft: '2px solid var(--ink)',
-                            background: isTitleInDoc(song.title)
-                              ? 'color-mix(in oklab, var(--paper) 90%, var(--ink) 4%)'
-                              : 'color-mix(in oklab, var(--paper) 65%, white)',
-                            // 우측에 ✕(곡 삭제) + ✎(제목 수정) 두 버튼 자리 확보
-                            padding: '16px 96px 16px 20px',
-                            cursor: 'pointer',
-                            borderRadius: 2,
-                            color: 'var(--ink)',
-                            transition: 'transform .18s, border-color .18s, box-shadow .2s',
-                            opacity: isTitleInDoc(song.title) ? 0.7 : 1,
-                            outline: 'none',
-                          }}
-                          title={isTitleInDoc(song.title) ? '이미 추가됨' : '클릭해서 제목 삽입'}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 12,
-                            }}
-                          >
-                            <div>
-                              <h2
-                                style={{
-                                  margin: '0 0 4px',
-                                  fontSize: 22,
-                                  fontWeight: 600,
-                                  fontFamily: 'var(--serif)',
-                                  letterSpacing: '-0.012em',
-                                  lineHeight: 1.3,
-                                  color: 'var(--ink)',
-                                }}
-                              >
-                                {song.title || 'Untitled'}
-                              </h2>
-                              <div className="mono" style={{ color: 'var(--ink-3)' }}>
-                                {song.sections.length}개 섹션
-                              </div>
-                            </div>
-                            <span
-                              className="mono"
-                              style={{
-                                fontSize: 11,
-                                color: isTitleInDoc(song.title)
-                                  ? 'var(--ink-3)'
-                                  : 'var(--accent-ink)',
-                                border:
-                                  '1px solid ' +
-                                  (isTitleInDoc(song.title) ? 'var(--rule)' : 'var(--accent)'),
-                                padding: '4px 10px',
-                                borderRadius: 99,
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {isTitleInDoc(song.title) ? '✓ 추가됨' : '+ 제목 삽입'}
-                            </span>
-                          </div>
-                        </div>
-                        {/* 우상단 도구바: ✕(곡 삭제) + ✎(제목 수정).
-                            클릭 영역(div role=button) 바깥이라 stopPropagation 불필요. */}
-                        <button
-                          onClick={() => removeSong(songIdx)}
-                          aria-label="곡 삭제"
-                          title="곡 삭제 (콘티 블록도 함께)"
-                          style={{
-                            position: 'absolute',
-                            top: 10,
-                            right: 50,
-                            width: 36,
-                            height: 36,
-                            borderRadius: '50%',
-                            background: 'var(--paper)',
-                            border: '1px solid var(--rule)',
-                            color: 'var(--ink-3)',
-                            cursor: 'pointer',
-                            fontSize: 14,
-                            lineHeight: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          ✕
-                        </button>
-                        <button
-                          onClick={() => startTitleEdit(songIdx, song.title)}
-                          aria-label="제목 수정"
-                          title="제목 수정"
-                          style={{
-                            position: 'absolute',
-                            top: 10,
-                            right: 10,
-                            width: 36,
-                            height: 36,
-                            borderRadius: '50%',
-                            background: 'var(--paper)',
-                            border: '1px solid var(--rule)',
-                            color: 'var(--ink-2)',
-                            cursor: 'pointer',
-                            fontSize: 13,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          ✎
-                        </button>
-                      </div>
-                    )}
-
-                    {/* 섹션 카드들 — 편집 모드면 인라인 에디터, 아니면 클릭 삽입 + ✎ 수정.
-                        같은 곡 안에서 섹션 순서를 드래그앤드롭으로 바꿀 수 있다. */}
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={(e) => handleSectionDragEnd(e, songIdx)}
-                    >
-                      <SortableContext
-                        items={song.sections.map((_, i) => `sec-${songIdx}-${i}`)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                    <div className="stack" style={cssVar('--gap', '10px')}>
-                      {song.sections.map((sec, secIdx) => {
-                        const id = sectionId(songIdx, secIdx);
-                        const cardKey = `${songIdx}-${secIdx}`;
-                        const insertedCount = sectionInsertCount(id);
-                        const previewLines = sec.text.split('\n').filter((l) => l.trim());
-                        const isEditing = editingCardKey === cardKey;
-
-                        const sortableId = `sec-${songIdx}-${secIdx}`;
-                        if (isEditing && cardDraft) {
-                          // ===== 섹션 편집 모드 =====
-                          return (
-                            <SortableBlock key={sortableId} id={sortableId}>
-                            <div
-                              style={{
-                                border: '1px solid var(--accent)',
-                                borderLeft: '2px solid var(--accent)',
-                                background: '#fff',
-                                borderRadius: 2,
-                                padding: '14px 16px',
-                              }}
-                            >
-                              {/* 인라인 편집은 라벨 입력 없이 type 드롭다운만 */}
-                              {/* type 변경 시 라벨도 비워서 칩이 자동으로 type 기본 이름 표시하게 */}
-                              <header
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  marginBottom: 10,
-                                  flexWrap: 'wrap',
-                                }}
-                              >
-                                <select
-                                  value={cardDraft.type}
-                                  onChange={(e) =>
-                                    setCardDraft({
-                                      ...cardDraft,
-                                      type: e.target.value as SectionType,
-                                      // type 바뀌면 라벨 비워서 새 type 기본 이름이 칩에 표시되게
-                                      label: '',
-                                    })
-                                  }
-                                  style={{
-                                    fontSize: 12,
-                                    padding: '4px 8px',
-                                    border: '1px solid var(--rule)',
-                                    borderRadius: 99,
-                                    background: '#fff',
-                                    cursor: 'pointer',
-                                    fontFamily: 'var(--sans)',
-                                    fontWeight: 600,
-                                    color: 'var(--ink)',
-                                  }}
-                                >
-                                  <option value="verse">Verse</option>
-                                  <option value="prechorus">Pre-Chorus</option>
-                                  <option value="chorus">Chorus / 후렴</option>
-                                  <option value="bridge">Bridge</option>
-                                  <option value="ending">Ending / 엔딩</option>
-                                </select>
-                              </header>
-                              <textarea
-                                value={cardDraft.text}
-                                onChange={(e) =>
-                                  setCardDraft({ ...cardDraft, text: e.target.value })
-                                }
-                                rows={Math.max(3, cardDraft.text.split('\n').length)}
-                                style={{
-                                  fontSize: 15,
-                                  lineHeight: 1.7,
-                                  padding: '10px 12px',
-                                  resize: 'vertical',
-                                }}
-                              />
-                              <div
-                                style={{
-                                  marginTop: 10,
-                                  display: 'flex',
-                                  gap: 8,
-                                  alignItems: 'center',
-                                }}
-                              >
-                                <button
-                                  className="btn-primary"
-                                  onClick={saveCardEdit}
-                                  style={{ padding: '8px 16px', fontSize: 14 }}
-                                >
-                                  저장
-                                </button>
-                                <button className="btn-ghost" onClick={cancelCardEdit}>
-                                  취소
-                                </button>
-                                <button
-                                  onClick={() => deleteConfirmedSection(songIdx, secIdx)}
-                                  style={{
-                                    marginLeft: 'auto',
-                                    fontSize: 12,
-                                    color: 'var(--ink-3)',
-                                    padding: '6px 10px',
-                                    border: '1px solid var(--rule)',
-                                    borderRadius: 2,
-                                    background: 'none',
-                                    cursor: 'pointer',
-                                  }}
-                                  title="이 섹션 삭제"
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </div>
-                            </SortableBlock>
-                          );
-                        }
-
-                        // ===== 섹션 표시 모드(기본) =====
-                        // 섹션 카드는 클릭 시 콘티에 추가되므로, 위/아래 이동·수정 버튼은
-                        // e.stopPropagation으로 카드 클릭과 분리한다.
-                        const canSecUp = secIdx > 0;
-                        const canSecDown = secIdx < song.sections.length - 1;
-                        return (
-                          <SortableBlock key={sortableId} id={sortableId}>
-                          <div style={{ position: 'relative' }}>
-                            <article
-                              className="section-card"
-                              onClick={() => insertSection(sec, songIdx, secIdx)}
-                              style={{ paddingRight: 128 }}
-                            >
-                              <header
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 10,
-                                  marginBottom: 8,
-                                }}
-                              >
-                                {/* 라벨은 type + 같은 type 순서로 자동 도출 (사용자가 직접 타이핑 X)
-                                    1개면 "Verse" / "후렴" / "Bridge", 여러 개면 "Verse 1", "Verse 2" */}
-                                <SectionChip
-                                  type={sec.type}
-                                  label={deriveLabel(song.sections, secIdx)}
-                                />
-                                <span
-                                  className="mono"
-                                  style={{ color: 'var(--ink-3)', fontSize: 11 }}
-                                >
-                                  {previewLines.length}줄
-                                </span>
-                                <span
-                                  className="mono"
-                                  style={{
-                                    marginLeft: 'auto',
-                                    fontSize: 11,
-                                    color:
-                                      insertedCount > 0
-                                        ? 'var(--ink-3)'
-                                        : 'var(--accent-ink)',
-                                  }}
-                                >
-                                  {insertedCount > 0
-                                    ? `✓ ${insertedCount}회 추가됨`
-                                    : '+ 콘티에 추가'}
-                                </span>
-                              </header>
-                              <div
-                                className="lyric"
-                                style={{ fontSize: 14.5, lineHeight: 1.7 }}
-                              >
-                                {previewLines.map((l, j) => (
-                                  <div key={j}>{l}</div>
-                                ))}
-                              </div>
-                            </article>
-                            {/* 우측 상단 도구바 — [↑][↓][✎] 가로 배치.
-                                article 밖 wrapper 안에 절대 배치해 카드 클릭과 분리. */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (canSecUp) moveSectionInSong(songIdx, secIdx, 'up');
-                              }}
-                              disabled={!canSecUp}
-                              aria-label="위로 이동"
-                              title="위로 이동"
-                              style={{
-                                position: 'absolute',
-                                top: 10,
-                                right: 92,
-                                width: 32,
-                                height: 32,
-                                borderRadius: '50%',
-                                background: 'var(--paper)',
-                                border: '1px solid var(--rule)',
-                                color: 'var(--ink-2)',
-                                cursor: canSecUp ? 'pointer' : 'not-allowed',
-                                opacity: canSecUp ? 1 : 0.3,
-                                fontSize: 12,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              ↑
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (canSecDown) moveSectionInSong(songIdx, secIdx, 'down');
-                              }}
-                              disabled={!canSecDown}
-                              aria-label="아래로 이동"
-                              title="아래로 이동"
-                              style={{
-                                position: 'absolute',
-                                top: 10,
-                                right: 52,
-                                width: 32,
-                                height: 32,
-                                borderRadius: '50%',
-                                background: 'var(--paper)',
-                                border: '1px solid var(--rule)',
-                                color: 'var(--ink-2)',
-                                cursor: canSecDown ? 'pointer' : 'not-allowed',
-                                opacity: canSecDown ? 1 : 0.3,
-                                fontSize: 12,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              ↓
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startCardEdit(songIdx, secIdx, sec);
-                              }}
-                              aria-label="섹션 수정"
-                              title="섹션 수정"
-                              style={{
-                                position: 'absolute',
-                                top: 10,
-                                right: 12,
-                                width: 32,
-                                height: 32,
-                                borderRadius: '50%',
-                                background: 'var(--paper)',
-                                border: '1px solid var(--rule)',
-                                color: 'var(--ink-2)',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              ✎
-                            </button>
-                          </div>
-                          </SortableBlock>
-                        );
-                      })}
-
-                      {/* + 섹션 추가 버튼 — 새 빈 섹션 생성 후 즉시 편집 모드 진입 */}
-                      <button
-                        className="btn-ghost"
-                        onClick={() => addNewSectionToSong(songIdx)}
-                        style={{ alignSelf: 'flex-start' }}
-                      >
-                        + 섹션 추가
-                      </button>
-                    </div>
-                      </SortableContext>
-                    </DndContext>
-                  </div>
-                ))}
-
-                <div className="caption" style={{ color: 'var(--ink-3)' }}>
-                  💡 카드를 누르면 우측 콘티에 추가, ✎로 카드 수정, "+ 섹션 추가"로 새 섹션 만들기.
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="stack" style={{ ...cssVar('--gap', '32px'), gridArea: 'right' }}>
-            {/* === 우측: 편집창 (sticky — 좌측 스크롤해도 화면 고정) === */}
-            <aside
-              className="editor-pane"
-              style={{
-                border: '1px solid var(--rule)',
-                background: 'color-mix(in oklab, var(--paper) 80%, white)',
-                borderRadius: 3,
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <header
-                style={{
-                  padding: '16px 22px',
-                  borderBottom: '1px solid var(--rule)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <div className="label" style={{ marginBottom: 2 }}>
-                    3. 콘티 편집
-                  </div>
-                  <div className="caption">
-                    {isEmpty
-                      ? '왼쪽에서 곡 제목·섹션을 눌러 콘티를 만드세요'
-                      : `${blockCount}개 섹션`}
-                  </div>
-                  {/* 사용자 안내: contentEditable 안에서 Enter 두 번이면 빈 줄 → PPT에서 슬라이드 분리 */}
-                  <div
-                    className="caption"
-                    style={{ color: 'var(--ink-3)', marginTop: 4, fontSize: 12 }}
-                  >
-                    가사 안에서 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 PPT 슬라이드가 거기서 나뉩니다.
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn-ghost"
-                    onClick={addMemoBlock}
-                    title="광고·기도제목 같은 자유 텍스트 슬라이드 추가"
-                  >
-                    + 메모 슬라이드
-                  </button>
-                  {/* 슬라이드 구분 추가 — 콘티 끝에 점선 분리자가 들어가고, ↑↓로 위치 조정 가능 */}
-                  <button
-                    className="btn-ghost"
-                    onClick={addSlidebreak}
-                    disabled={isEmpty}
-                    title="여기 위치에 슬라이드 분리자 추가 (PPT에서 페이지 구분)"
-                  >
-                    + 슬라이드 구분
-                  </button>
-                  <button className="btn-ghost" onClick={onClear} disabled={isEmpty}>
-                    전체 비우기
-                  </button>
-                </div>
-              </header>
-
-              {/* editor-body — 내용이 길어지면 여기서만 내부 스크롤 (aside 자체는 잘리지 않음)
-                  ref로 자동 스크롤(맨 아래로) 제어 */}
-              <div
-                ref={editorBodyRef}
-                className="editor-body"
-                style={{
-                  padding: '28px 32px',
-                  background: '#fff',
-                  position: 'relative',
-                }}
-              >
-                {isEmpty ? (
-                  <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-                    <div
-                      className="mascot-float"
-                      style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}
-                    >
-                      <Mascot pose="idle" size={140} />
-                    </div>
-                    <div className="h-song" style={{ fontSize: 22, margin: 0 }}>
-                      빈 콘티에서 시작
-                    </div>
-                    <div className="caption" style={{ maxWidth: 320, margin: '12px auto 0' }}>
-                      왼쪽 결과에서 <span style={{ color: 'var(--ink)' }}>곡 제목</span>이나{' '}
-                      <span style={{ color: 'var(--ink)' }}>섹션 카드</span>를 눌러보세요.
-                      순서대로 빈 줄을 두고 이어집니다.
-                    </div>
-                    {/* 붙여넣기 모드 발견율을 높이기 위해 시작 경로를 둘 다 명시한다. */}
-                    <div className="caption" style={{ maxWidth: 360, margin: '10px auto 0' }}>
-                      1) 악보 파일 업로드 — JPG·PDF 올리기
-                      <br />
-                      2) 직접 가사 붙여넣기 — 토글 켜고 텍스트 입력
-                    </div>
-                  </div>
-                ) : (
-                  // 콘티 편집 블록 정렬은 ↑↓ 버튼만 사용한다.
-                  // 드래그앤드롭은 contentEditable Enter/blur 로직과 자꾸 충돌해서 제거.
-                  <div>
-                    {doc.map((b, i) => (
-                      <EditorBlockView
-                        key={blockIds[i]}
-                        block={b}
-                        onUpdate={(next) => updateBlock(i, next)}
-                        onRemove={() => removeBlock(i)}
-                        onMoveUp={() => moveBlockUp(i)}
-                        onMoveDown={() => moveBlockDown(i)}
-                        canMoveUp={findPrevContentIdx(i) !== -1}
-                        canMoveDown={findNextContentIdx(i) !== -1}
-                        onMergeWithPrev={() => mergeWithPrev(i)}
-                        onAutoSplit={() => autoSplitOnBlankLine(i)}
-                        shouldFocus={
-                          pendingMemoFocusRef.current &&
-                          b.kind === 'memo' &&
-                          i === doc.length - 1
-                        }
-                        onFocused={() => {
-                          pendingMemoFocusRef.current = false;
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 다운로드/복사 버튼 — 편집창 하단 footer */}
-              <footer
-                style={{
-                  padding: '16px 22px',
-                  borderTop: '1px solid var(--rule)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div className="caption" style={{ color: 'var(--ink-3)' }}>
-                  {!isEmpty ? '준비 완료' : '비어있음'}
-                </div>
-                <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-                  <button className="btn-text" disabled={isEmpty} onClick={handleSaveTxt}>
-                    TXT 다운로드
-                  </button>
-                  <button className="btn-text" disabled={isEmpty} onClick={handleSaveDocx}>
-                    DOCX 다운로드
-                  </button>
-                  <button className="btn-text" disabled={isEmpty} onClick={handleCopy}>
-                    클립보드 복사
-                  </button>
-                  <button
-                    className="btn-text"
-                    disabled={isEmpty}
-                    onClick={handleCopyShareLink}
-                    title="이 콘티를 공유 링크로 복사 (URL hash에 인코딩, 외부 서버 X)"
-                  >
-                    공유 링크 복사
-                  </button>
-                </div>
-              </footer>
-            </aside>
-          </div>
-
-          {/* === 4. PPT 제작 (grid-area: ppt) ===
-              데스크톱: 좌측 컬럼 하단 영역에 자리.
-              모바일: 1·2·3 다음 마지막 순서로 자연스럽게 흐름. */}
-          <div
-            className="stack"
-            style={{ ...cssVar('--gap', '16px'), gridArea: 'ppt' }}
-          >
-            <div className="label">4. PPT 제작</div>
-
-            {/* 사용자 가이드 — 슬라이드당 가사 양 권장 + 분리 방법. */}
-            <div className="caption" style={{ color: 'var(--ink-2)', lineHeight: 1.6 }}>
-              한 슬라이드는 <span style={{ color: 'var(--ink)', fontWeight: 600 }}>2~3줄</span>일 때 가장 깔끔하게 만들어집니다 (최대 4줄).
-              <br />
-              콘티 편집에서 가사 안 <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Enter</span>로 빈 줄을 두면 거기서 슬라이드가 나뉘어요.
-            </div>
-
-            {/* 폰트 + 테마 선택 + 다운로드 버튼 한 줄 */}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <select
-                value={pptFont}
-                onChange={(e) => setPptFont(e.target.value as PptFont)}
-                aria-label="PPT 폰트 선택"
-                style={{
-                  padding: '10px 14px',
-                  border: '1px solid var(--rule)',
-                  borderRadius: 2,
-                  background: 'var(--paper)',
-                  color: 'var(--ink)',
-                  fontFamily: 'var(--sans)',
-                  fontSize: 14,
-                }}
-              >
-                {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => (
-                  <option key={f} value={f}>
-                    {PPT_FONT_LABELS[f]}
-                  </option>
-                ))}
-              </select>
-              {/* 테마 — PPT_THEME_LABELS의 모든 테마를 자동 표시한다. */}
-              <select
-                value={pptTheme}
-                onChange={(e) => setPptTheme(e.target.value as PptTheme)}
-                aria-label="PPT 배경 테마 선택"
-                style={{
-                  padding: '10px 14px',
-                  border: '1px solid var(--rule)',
-                  borderRadius: 2,
-                  background: 'var(--paper)',
-                  color: 'var(--ink)',
-                  fontFamily: 'var(--sans)',
-                  fontSize: 14,
-                }}
-              >
-                {(Object.keys(PPT_THEME_LABELS) as PptTheme[]).map((t) => (
-                  <option key={t} value={t}>
-                    {PPT_THEME_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-              <button className="btn-text" onClick={handleSavePptx} disabled={isEmpty}>
-                PPT 다운로드 (.pptx)
-              </button>
-              {/* 외부 도구 형식은 ProPresenter/EasyWorship 사용자에게만 필요 — 더보기로 숨김 */}
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setShowExternalExports((v) => !v)}
-                aria-expanded={showExternalExports}
-                style={{ padding: '6px 10px', fontSize: 12 }}
-                title="ProPresenter, EasyWorship, OpenLP 등 다른 슬라이드 도구로 가져갈 형식"
-              >
-                다른 도구로 내보내기 <span style={{ fontSize: 10, opacity: 0.6 }}>{showExternalExports ? '▴' : '▾'}</span>
-              </button>
-            </div>
-
-            {showExternalExports && (
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  flexWrap: 'wrap',
-                  padding: '10px 12px',
-                  border: '1px dashed var(--rule)',
-                  borderRadius: 4,
-                  background: 'color-mix(in oklab, var(--paper) 80%, white)',
-                }}
-              >
-                <button
-                  className="btn-text"
-                  onClick={handleSavePlainSlides}
-                  disabled={isEmpty}
-                  title="ProPresenter / EasyWorship 텍스트 import 호환"
-                  style={{ padding: '6px 10px', fontSize: 13 }}
-                >
-                  Plain Slides (.txt)
-                </button>
-                <button
-                  className="btn-text"
-                  onClick={handleSaveOpenSong}
-                  disabled={isEmpty}
-                  title="OpenSong / OpenLP / ProPresenter import 호환"
-                  style={{ padding: '6px 10px', fontSize: 13 }}
-                >
-                  OpenSong (.xml)
-                </button>
-              </div>
-            )}
-
-            {/* 저작권 슬라이드 — 곡 제목은 자동 수집하고 CCLI 정보만 선택 입력한다. */}
-            <div className="stack" style={cssVar('--gap', '10px')}>
-              <button
-                type="button"
-                role="switch"
-                className="toggle"
-                data-on={includeCopyright}
-                aria-checked={includeCopyright}
-                onClick={() => setIncludeCopyright((v) => !v)}
-                style={{ padding: 0 }}
-              >
-                <span className="track" />
-                <span>저작권 슬라이드 자동 추가</span>
-              </button>
-              {includeCopyright && (
-                <div className="stack" style={cssVar('--gap', '8px')}>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                      gap: 8,
-                    }}
-                  >
-                    <input
-                      type="text"
-                      value={ccliNumber}
-                      onChange={(e) => setCcliNumber(e.target.value)}
-                      placeholder="CCLI #####"
-                      aria-label="CCLI 번호"
-                      style={{ padding: '9px 12px', fontSize: 13.5 }}
-                    />
-                    <input
-                      type="text"
-                      value={licenseLabel}
-                      onChange={(e) => setLicenseLabel(e.target.value)}
-                      placeholder="예: CCLI Worship License"
-                      aria-label="라이선스 라벨"
-                      style={{ padding: '9px 12px', fontSize: 13.5 }}
-                    />
-                  </div>
-                  <div className="caption" style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-                    곡 제목은 자동으로 들어갑니다. CCLI 번호와 라벨은 선택사항이에요.
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 슬라이드 미리보기 — 각 섹션 블록 = 한 슬라이드.
-                16:9 비율로 실제 PPT 모양처럼 보여주고 선택한 테마 배경을 그대로 적용한다.
-                한도 초과 시 빨강 테두리. */}
-            {!isEmpty && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                {docToSlides().map((slide, i) => {
-                  const v = validateSlide(slide);
-                  const isOverflow = !v.ok;
-                  const slideMeta = 'fontSize' in v
-                    ? `${v.lineCount}줄 · ${v.fontSize}pt`
-                    : v.reason === 'too-many-lines'
-                      ? `${v.lineCount}줄 · 한도 초과 (분리 필요)`
-                      : `한 줄이 너무 깁니다 (줄당 최대 ${v.maxCharsPerLine}자)`;
-                  const needsWhiteOverlay =
-                    pptTheme === 'meadow' || pptTheme === 'cross' || pptTheme === 'bible';
-                  return (
-                    <div key={i}>
-                      <div
-                        className="mono"
-                        style={{
-                          marginBottom: 4,
-                          fontSize: 10.5,
-                          color: isOverflow ? 'var(--accent-ink)' : 'var(--ink-3)',
-                        }}
-                      >
-                        슬라이드 {i + 1} · {slideMeta}
-                      </div>
-                      <div
-                        style={{
-                          aspectRatio: '16 / 9',
-                          background: themeBackground(pptTheme),
-                          color: themeText(pptTheme),
-                          borderRadius: 4,
-                          border:
-                            '2px solid ' + (isOverflow ? 'var(--accent)' : 'var(--rule)'),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          textAlign: 'center',
-                          padding: '8px 10px',
-                          fontFamily: 'var(--serif)',
-                          // 실제 PPT 글자 크기에 비례 — pt 값을 0.18 정도로 스케일.
-                          fontSize: 'fontSize' in v ? `${v.fontSize * 0.18}px` : '11px',
-                          lineHeight: 1.35,
-                          overflow: 'hidden',
-                          position: 'relative',
-                        }}
-                      >
-                        {needsWhiteOverlay && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              background: 'rgba(255,255,255,0.65)',
-                            }}
-                          />
-                        )}
-                        {slide.lines.length === 0 ? (
-                          <span style={{ opacity: 0.4, position: 'relative', zIndex: 1 }}>(빈 슬라이드)</span>
-                        ) : (
-                          <div style={{ position: 'relative', zIndex: 1 }}>
-                            {slide.lines.map((l, j) => (
-                              <div key={j}>{l}</div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {isOverflow && (
-                        <div
-                          className="caption"
-                          style={{ marginTop: 4, color: 'var(--accent-ink)', fontSize: 11.5 }}
-                        >
-                          최대 4줄 · 줄당 17~32자. 분리해주세요.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {isEmpty && (
-              <div className="caption" style={{ color: 'var(--ink-3)' }}>
-                콘티 편집에 섹션을 추가하면 여기에 슬라이드 미리보기가 나타납니다.
-              </div>
-            )}
-          </div>
+        {/* Row 2: 02 추출된 곡 | 03 콘티 편집 */}
+        <div className="work-grid">
+          <ExtractedSection
+            songs={songs}
+            text={text}
+            extracting={extracting}
+            onUpdateSong={updateSong}
+            onRemoveSong={removeSong}
+            onAddEmptySong={addEmptySong}
+          />
+          <EditorSection
+            text={text}
+            setText={setText}
+            onClear={onClear}
+            onCopy={handleCopy}
+            onDownloadTxt={handleSaveTxt}
+            onDownloadDocx={handleSaveDocx}
+          />
         </div>
+
+        {/* Row 3: 04 PPT 만들기 */}
+        <PptSection
+          slideCount={buildSlidesFromText(text).length}
+          pptFont={pptFont}
+          setPptFont={setPptFont}
+          pptTheme={pptTheme}
+          setPptTheme={setPptTheme}
+          includeCopyright={includeCopyright}
+          setIncludeCopyright={setIncludeCopyright}
+          onOpenPreview={() => setPreviewOpen(true)}
+          onDownloadPptx={handleSavePptx}
+          onCopyShareLink={handleCopyShareLink}
+          onDownloadOpenSong={handleSaveOpenSong}
+          onDownloadPlainSlides={handleSavePlainSlides}
+        />
       </main>
+
+      {/* PPT 전체 미리보기 모달 — 04 PptSection의 "전체 미리보기" 버튼이 트리거 */}
+      <PreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        text={text}
+        pptTheme={pptTheme}
+        pptFont={pptFont}
+      />
+
 
       {/* ----- 푸터 ----- */}
       <footer
@@ -2610,13 +1132,14 @@ export default function Home() {
       {showSets && (
         <SavedSetsModal
           currentSongs={songs}
-          currentDoc={doc}
+          currentDoc={text}
           isCurrentEmpty={isEmpty}
           isCloudUser={Boolean(authUser)}
           onClose={() => setShowSets(false)}
           onLoad={(s) => {
             setSongs(s.songs);
-            setDoc(s.doc);
+            // s.doc은 이제 string (ensureText에서 자동 변환됨)
+            setText(s.doc);
             showToast(`"${s.name}" 콘티를 불러왔어요`);
             setShowSets(false);
           }}
@@ -2778,36 +1301,43 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </h4>
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
             <li>
-              <b>곡 제목 카드 클릭</b> → 오른쪽 콘티에 그 곡의 제목 슬라이드 추가
+              <b>곡 제목 클릭</b> → 인라인으로 제목을 바로 수정할 수 있어요.
             </li>
             <li>
-              <b>섹션 카드 클릭</b> (Verse, 후렴, Bridge 등) → 그 섹션 가사가 콘티에 추가
+              <b>섹션 칩(Verse/후렴/Bridge…) 본문 클릭</b> → 오른쪽 콘티에 그 섹션 가사가 추가됨. <b>여러 번 누르면 여러 번 추가</b> (후렴 4번이면 4번 클릭).
             </li>
             <li>
-              곡 카드 우측 <b>↑↓</b> — 곡 순서 바꾸기 / <b>✕</b> — 그 곡 삭제 (콘티에 추가했던 것도 같이 빠짐)
+              섹션 칩 위 <b>✎</b> → 라벨과 가사를 직접 수정 (AI가 잘못 읽었을 때 보완용).
             </li>
             <li>
-              섹션 카드의 <b>↑↓</b> — 그 곡 안에서 섹션 순서 바꾸기 (예: 후렴을 Verse 1 위로)
+              <b>+ 새 섹션 추가</b> → 6종 라벨(Verse/Pre-Chorus/Chorus/Bridge/Ending/Intro) 중 선택하면 빈 가사 칩이 새로 만들어져요.
+            </li>
+            <li>
+              곡 카드의 <b>+ 곡 추가</b> → 그 곡의 모든 섹션을 콘티에 한 번에 추가. <b>✕</b> → 곡 라이브러리에서 곡 제거.
             </li>
           </ul>
 
           <h4 style={{ fontSize: 13, color: 'var(--ink)', margin: '14px 0 6px', fontWeight: 600 }}>
-            3번 영역 — 콘티 편집 (오른쪽)
+            3번 영역 — 콘티 편집 (오른쪽 큰 텍스트 박스)
           </h4>
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
             <li>
-              <b>+ 메모 슬라이드</b> — 광고, 기도제목, 축도자 이름처럼 가사가 아닌 자유 텍스트 슬라이드 만들기.
+              <b>한 줄</b> = 화면 한 줄. <b>빈 줄</b>(Enter 두 번) = <b>슬라이드 분리</b>. 그게 전부예요.
             </li>
             <li>
-              <b>+ 슬라이드 구분</b> — 슬라이드를 정확히 여기서 자르고 싶을 때 명시적으로 분리자 추가.
-              <span style={{ color: 'var(--ink-3)' }}> (보통은 Enter 두 번이면 충분)</span>
+              가사 안에서 빈 줄을 지우면(백스페이스) 두 슬라이드가 자동으로 <b>합쳐짐</b>.
             </li>
             <li>
-              <b>공유 링크 복사</b> — 지금 만든 콘티를 통째로 URL에 담아서 복사. 링크 받은 사람이 열면 똑같은 콘티가 보여요.
-              <span style={{ color: 'var(--ink-3)' }}> (외부 서버에 저장되는 거 아님)</span>
+              <b>제목 슬라이드</b>를 직접 만들고 싶으면 줄 맨 앞에 <b>"#&nbsp;"</b> 입력. 예: <code className="kbd"># 은혜로다</code>
             </li>
             <li>
-              블록 안의 <b>↑↓</b> — 위·아래로 이동 / <b>✎</b> — 가사 직접 고치기 / <b>✕</b> — 삭제
+              <b>메모 슬라이드</b>(광고/기도제목/축도자) 만들고 싶으면 줄 맨 앞에 <b>"&gt;&nbsp;"</b> 입력. 예: <code className="kbd">&gt; 예배 후 광고</code>
+            </li>
+            <li>
+              하단 <b>📋 클립보드 / 📄 TXT / 📝 DOCX</b> — 슬라이드 안 만들고 텍스트만 뽑고 싶을 때.
+            </li>
+            <li>
+              하단 <b>전체 비우기</b> — 콘티 통째로 지움 (한 번 더 묻습니다).
             </li>
           </ul>
 
@@ -2877,11 +1407,11 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           />
           <FAQ
             q="가사가 빠지거나 이상하게 나왔어요."
-            a="① '정확도 우선' 켜고 다시 추출하기. ② 그래도 안 되면 콘티 블록 옆 ✎ 버튼으로 직접 고치기. (한 번 고친 패턴은 다음 추출 때 AI가 참고해요)"
+            a="① '정확도 우선' 켜고 다시 추출하기. ② 그래도 안 되면 ② 곡 카드 안 섹션 칩의 ✎ 버튼으로 가사를 직접 고치기 — AI는 한 번 고친 패턴을 다음 추출 때 힌트로 참고해요. ③ AI가 한 섹션을 통째로 빼먹었다면 '+ 새 섹션 추가'로 직접 만드세요."
           />
           <FAQ
             q="곡 카드 ✕ 누르면 콘티에 추가한 것도 사라져요?"
-            a="네, 그 곡으로 추가했던 콘티 블록도 같이 사라져요. 누를 때 한 번 더 물어봐요."
+            a="아니요, 콘티 편집창 텍스트는 그대로 남아요. 곡 카드는 그냥 '왼쪽 라이브러리에서 그 곡을 빼는' 것일 뿐, 이미 콘티에 들어간 가사는 그대로 유지됩니다."
           />
           <FAQ
             q="PPT 열었더니 글씨체가 다르게 보여요."
@@ -3098,7 +1628,7 @@ function SavedSetsModal({
   onSaved,
 }: {
   currentSongs: Song[];
-  currentDoc: Block[];
+  currentDoc: string;
   isCurrentEmpty: boolean;
   // 로그인 상태인지 — UI에 "클라우드에 저장됨" 안내 표기용
   isCloudUser: boolean;
@@ -3304,9 +1834,10 @@ function SavedSetsModal({
         ) : (
           <div className="stack" style={cssVar('--gap', '8px')}>
             {sets.map((s) => {
-              const sectionCount = s.doc.filter(
-                (b: any) => b && b.kind === 'section'
-              ).length;
+              // 텍스트 모델: 빈 줄 기준 paragraph 수 = 슬라이드 수
+              const sectionCount = s.doc
+                ? s.doc.split(/\n[ \t]*\n+/).filter((p) => p.trim().length > 0).length
+                : 0;
               return (
                 <div
                   key={s.id}
@@ -3922,558 +2453,3 @@ function ChurchTemplateModal({
 }
 
 
-// ============== 편집창 안의 블록 렌더링 ==============
-function SortableBlock({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-        position: 'relative',
-      }}
-      {...attributes}
-      {...listeners}
-    >
-      {children}
-    </div>
-  );
-}
-
-// title / section / spacer 세 종류를 분기 처리
-// section 본문은 contentEditable로 인라인 수정 가능
-//
-// contentEditable + React 주의:
-// React가 children prop으로 텍스트를 박으면, 부모 재렌더 시 사용자 편집 내용을
-// 덮어쓸 수 있음(자식 비제어 + React 재렌더 충돌). ref + useEffect로 외부 값이
-// 실제로 다를 때만 DOM에 반영하는 패턴 사용 → 편집 중 포커스/입력 보존.
-function EditorBlockView({
-  block,
-  onUpdate,
-  onRemove,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
-  onMergeWithPrev,
-  onAutoSplit,
-  shouldFocus,
-  onFocused,
-}: {
-  block: Block;
-  onUpdate: (next: Block) => void;
-  onRemove: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  // 커서가 section 본문 맨 앞 + Backspace → 위 section과 합치기 트리거
-  onMergeWithPrev?: () => void;
-  // section 본문에 빈 줄(\n\n) 있을 때 doc에서 두 section으로 자동 분리
-  onAutoSplit?: () => void;
-  shouldFocus?: boolean;
-  onFocused?: () => void;
-}) {
-  // 모든 contentEditable 영역은 비제어 — 외부 prop이 진짜 다를 때만 동기화
-  const editableRef = useRef<HTMLElement | null>(null);
-  const sectionFocusTextRef = useRef('');
-  const [isSectionHovered, setIsSectionHovered] = useState(false);
-  const [isMemoEmpty, setIsMemoEmpty] = useState(block.kind === 'memo' && !block.body);
-
-  // block 텍스트가 외부에서 바뀐 경우(블록 추가, 다른 곳 편집)에만 DOM 갱신
-  // 사용자가 그냥 타이핑 중일 땐 DOM = state라서 if 조건이 false → 건들지 않음
-  useEffect(() => {
-    if (block.kind !== 'section' && block.kind !== 'title' && block.kind !== 'memo') return;
-    const el = editableRef.current;
-    if (!el) return;
-    const expected = block.kind === 'title' ? block.text : block.body;
-    if (el.innerText !== expected) {
-      el.innerText = expected;
-    }
-    if (block.kind === 'memo') setIsMemoEmpty(!expected);
-  }, [block]);
-
-  useEffect(() => {
-    if (!shouldFocus || block.kind !== 'memo') return;
-    const el = editableRef.current;
-    if (!el) return;
-    el.focus();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    onFocused?.();
-  }, [block.kind, onFocused, shouldFocus]);
-
-  if (block.kind === 'spacer') {
-    return <div style={{ height: 14 }} />;
-  }
-
-  if (block.kind === 'slidebreak') {
-    // 슬라이드 구분자 — PPT에서 여기를 기준으로 페이지가 나뉜다.
-    // 시각적으로 점선 + 가운데 라벨 + 우측 [↑][↓][✕] 도구바.
-    return (
-      <div
-        style={{
-          position: 'relative',
-          margin: '12px 0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          paddingRight: 96,
-        }}
-      >
-        <div style={{ flex: 1, height: 1, borderTop: '1px dashed var(--accent)' }} />
-        <div
-          className="mono"
-          style={{
-            color: 'var(--accent-ink)',
-            whiteSpace: 'nowrap',
-            fontSize: 10.5,
-            letterSpacing: '0.18em',
-          }}
-        >
-          ─ 슬라이드 구분 ─
-        </div>
-        <div style={{ flex: 1, height: 1, borderTop: '1px dashed var(--accent)' }} />
-        <button
-          onClick={() => canMoveUp && onMoveUp()}
-          disabled={!canMoveUp}
-          aria-label="위로 이동"
-          title="위로 이동"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            right: 68,
-            transform: 'translateY(-50%)',
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: 'var(--paper)',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-2)',
-            cursor: canMoveUp ? 'pointer' : 'not-allowed',
-            opacity: canMoveUp ? 1 : 0.3,
-            fontSize: 11,
-          }}
-        >
-          ↑
-        </button>
-        <button
-          onClick={() => canMoveDown && onMoveDown()}
-          disabled={!canMoveDown}
-          aria-label="아래로 이동"
-          title="아래로 이동"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            right: 38,
-            transform: 'translateY(-50%)',
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: 'var(--paper)',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-2)',
-            cursor: canMoveDown ? 'pointer' : 'not-allowed',
-            opacity: canMoveDown ? 1 : 0.3,
-            fontSize: 11,
-          }}
-        >
-          ↓
-        </button>
-        <button
-          onClick={onRemove}
-          aria-label="구분 제거"
-          title="구분 제거"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            right: 8,
-            transform: 'translateY(-50%)',
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: 'var(--paper)',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-3)',
-            cursor: 'pointer',
-            fontSize: 12,
-            lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
-      </div>
-    );
-  }
-
-  if (block.kind === 'title') {
-    return (
-      <div style={{ position: 'relative', marginBottom: 18 }}>
-        <div className="label" style={{ marginBottom: 6 }}>
-          곡 제목
-        </div>
-        <h1
-          ref={editableRef as React.RefObject<HTMLHeadingElement>}
-          contentEditable
-          suppressContentEditableWarning
-          onBlur={(e) =>
-            onUpdate({ ...block, text: e.currentTarget.innerText || '' })
-          }
-          className="h-song"
-          style={{
-            margin: 0,
-            fontSize: 38,
-            outline: 'none',
-            borderBottom: '1px solid var(--rule)',
-            paddingBottom: 8,
-          }}
-        />
-        <button
-          onClick={onMoveUp}
-          disabled={!canMoveUp}
-          aria-label="위로 이동"
-          title="위로 이동"
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 58,
-            background: 'none',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-3)',
-            cursor: canMoveUp ? 'pointer' : 'not-allowed',
-            fontSize: 12,
-            padding: '2px 7px',
-            borderRadius: 99,
-            opacity: canMoveUp ? 1 : 0.3,
-          }}
-        >
-          ↑
-        </button>
-        <button
-          onClick={onMoveDown}
-          disabled={!canMoveDown}
-          aria-label="아래로 이동"
-          title="아래로 이동"
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 30,
-            background: 'none',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-3)',
-            cursor: canMoveDown ? 'pointer' : 'not-allowed',
-            fontSize: 12,
-            padding: '2px 7px',
-            borderRadius: 99,
-            opacity: canMoveDown ? 1 : 0.3,
-          }}
-        >
-          ↓
-        </button>
-        <button
-          onClick={onRemove}
-          title="제거"
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            background: 'none',
-            border: 'none',
-            color: 'var(--ink-3)',
-            cursor: 'pointer',
-            fontSize: 12,
-            padding: 4,
-          }}
-        >
-          제거
-        </button>
-      </div>
-    );
-  }
-
-  if (block.kind === 'memo') {
-    return (
-      <div
-        style={{
-          position: 'relative',
-          marginBottom: 14,
-          padding: '18px 18px 16px',
-          background: '#fff',
-          border: '1px dashed color-mix(in oklab, var(--ink-3) 55%, white)',
-          borderRadius: 4,
-        }}
-        onMouseEnter={() => setIsSectionHovered(true)}
-        onMouseLeave={() => setIsSectionHovered(false)}
-      >
-        <div
-          className="mono"
-          style={{
-            marginBottom: 8,
-            color: 'var(--ink-3)',
-            fontSize: 10.5,
-            letterSpacing: '0.16em',
-          }}
-        >
-          메모
-        </div>
-        <button
-          onClick={onMoveUp}
-          disabled={!canMoveUp}
-          aria-label="위로 이동"
-          title="위로 이동"
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 88,
-            background: 'var(--paper)',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-3)',
-            cursor: canMoveUp ? 'pointer' : 'not-allowed',
-            fontSize: 11,
-            padding: '2px 8px',
-            borderRadius: 99,
-            opacity: isSectionHovered ? (canMoveUp ? 1 : 0.3) : 0,
-            transition: 'opacity .15s ease',
-          }}
-        >
-          ↑
-        </button>
-        <button
-          onClick={onMoveDown}
-          disabled={!canMoveDown}
-          aria-label="아래로 이동"
-          title="아래로 이동"
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 54,
-            background: 'var(--paper)',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-3)',
-            cursor: canMoveDown ? 'pointer' : 'not-allowed',
-            fontSize: 11,
-            padding: '2px 8px',
-            borderRadius: 99,
-            opacity: isSectionHovered ? (canMoveDown ? 1 : 0.3) : 0,
-            transition: 'opacity .15s ease',
-          }}
-        >
-          ↓
-        </button>
-        <button
-          onClick={onRemove}
-          title="메모 제거"
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            background: 'var(--paper)',
-            border: '1px solid var(--rule)',
-            color: 'var(--ink-3)',
-            cursor: 'pointer',
-            fontSize: 11,
-            padding: '2px 8px',
-            borderRadius: 99,
-            opacity: isSectionHovered ? 1 : 0,
-            transition: 'opacity .15s ease',
-          }}
-        >
-          제거
-        </button>
-        <div style={{ position: 'relative' }}>
-          {isMemoEmpty && (
-            <div
-              className="lyric"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                pointerEvents: 'none',
-                color: 'var(--ink-3)',
-                opacity: 0.65,
-                fontSize: 17,
-                lineHeight: 1.75,
-              }}
-            >
-              광고, 기도제목 같은 자유 텍스트…
-            </div>
-          )}
-          <div
-            ref={editableRef as React.RefObject<HTMLDivElement>}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => {
-              const nextBody = (e.currentTarget as HTMLDivElement).innerText;
-              setIsMemoEmpty(!nextBody);
-              onUpdate({ ...block, body: nextBody });
-            }}
-            onBlur={(e) => {
-              const nextBody = e.currentTarget.innerText;
-              setIsMemoEmpty(!nextBody);
-              onUpdate({ ...block, body: nextBody });
-            }}
-            className="lyric"
-            style={{
-              minHeight: 32,
-              outline: 'none',
-              whiteSpace: 'pre-wrap',
-              fontSize: 17,
-              lineHeight: 1.75,
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // section 블록 — 사용자 요청대로 칩(Verse 1 같은 분류) 제거
-  // 가사 본문만 표시하되, hover 시 우측 위에 "제거" 버튼이 나타남
-  // 섹션 구분은 spacer(빈 줄)로 자연스럽게
-  // globals.css를 건드리지 않기 위해 이동 버튼 hover 노출은 로컬 state로 처리한다.
-  // 제거 버튼의 기존 hover UX와 맞추면서 이번 변경 범위를 page.tsx 안에 제한한다.
-  return (
-    <div
-      style={{ position: 'relative', marginBottom: 14 }}
-      className="editor-section-block"
-      onMouseEnter={() => setIsSectionHovered(true)}
-      onMouseLeave={() => setIsSectionHovered(false)}
-    >
-      <button
-        onClick={onMoveUp}
-        disabled={!canMoveUp}
-        aria-label="위로 이동"
-        title="위로 이동"
-        className="editor-section-move"
-        style={{
-          position: 'absolute',
-          top: -2,
-          right: 88,
-          background: 'var(--paper)',
-          border: '1px solid var(--rule)',
-          color: 'var(--ink-3)',
-          cursor: canMoveUp ? 'pointer' : 'not-allowed',
-          fontSize: 11,
-          padding: '2px 8px',
-          borderRadius: 99,
-          opacity: isSectionHovered ? (canMoveUp ? 1 : 0.3) : 0,
-          transition: 'opacity .15s ease',
-        }}
-      >
-        ↑
-      </button>
-      <button
-        onClick={onMoveDown}
-        disabled={!canMoveDown}
-        aria-label="아래로 이동"
-        title="아래로 이동"
-        className="editor-section-move"
-        style={{
-          position: 'absolute',
-          top: -2,
-          right: 54,
-          background: 'var(--paper)',
-          border: '1px solid var(--rule)',
-          color: 'var(--ink-3)',
-          cursor: canMoveDown ? 'pointer' : 'not-allowed',
-          fontSize: 11,
-          padding: '2px 8px',
-          borderRadius: 99,
-          opacity: isSectionHovered ? (canMoveDown ? 1 : 0.3) : 0,
-          transition: 'opacity .15s ease',
-        }}
-      >
-        ↓
-      </button>
-      <button
-        onClick={onRemove}
-        title="섹션 제거"
-        className="editor-section-remove"
-        style={{
-          position: 'absolute',
-          top: -2,
-          right: 0,
-          background: 'var(--paper)',
-          border: '1px solid var(--rule)',
-          color: 'var(--ink-3)',
-          cursor: 'pointer',
-          fontSize: 11,
-          padding: '2px 8px',
-          borderRadius: 99,
-          opacity: 0,
-          transition: 'opacity .15s ease',
-        }}
-      >
-        제거
-      </button>
-      {/* 비제어 contentEditable — block 변경 시에만 useEffect로 DOM 갱신
-          (children으로 박으면 사용자 편집 중 React 재렌더가 덮어씀) */}
-      <div
-        ref={editableRef as React.RefObject<HTMLDivElement>}
-        contentEditable
-        suppressContentEditableWarning
-        // onInput으로 실시간 반영 — Enter로 만든 빈 줄을 백스페이스로 지우자마자
-        // PPT 미리보기가 즉시 합쳐지도록(역방향 호환). useEffect의 동기화 로직이
-        // innerText === expected 비교로 무한 루프를 막아준다.
-        onFocus={() => {
-          sectionFocusTextRef.current = block.body;
-        }}
-        onKeyDown={(e) => {
-          // 본문 맨 앞에서 Backspace → 위 section과 합치기 (사용자가 두 섹션을 자연스럽게 이어붙이고 싶을 때)
-          if (e.key === 'Backspace' && onMergeWithPrev) {
-            const sel = window.getSelection();
-            if (
-              sel &&
-              sel.isCollapsed &&
-              sel.anchorOffset === 0 &&
-              // contentEditable 안 첫 번째 텍스트 노드/요소에 커서가 있는 경우만
-              e.currentTarget.contains(sel.anchorNode)
-            ) {
-              // 추가 안전장치: 첫 줄 첫 글자 앞인지 확인
-              const range = sel.getRangeAt(0);
-              const preRange = document.createRange();
-              preRange.selectNodeContents(e.currentTarget as HTMLDivElement);
-              preRange.setEnd(range.startContainer, range.startOffset);
-              if (preRange.toString().length === 0) {
-                e.preventDefault();
-                onMergeWithPrev();
-              }
-            }
-          }
-          // ESC → blur (자동 split 트리거 — onBlur가 빈 줄 발견 시 분리)
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            (e.currentTarget as HTMLDivElement).blur();
-          }
-        }}
-        onInput={(e) => onUpdate({ ...block, body: (e.currentTarget as HTMLDivElement).innerText })}
-        onBlur={(e) => {
-          const nextBody = e.currentTarget.innerText;
-          // 사용자가 본문을 직접 고친 패턴을 다음 OCR 요청의 약한 힌트로 저장한다.
-          if (sectionFocusTextRef.current.trim() !== nextBody.trim()) {
-            recordCorrection(sectionFocusTextRef.current, nextBody);
-          }
-          onUpdate({ ...block, body: nextBody });
-          // 빈 줄(\n\n)이 있으면 doc 안에서도 두 section으로 자동 분리.
-          // 분리되면 ↑↓/dnd가 각자 동작 (사용자 요청: "엔터치면 분리").
-          if (onAutoSplit && /\n\s*\n/.test(nextBody)) {
-            // 다음 tick에 호출 — onUpdate setDoc과 순서 정리
-            setTimeout(() => onAutoSplit(), 0);
-          }
-        }}
-        className="lyric"
-        style={{
-          outline: 'none',
-          padding: '4px 0 8px',
-          whiteSpace: 'pre-wrap',
-          fontSize: 17.5,
-          lineHeight: 1.85,
-        }}
-      />
-    </div>
-  );
-}

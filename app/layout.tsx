@@ -19,21 +19,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" data-theme="wanted">
       <head>
         {/* 폰트 CDN preconnect — 로딩 속도 향상 */}
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
 
-        {/* Pretendard — 한국어 본문용 산세리프 */}
+        {/* Pretendard — 한국어 본문용 산세리프 (paper 테마용) */}
         <link
           rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+        />
+        {/* Pretendard JP — Wanted 테마 본문용. JP 변종이 wanted 디자인 시스템 톤과 어울림. */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-jp.min.css"
+        />
+        {/* Wanted Sans — Wanted 테마 디스플레이용 */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/complete/WantedSansVariable.min.css"
         />
 
-        {/* Google Fonts — Noto Serif KR(한글 세리프 헤드라인) + JetBrains Mono(작은 메타용)
-            * Newsreader는 영문 전용이라 한글이 폴백돼서 톤 어긋남 → Noto Serif KR로 교체 */}
+        {/* Google Fonts — Noto Serif KR(paper 테마 헤드라인) + JetBrains Mono(메타용) */}
         <link
           href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"

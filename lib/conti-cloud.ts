@@ -19,6 +19,7 @@ import {
   removeSet as removeLocal,
   type SavedSet,
 } from './conti-storage';
+import { ensureText } from './text-doc';
 import type { Song } from './types';
 
 async function getCurrentUserId(): Promise<string | null> {
@@ -29,6 +30,8 @@ async function getCurrentUserId(): Promise<string | null> {
 }
 
 // DB row를 SavedSet 형태로 변환. doc 컬럼 안에 { songs, doc }가 들어있다.
+// 기존(Phase 2 이전) 저장 행의 doc는 Block[]일 수 있고, 새 저장은 string.
+// ensureText()가 두 케이스 다 처리해 string으로 정규화한다.
 function rowToSavedSet(row: any): SavedSet {
   const payload = row.doc ?? {};
   const savedAtSource = row.updated_at ?? row.created_at;
@@ -37,7 +40,7 @@ function rowToSavedSet(row: any): SavedSet {
     name: row.name,
     savedAt: savedAtSource ? new Date(savedAtSource).getTime() : Date.now(),
     songs: Array.isArray(payload.songs) ? payload.songs : [],
-    doc: Array.isArray(payload.doc) ? payload.doc : [],
+    doc: ensureText(payload.doc),
   };
 }
 
@@ -60,10 +63,11 @@ export async function listSetsAsync(): Promise<SavedSet[]> {
 }
 
 // 새 콘티 세트 저장. 로그인 안 했으면 localStorage에 저장.
+// Phase 3: doc은 단일 string (텍스트 모델). 기존 호출부는 ensureText로 변환됨.
 export async function saveSetAsync(
   name: string,
   songs: Song[],
-  doc: any[]
+  doc: string
 ): Promise<SavedSet> {
   const userId = await getCurrentUserId();
   if (!userId) return saveLocal(name, songs, doc);
