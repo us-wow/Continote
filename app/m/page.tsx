@@ -33,10 +33,16 @@ import ExtractedSection from '@/components/ExtractedSection';
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
+import IntroScreen from '@/components/IntroScreen';
 import type { DesignTheme } from '@/components/Header';
 
 export default function MobilePage() {
   // ----- 핵심 상태 -----
+  // introSeen: 처음 진입 시 IntroScreen 보여주는 게이트.
+  //   null = mount 전 아직 모름(SSR/hydration 깜빡임 방지 위해 처음엔 아무것도 렌더 X)
+  //   false = 인트로 표시 중
+  //   true = 인트로 건너뛰고 wizard 표시
+  const [introSeen, setIntroSeen] = useState<boolean | null>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [files, setFiles] = useState<File[]>([]);
   const [thumbs, setThumbs] = useState<string[]>([]);
@@ -109,6 +115,24 @@ export default function MobilePage() {
       const saved = window.localStorage.getItem('conti-design-theme');
       if (saved === 'wanted' || saved === 'paper') setDesignTheme(saved);
     } catch {}
+  }, []);
+
+  // ----- 인트로 게이트 — 처음 들어왔으면 IntroScreen, 한 번 본 적 있으면 wizard 직행 -----
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const seen = window.localStorage.getItem('intro-seen');
+      setIntroSeen(seen === '1');
+    } catch {
+      setIntroSeen(true); // localStorage 차단 환경에선 그냥 wizard로
+    }
+  }, []);
+
+  const dismissIntro = useCallback(() => {
+    try {
+      window.localStorage.setItem('intro-seen', '1');
+    } catch {}
+    setIntroSeen(true);
   }, []);
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -473,6 +497,25 @@ export default function MobilePage() {
     } catch {}
     window.location.assign('/');
   };
+
+  // SSR + hydration 깜빡임 방지 — introSeen이 결정되기 전까진 빈 화면
+  if (introSeen === null) {
+    return <div className="m-app" />;
+  }
+
+  // 첫 진입(또는 사용자가 명시적으로 인트로 다시 보기) → IntroScreen
+  if (introSeen === false) {
+    return (
+      <IntroScreen
+        theme={designTheme}
+        onStart={dismissIntro}
+        onGoogleSignIn={handleSignIn}
+        authBusy={authBusy}
+        authUser={authUser}
+        supabaseEnabled={isSupabaseConfigured()}
+      />
+    );
+  }
 
   return (
     <div className="m-app">

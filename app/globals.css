@@ -1478,6 +1478,372 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   }
 }
 
+/* ── Mobile Intro Screen (모바일 첫 진입 — IntroScreen.tsx) ── */
+.intro3 {
+  height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  font-family: var(--font-body);
+  position: relative;
+  overflow: hidden;
+  /* 부드러운 상단 틴트 — 액센트 컬러로 테마마다 자동 적응 */
+  background:
+    linear-gradient(180deg, var(--accent-tint) 0%, transparent 40%),
+    var(--paper);
+}
+.intro3-statusbar-pad {
+  /* iOS 노치/상단 안전영역 */
+  height: max(env(safe-area-inset-top), 24px);
+  flex-shrink: 0;
+}
+.intro3-body {
+  flex: 1;
+  padding: 14px 24px max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  /* 자연스러운 세로 flow — space-between/margin-top:auto 사용 금지(spec) */
+}
+.intro3-top,
+.intro3-mid,
+.intro3-bottom {
+  display: flex;
+  flex-direction: column;
+}
+.intro3-top {
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.intro3-mid {
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.intro3-bottom {
+  gap: 10px;
+}
+
+/* ── 브랜드 행 ── */
+.intro3-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.intro3-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.intro3-brand-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.024em;
+  color: var(--ink);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.intro3-brand-sub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+/* ── 헤드라인 + 본문 ── */
+.intro3-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.intro3-headline h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.24;
+  letter-spacing: -0.028em;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.intro3-headline h1 > span {
+  display: block;
+}
+.intro3-headline em {
+  font-style: normal;
+  font-weight: 800;
+  color: var(--accent-strong);
+  position: relative;
+  display: inline-block;
+}
+.intro3-headline em::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 1px;
+  height: 10px;
+  background: var(--accent-tint);
+  z-index: -1;
+  border-radius: 1px;
+  transform: skewY(-0.6deg);
+}
+.intro3-headline p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+  word-break: keep-all;
+}
+
+/* ── 4-step 가로 타임라인 ── */
+.intro3-steps {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 6px 0 2px;
+}
+.intro3-track {
+  position: absolute;
+  top: 28px;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--rule-2) 0 4px,
+    transparent 4px 8px
+  );
+  z-index: 0;
+}
+.intro3-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.intro3-step-node {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  color: var(--accent-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+.intro3-step-num {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+.intro3-step-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+}
+.intro3-step-hint {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-align: center;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+/* ── 미니 데모 (악보 → 가사 → 슬라이드) ── */
+.intro3-demo {
+  background:
+    radial-gradient(ellipse at 50% 100%, var(--accent-tint) 0%, transparent 70%),
+    rgba(112, 115, 124, 0.05);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.intro3-demo-caption {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  text-align: center;
+  letter-spacing: -0.005em;
+}
+.intro3-demo-caption b {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+.intro3-demo-row {
+  display: grid;
+  grid-template-columns: 1fr 16px 1fr 16px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+.intro3-demo-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.intro3-demo-card svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.08));
+}
+.intro3-demo-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink-2);
+  text-align: center;
+}
+.intro3-demo-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-bottom: 18px; /* 라벨 높이만큼 위로 — 카드 그림 중앙과 정렬 */
+}
+
+/* ── Trust strip ── */
+.intro3-trust {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.intro3-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.intro3-trust svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── CTA + Skip ── */
+.intro3-cta-block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.intro3-cta {
+  height: 58px;
+  border-radius: 16px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: background 140ms, transform 80ms;
+}
+.intro3-cta:hover {
+  background: var(--accent-strong);
+}
+.intro3-cta:active {
+  transform: translateY(1px);
+}
+.intro3-skip {
+  align-self: center;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rule-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.intro3-skip:hover {
+  color: var(--ink-2);
+}
+
+/* ── Footer (Google login — 선택) ── */
+.intro3-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule);
+}
+.intro3-google {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--rule-2);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.intro3-google:hover:not(:disabled) {
+  background: var(--paper-2);
+}
+.intro3-google:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.intro3-google-note {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-align: center;
+  line-height: 1.45;
+  padding: 0 4px;
+}
+
 /* ── Mobile wizard (/m 라우트 — 4단계 풀스크린) ── */
 .m-app {
   display: flex;
