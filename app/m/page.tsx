@@ -508,6 +508,7 @@ export default function MobilePage() {
     return (
       <IntroScreen
         theme={designTheme}
+        onChangeTheme={setDesignTheme}
         onStart={dismissIntro}
         onGoogleSignIn={handleSignIn}
         authBusy={authBusy}
@@ -521,10 +522,18 @@ export default function MobilePage() {
     <div className="m-app">
       {/* ===== Top Bar — 미니 헤더 ===== */}
       <header className="m-header">
-        <div className="m-brand">
+        {/* 브랜드 클릭 → 인트로 화면으로 돌아감 (localStorage는 그대로 두고 introSeen만 false로).
+            "시작하기" 다시 눌러도 어차피 dismissIntro가 동일 값으로 setItem해서 무해. */}
+        <button
+          type="button"
+          className="m-brand m-brand-button"
+          onClick={() => setIntroSeen(false)}
+          aria-label="초기화면으로 돌아가기"
+          title="콘티노트 인트로로"
+        >
           <BrandMark size={28} />
           <span className="m-brand-name">콘티노트</span>
-        </div>
+        </button>
         <div className="m-header-actions">
           <button
             type="button"

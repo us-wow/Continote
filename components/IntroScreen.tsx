@@ -31,6 +31,8 @@ const INTRO_STEPS = [
 type IntroScreenProps = {
   // 디자인 시스템 토글 — paper / wanted
   theme: 'paper' | 'wanted';
+  // 인트로에서 미리 톤을 바꿔두면 뒤 wizard도 같은 톤으로 이어진다 (designTheme localStorage 공유).
+  onChangeTheme: (next: 'paper' | 'wanted') => void;
   // 시작하기 / Skip 클릭 시 호출 — 부모가 localStorage 기록 + step 1 으로 전환
   onStart: () => void;
   // Google 로그인 — 선택 사항. 비로그인도 모든 기능 동작.
@@ -43,15 +45,35 @@ type IntroScreenProps = {
 
 export default function IntroScreen({
   theme,
+  onChangeTheme,
   onStart,
   onGoogleSignIn,
   authBusy,
   authUser,
   supabaseEnabled,
 }: IntroScreenProps) {
+  // 인트로 우상단 토글 — 누르면 반대 톤으로 즉시 전환. 사용자가 고른 톤은 wizard에도 그대로 이어짐.
+  const nextTheme: 'paper' | 'wanted' = theme === 'paper' ? 'wanted' : 'paper';
   return (
     <div className="intro3" data-theme={theme}>
       <div className="intro3-statusbar-pad" />
+
+      {/* 우상단 떠다니는 디자인 토글 — 인트로 흐름을 방해하지 않는 위치에. */}
+      <button
+        type="button"
+        className="intro3-theme-toggle"
+        onClick={() => onChangeTheme(nextTheme)}
+        aria-label="디자인 변경"
+        title={`디자인 변경 (현재: ${theme === 'paper' ? '종이톤' : 'Wanted'})`}
+      >
+        <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true">
+          <path
+            d="M8 2 L9.5 6.5 L14 8 L9.5 9.5 L8 14 L6.5 9.5 L2 8 L6.5 6.5 Z"
+            fill="currentColor"
+          />
+        </svg>
+        <span>{theme === 'paper' ? '종이톤' : 'Wanted'}</span>
+      </button>
 
       <div className="intro3-body">
         {/* ── ① TOP — 브랜드 + 약속 ── */}

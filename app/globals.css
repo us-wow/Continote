@@ -1498,6 +1498,37 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   height: max(env(safe-area-inset-top), 24px);
   flex-shrink: 0;
 }
+
+/* 우상단 떠다니는 디자인 토글 — 인트로 흐름을 가리지 않게 작게 */
+.intro3-theme-toggle {
+  position: absolute;
+  top: max(env(safe-area-inset-top), 14px);
+  right: 14px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 140ms, color 140ms, border-color 140ms;
+}
+.intro3-theme-toggle:hover {
+  color: var(--ink);
+  border-color: var(--rule-2);
+  background: var(--paper-2);
+}
+.intro3-theme-toggle svg {
+  color: var(--accent);
+}
 .intro3-body {
   flex: 1;
   padding: 14px 24px max(16px, env(safe-area-inset-bottom));
@@ -1870,6 +1901,24 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* 브랜드를 button으로 쓸 때 — 인트로로 돌아가는 클릭 영역. 기본 button 스타일 리셋. */
+.m-brand-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 140ms;
+  font: inherit;
+  color: inherit;
+}
+.m-brand-button:hover {
+  background: var(--paper-2);
+}
+.m-brand-button:active {
+  transform: translateY(1px);
 }
 .m-brand-name {
   font-family: var(--font-display);
