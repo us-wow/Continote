@@ -1114,11 +1114,8 @@ export default function Home() {
             gap: 12,
           }}
         >
-          {/* 푸터 — 미니 마스코트 제거, 텍스트만 (시각적 군더더기 줄이기) */}
+          {/* 푸터 — 군더더기 멘트 제거(2026-05-20 사용자 요청), 정체성 한 줄만 유지 */}
           <span className="caption">콘티노트 · CCM 찬양팀을 위한 도구</span>
-          <span className="mono" style={{ color: 'var(--ink-3)' }}>
-            made with care · seoul
-          </span>
         </div>
       </footer>
 

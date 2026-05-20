@@ -71,6 +71,10 @@ export default function MobilePage() {
   const [authBusy, setAuthBusy] = useState(false);
   const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
 
+  // 메뉴 시트 — ☰ 햄버거 눌렀을 때 바닥에서 슉 올라옴.
+  // 안에 사용법 / 데스크탑으로 보기 / 로그아웃 등 잘 안 쓰는 액션 모음.
+  const [menuOpen, setMenuOpen] = useState(false);
+
   // 토스트
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -535,6 +539,7 @@ export default function MobilePage() {
           <span className="m-brand-name">콘티노트</span>
         </button>
         <div className="m-header-actions">
+          {/* 디자인 토글 — 두 톤 전환은 자주 쓰는 액션이라 메뉴 밖에 둠 */}
           <button
             type="button"
             className="m-icon-btn"
@@ -544,45 +549,45 @@ export default function MobilePage() {
           >
             ✦
           </button>
-          {isSupabaseConfigured() &&
-            (authUser ? (
-              <button
-                type="button"
-                className="m-icon-btn"
-                onClick={handleSignOut}
-                disabled={authBusy}
-                aria-label="로그아웃"
-                title={authUser.email ?? '로그아웃'}
-              >
-                {(authUser.email ?? '?')[0].toUpperCase()}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="m-login-btn"
-                onClick={handleSignIn}
-                disabled={authBusy}
-              >
-                <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
-                  <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
-                  <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.32A9 9 0 0 0 9 18z" />
-                  <path fill="#FBBC05" d="M3.96 10.72A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.28-1.72V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04z" />
-                  <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.96l3 2.32C4.68 5.16 6.66 3.58 9 3.58z" />
-                </svg>
-                로그인
-              </button>
-            ))}
+          {/* 햄버거 메뉴 — 사용법/데스크탑/로그인 등 보조 액션 모음 */}
           <button
             type="button"
-            className="m-icon-btn m-desktop-swap"
-            onClick={swapToDesktop}
-            aria-label="데스크탑 화면으로"
-            title="데스크탑 화면으로"
+            className="m-icon-btn m-menu-btn"
+            onClick={() => setMenuOpen(true)}
+            aria-label="메뉴 열기"
+            aria-expanded={menuOpen}
           >
-            ⊞
+            <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
+              <line x1="3" y1="6" x2="17" y2="6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <line x1="3" y1="14" x2="17" y2="14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
       </header>
+
+      {/* ===== 메뉴 바텀시트 ===== */}
+      {menuOpen && (
+        <MobileMenuSheet
+          onClose={() => setMenuOpen(false)}
+          onBackToIntro={() => {
+            setMenuOpen(false);
+            setIntroSeen(false);
+          }}
+          onSwapToDesktop={swapToDesktop}
+          authUser={authUser}
+          authBusy={authBusy}
+          onSignIn={() => {
+            setMenuOpen(false);
+            handleSignIn();
+          }}
+          onSignOut={() => {
+            setMenuOpen(false);
+            handleSignOut();
+          }}
+          supabaseEnabled={isSupabaseConfigured()}
+        />
+      )}
 
       {/* ===== Step indicator — 1/2/3/4 ===== */}
       <div className="m-steps">
@@ -701,5 +706,111 @@ export default function MobilePage() {
       {/* 토스트 */}
       {toast && <div className="toast">{toast}</div>}
     </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 모바일 메뉴 바텀시트 — ☰ 햄버거 누르면 바닥에서 슉 올라옴.
+// 사용법 / 인트로로 돌아가기 / 데스크탑 보기 / 로그인-로그아웃 같은 보조 액션.
+// ────────────────────────────────────────────────────────────────────────
+function MobileMenuSheet({
+  onClose,
+  onBackToIntro,
+  onSwapToDesktop,
+  authUser,
+  authBusy,
+  onSignIn,
+  onSignOut,
+  supabaseEnabled,
+}: {
+  onClose: () => void;
+  onBackToIntro: () => void;
+  onSwapToDesktop: () => void;
+  authUser: User | null;
+  authBusy: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  supabaseEnabled: boolean;
+}) {
+  // ESC로 닫기
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <>
+      {/* 어두운 배경 — 클릭하면 닫힘 */}
+      <div className="m-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="m-sheet" role="menu" aria-label="메뉴">
+        <div className="m-sheet-handle" aria-hidden="true" />
+        <div className="m-sheet-head">
+          <span className="label">메뉴</span>
+          <button
+            type="button"
+            className="m-sheet-close"
+            onClick={onClose}
+            aria-label="메뉴 닫기"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="m-sheet-list">
+          <button type="button" className="m-sheet-item" onClick={onBackToIntro}>
+            <span className="m-sheet-item-label">콘티노트 인트로</span>
+            <span className="m-sheet-item-sub">처음 화면으로 돌아가기</span>
+          </button>
+          <button type="button" className="m-sheet-item" onClick={onSwapToDesktop}>
+            <span className="m-sheet-item-label">데스크탑으로 보기</span>
+            <span className="m-sheet-item-sub">큰 화면(2단 레이아웃)으로 전환</span>
+          </button>
+          <a
+            href="https://contionote.vercel.app/?view=desktop#help"
+            target="_blank"
+            rel="noreferrer"
+            className="m-sheet-item"
+            onClick={onClose}
+          >
+            <span className="m-sheet-item-label">사용법 보기</span>
+            <span className="m-sheet-item-sub">데스크탑 화면에서 자세한 가이드</span>
+          </a>
+
+          {supabaseEnabled && (
+            <div className="m-sheet-auth">
+              {authUser ? (
+                <button
+                  type="button"
+                  className="m-sheet-item"
+                  onClick={onSignOut}
+                  disabled={authBusy}
+                >
+                  <span className="m-sheet-item-label">로그아웃</span>
+                  <span className="m-sheet-item-sub">{authUser.email ?? ''}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="m-sheet-google"
+                  onClick={onSignIn}
+                  disabled={authBusy}
+                >
+                  <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
+                    <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.32A9 9 0 0 0 9 18z" />
+                    <path fill="#FBBC05" d="M3.96 10.72A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.28-1.72V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04z" />
+                    <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.96l3 2.32C4.68 5.16 6.66 3.58 9 3.58z" />
+                  </svg>
+                  {authBusy ? '연결 중…' : 'Google로 로그인'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
