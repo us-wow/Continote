@@ -269,40 +269,9 @@ export default function Home() {
     }
   }, []);
 
-  // 데스크탑 ↔ 모바일 자동 라우팅 (양방향).
-  // - 폰이면 /m으로, 데스크탑이면 /로 (mismatch만 이동)
-  // - ?view=desktop|mobile|auto 쿼리로 강제 가능 (localStorage 영속화)
-  // - PRD "고정" 사항 #9
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const force = new URL(window.location.href).searchParams.get('view');
-      if (force === 'desktop' || force === 'mobile') {
-        window.localStorage.setItem('conti-view', force);
-      } else if (force === 'auto') {
-        window.localStorage.removeItem('conti-view');
-      }
-      const pref = window.localStorage.getItem('conti-view');
-      let isMobile: boolean;
-      if (pref === 'mobile') isMobile = true;
-      else if (pref === 'desktop') isMobile = false;
-      else {
-        isMobile =
-          /iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(
-            navigator.userAgent
-          ) || window.matchMedia('(max-width: 768px)').matches;
-      }
-      const onMobilePath = window.location.pathname === '/m';
-      // 모바일이면 /m, 데스크탑이면 / 로 양방향 정리
-      if (isMobile && !onMobilePath) {
-        window.location.replace('/m');
-      } else if (!isMobile && onMobilePath) {
-        window.location.replace('/');
-      }
-    } catch {
-      /* 라우팅 실패 시 현재 경로 유지 */
-    }
-  }, []);
+  // 데스크탑 ↔ 모바일 라우팅은 middleware.ts(서버 사이드, 쿠키 기반)가 담당.
+  // 여기 client useEffect에서 redirect를 같이 만지면 middleware와 핑퐁 루프가 발생해서 제거함.
+  // 사용자가 강제 전환할 때는 <a href="/?view=desktop"> 또는 ?view=mobile 로 진입 → middleware가 쿠키 저장.
 
   // designTheme 변할 때 <html data-theme> 갱신 + localStorage 저장.
   // CSS [data-theme="wanted"] selector가 토큰을 wanted 세트로 스왑한다.

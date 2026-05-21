@@ -1,36 +1,59 @@
-// 데스크탑 ↔ 모바일 자동 라우팅 — 서버 사이드(edge)에서 즉시 redirect.
+// 데스크탑 ↔ 모바일 자동 라우팅 — middleware가 단일 진실 공급원(single source of truth).
 //
-// 이전엔 client-side useEffect로만 처리했는데, 모바일에서 데스크탑 헤더가 잠깐 보였다가
-// 사라지는 깜빡임 + localStorage 'conti-view' 가 desktop으로 sticky 되어 모바일 진입해도
-// 데스크탑 페이지가 노출되는 문제가 있었음.
-// User-Agent 기반으로 즉시 redirect 하면 그 문제 해결.
+// 우선순위:
+//   1) ?view=desktop|mobile|auto 쿼리 → 쿠키 저장 + 쿼리 제거된 URL로 redirect (one-shot 설정)
+//   2) conti-view 쿠키가 있으면 그 값으로 라우팅
+//   3) 둘 다 없으면 User-Agent로 모바일/데스크탑 판단
 //
-// 강제 옵션: ?view=desktop | ?view=mobile 쿼리는 그대로 통과 (client에서 localStorage 저장 → sticky).
+// 이전엔 client useEffect도 라우팅을 같이 만져서 middleware와 핑퐁이 일어남 → 무한 redirect 루프.
+// 이제 client는 라우팅을 건드리지 않고, 사용자 선택은 ?view 쿼리로 middleware에 전달.
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const MOBILE_UA = /iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i;
+const COOKIE_NAME = 'conti-view';
+// 쿠키 유효 기간 — 1년. 사용자가 '데스크탑으로 보기' 한 번 누르면 그 후엔 그대로.
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const force = url.searchParams.get('view');
 
-  // 사용자가 명시적으로 데스크탑/모바일 강제 요청한 경우는 그대로 통과.
-  // (client useEffect가 localStorage에 저장해서 다음 요청부터 sticky)
-  if (force === 'desktop' || force === 'mobile') {
-    return NextResponse.next();
+  // 1) ?view=… 쿼리 처리 → 쿠키 저장 + 깔끔한 URL로 redirect
+  if (force === 'desktop' || force === 'mobile' || force === 'auto') {
+    url.searchParams.delete('view');
+    const res = NextResponse.redirect(url);
+    if (force === 'auto') {
+      res.cookies.delete(COOKIE_NAME);
+    } else {
+      res.cookies.set(COOKIE_NAME, force, {
+        maxAge: COOKIE_MAX_AGE,
+        path: '/',
+        sameSite: 'lax',
+      });
+    }
+    return res;
   }
 
-  const ua = req.headers.get('user-agent') || '';
-  const isMobile = MOBILE_UA.test(ua);
+  // 2) 쿠키 우선 — 사용자 명시적 선택이 살아있으면 그대로
+  const pref = req.cookies.get(COOKIE_NAME)?.value;
+  let wantMobile: boolean;
+  if (pref === 'mobile') {
+    wantMobile = true;
+  } else if (pref === 'desktop') {
+    wantMobile = false;
+  } else {
+    // 3) UA 휴리스틱
+    const ua = req.headers.get('user-agent') || '';
+    wantMobile = MOBILE_UA.test(ua);
+  }
 
-  // 모바일 UA → 루트 진입 → /m 으로
-  if (isMobile && url.pathname === '/') {
+  const onMobilePath = url.pathname === '/m';
+  if (wantMobile && !onMobilePath) {
     url.pathname = '/m';
     return NextResponse.redirect(url);
   }
-  // 데스크탑 UA → /m 진입 → / 로
-  if (!isMobile && url.pathname === '/m') {
+  if (!wantMobile && onMobilePath) {
     url.pathname = '/';
     return NextResponse.redirect(url);
   }
@@ -38,7 +61,6 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// /와 /m 두 경로만 매칭. /auth/callback 등 다른 경로는 통과.
 export const config = {
   matcher: ['/', '/m'],
 };

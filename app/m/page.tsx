@@ -84,33 +84,7 @@ export default function MobilePage() {
     toastTimer.current = setTimeout(() => setToast(''), 2400);
   }, []);
 
-  // ----- 데스크탑 ↔ 모바일 자동 라우팅 (양방향) -----
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const force = new URL(window.location.href).searchParams.get('view');
-      if (force === 'desktop' || force === 'mobile') {
-        window.localStorage.setItem('conti-view', force);
-      } else if (force === 'auto') {
-        window.localStorage.removeItem('conti-view');
-      }
-      const pref = window.localStorage.getItem('conti-view');
-      let isMobile: boolean;
-      if (pref === 'mobile') isMobile = true;
-      else if (pref === 'desktop') isMobile = false;
-      else {
-        isMobile =
-          /iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(
-            navigator.userAgent
-          ) || window.matchMedia('(max-width: 768px)').matches;
-      }
-      if (!isMobile && window.location.pathname === '/m') {
-        window.location.replace('/');
-      }
-    } catch {
-      /* noop */
-    }
-  }, []);
+  // 라우팅은 middleware.ts가 담당 — client redirect 제거 (핑퐁 루프 방지).
 
   // ----- 디자인 테마 -----
   useEffect(() => {
@@ -495,11 +469,10 @@ export default function MobilePage() {
     setDesignTheme((t) => (t === 'paper' ? 'wanted' : 'paper'));
   };
 
+  // ?view=desktop 쿼리로 진입하면 middleware가 쿠키 저장하고 깔끔한 URL로 다시 redirect.
+  // 그 후엔 모바일 UA여도 데스크탑 페이지를 그대로 보여줌 (사용자 명시 선택).
   const swapToDesktop = () => {
-    try {
-      window.localStorage.setItem('conti-view', 'desktop');
-    } catch {}
-    window.location.assign('/');
+    window.location.assign('/?view=desktop');
   };
 
   // SSR + hydration 깜빡임 방지 — introSeen이 결정되기 전까진 빈 화면
