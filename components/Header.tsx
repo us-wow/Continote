@@ -66,10 +66,16 @@ export default function Header({
                 fill="currentColor"
               />
             </svg>
-            <span>디자인 변경</span>
+            <span className="nav-label">디자인 변경</span>
           </button>
 
-          <button type="button" className="btn btn-text" onClick={onOpenHelp}>
+          <button
+            type="button"
+            className="btn btn-text"
+            onClick={onOpenHelp}
+            aria-label="사용법 보기"
+            title="사용법"
+          >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
               <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
               <path
@@ -81,10 +87,16 @@ export default function Header({
               />
               <circle cx="8" cy="11.4" r="0.8" fill="currentColor" />
             </svg>
-            <span>사용법</span>
+            <span className="nav-label">사용법</span>
           </button>
 
-          <button type="button" className="btn btn-text" onClick={onOpenMenu}>
+          <button
+            type="button"
+            className="btn btn-text"
+            onClick={onOpenMenu}
+            aria-label="내 보관함 열기"
+            title="내 보관함"
+          >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
               <path
                 d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6.2 L7.4 4.2 H12.5 C13.3 4.2 14 4.9 14 5.7 V12 C14 12.8 13.3 13.5 12.5 13.5 H3.5 C2.7 13.5 2 12.8 2 12 Z"
@@ -94,7 +106,7 @@ export default function Header({
                 strokeLinejoin="round"
               />
             </svg>
-            <span>내 보관함</span>
+            <span className="nav-label">내 보관함</span>
           </button>
 
           {supabaseEnabled && (

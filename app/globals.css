@@ -557,6 +557,8 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   letter-spacing: -0.02em;
   color: var(--ink);
   line-height: 1.1;
+  /* 좁은 폭에서 글자 한 자씩 세로로 깨지지 않게 — 한국어는 단어 단위로 끊지 못해 강제 nowrap. */
+  white-space: nowrap;
 }
 .cn-header .brand-sub {
   font-family: var(--font-body);
@@ -601,9 +603,25 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   font-size: 12px;
 }
 @media (max-width: 700px) {
-  .cn-header-inner { padding: 12px 16px; }
+  .cn-header-inner { padding: 12px 12px; gap: 8px; }
   .cn-header .brand-sub { display: none; }
+  .cn-header .brand-name { font-size: 15px; }
+  /* 좁은 폭에선 nav 버튼들의 텍스트 라벨은 숨기고 아이콘만 — 자리 부족 방지 */
+  .cn-header .nav-label { display: none; }
+  /* 디자인 변경 라벨도 같이 숨김 (theme-switch-btn span은 .nav-label과 동일) */
   .cn-header .theme-switch-btn span { display: none; }
+  /* gap 줄여서 더 컴팩트하게 */
+  .cn-nav { gap: 2px; }
+  .cn-nav .btn { padding: 6px 8px; }
+  .cn-header .auth-pill { padding: 3px 3px 3px 8px; font-size: 11.5px; }
+  .cn-header .auth-pill-email { max-width: 70px; }
+}
+
+@media (max-width: 420px) {
+  /* 진짜 좁은 폭(아이폰 SE 등)에선 사용법은 햄버거 안으로 넣지 말고 우선 숨겨 — 보관함만 남기는 게 깔끔.
+     하지만 사용자가 사용법 못 찾으면 곤란해서 그대로 둠 — 메뉴 아이콘 + 로그인만 압축 */
+  .cn-header .brand-name { font-size: 14px; }
+  .cn-nav .btn { padding: 5px 6px; }
 }
 
 /* ── 메인 3-row 레이아웃 (Row1=Upload / Row2=Extracted+Editor 좌우 / Row3=PPT) ── */
