@@ -58,7 +58,7 @@ export default function Header({
             className="btn btn-text theme-switch-btn"
             onClick={() => onChangeTheme(nextTheme)}
             aria-label="디자인 변경"
-            title={`디자인 변경 (현재: ${theme === 'paper' ? '종이톤' : 'Wanted'})`}
+            title={`디자인 변경 (현재: ${theme === 'paper' ? '종이톤' : '기본톤'})`}
           >
             <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
               <path

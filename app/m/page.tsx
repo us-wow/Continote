@@ -518,7 +518,7 @@ export default function MobilePage() {
             className="m-icon-btn"
             onClick={toggleTheme}
             aria-label="디자인 변경"
-            title={`현재: ${designTheme === 'paper' ? '종이톤' : 'Wanted'}`}
+            title={`현재: ${designTheme === 'paper' ? '종이톤' : '기본톤'}`}
           >
             ✦
           </button>

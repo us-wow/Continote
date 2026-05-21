@@ -58,13 +58,14 @@ export default function IntroScreen({
     <div className="intro3" data-theme={theme}>
       <div className="intro3-statusbar-pad" />
 
-      {/* 우상단 떠다니는 디자인 토글 — 인트로 흐름을 방해하지 않는 위치에. */}
+      {/* 우상단 떠다니는 디자인 토글 — 인트로 흐름을 방해하지 않는 위치에.
+          라벨은 동작("디자인 변경")만 보여주고, 현재 톤은 화면 자체가 보여줌. */}
       <button
         type="button"
         className="intro3-theme-toggle"
         onClick={() => onChangeTheme(nextTheme)}
         aria-label="디자인 변경"
-        title={`디자인 변경 (현재: ${theme === 'paper' ? '종이톤' : 'Wanted'})`}
+        title={`디자인 변경 (현재: ${theme === 'paper' ? '종이톤' : '기본톤'})`}
       >
         <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true">
           <path
@@ -72,7 +73,7 @@ export default function IntroScreen({
             fill="currentColor"
           />
         </svg>
-        <span>{theme === 'paper' ? '종이톤' : 'Wanted'}</span>
+        <span>디자인 변경</span>
       </button>
 
       <div className="intro3-body">
