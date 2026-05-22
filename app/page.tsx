@@ -1357,10 +1357,10 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               </tr>
             </thead>
             <tbody>
-              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>64pt</td><td style={{ padding: '6px 4px' }}>17자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>54pt</td><td style={{ padding: '6px 4px' }}>21자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>44pt</td><td style={{ padding: '6px 4px' }}>26자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>36pt</td><td style={{ padding: '6px 4px' }}>32자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>56pt</td><td style={{ padding: '6px 4px' }}>19자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>48pt</td><td style={{ padding: '6px 4px' }}>24자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>38pt</td><td style={{ padding: '6px 4px' }}>29자까지</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>32pt</td><td style={{ padding: '6px 4px' }}>36자까지</td></tr>
               <tr><td style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>5줄 이상</td><td colSpan={2} style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>슬라이드를 두 개로 나눠야 해요</td></tr>
             </tbody>
           </table>
