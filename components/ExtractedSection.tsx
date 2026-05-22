@@ -202,15 +202,27 @@ function SongCard({
           aria-expanded={open}
           aria-label={`${song.title} 펼치기`}
         >
-          <span
+          {/* SVG 셰브론 — 폰트 의존 glyph(▾)가 작아 보이는 문제 해결.
+              펼침: 아래로(0deg) / 접힘: 오른쪽으로(-90deg) */}
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            aria-hidden="true"
             style={{
-              display: 'inline-block',
               transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
               transition: 'transform 160ms',
             }}
           >
-            ▾
-          </span>
+            <path
+              d="M3 5 L7 9 L11 5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
         <div className="song-card-title-wrap">
           {editingTitle ? (

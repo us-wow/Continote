@@ -740,21 +740,24 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   font-size: 11px;
 }
 .song-toggle {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   border: 1px solid var(--rule);
   background: var(--surface);
   color: var(--ink-2);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 160ms;
-  font-size: 10px;
+  transition: background 160ms, color 160ms, border-color 160ms;
+  flex-shrink: 0;
+  padding: 0;
 }
 .song-toggle:hover {
   background: var(--paper);
+  color: var(--ink);
+  border-color: var(--rule-2);
 }
 .song-add {
   flex-shrink: 0;
