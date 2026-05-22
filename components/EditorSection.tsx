@@ -104,6 +104,54 @@ export default function EditorSection({
   const slideCount = useMemo(() => buildSlidesFromText(text).length, [text]);
   const isEmpty = !text || !text.trim();
 
+  // textarea 좌측 gutter에 표시할 슬라이드 번호 정보 계산.
+  // text를 줄 단위로 훑으며 빈 줄을 paragraph 경계로 보고, 각 paragraph(=슬라이드)의
+  // 첫 줄 line index(0-based)와 슬라이드 번호(1-based)를 기록한다.
+  // overflowSlideIndices(0-based)와 매칭해 4줄 초과 paragraph는 gutter에서 빨강으로 표시.
+  const paragraphInfo = useMemo(() => {
+    const result: { slideNum: number; startLine: number }[] = [];
+    let slideNum = 0;
+    let inParagraph = false;
+    let paraStart = 0;
+    let hasContent = false;
+    const lines = text.split('\n');
+    lines.forEach((line, i) => {
+      if (line.trim() === '') {
+        // 빈 줄 — 진행 중이던 paragraph가 있다면 종료
+        if (inParagraph && hasContent) {
+          slideNum++;
+          result.push({ slideNum, startLine: paraStart });
+        }
+        inParagraph = false;
+        hasContent = false;
+      } else {
+        if (!inParagraph) {
+          paraStart = i;
+          inParagraph = true;
+        }
+        hasContent = true;
+      }
+    });
+    // 텍스트 마지막에 빈 줄이 없을 경우의 마지막 paragraph
+    if (inParagraph && hasContent) {
+      slideNum++;
+      result.push({ slideNum, startLine: paraStart });
+    }
+    return result;
+  }, [text]);
+
+  // textarea 스크롤과 gutter를 동기화 — 사용자가 스크롤 내릴 때 번호도 같이 따라감.
+  const [scrollTop, setScrollTop] = useState(0);
+  const onScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  };
+
+  // textarea 시각 상수 — CSS의 .ed-textarea 값과 정확히 일치해야 gutter 번호가 어긋나지 않음.
+  // 한국어 줄 wrap이 일어나는 경우 newline 기반 계산이라 살짝 어긋날 수 있으나,
+  // 사용자가 "11번 슬라이드"를 대략 찾을 수 있는 정도면 충분.
+  const LINE_HEIGHT = 28;
+  const PADDING_TOP = 22;
+
   return (
     <aside className="panel ed-panel" aria-labelledby="editor-h">
       <header className="ed-head">
@@ -124,15 +172,39 @@ export default function EditorSection({
         </div>
       </header>
 
-      <textarea
-        ref={taRef}
-        className="ed-textarea"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder={PLACEHOLDER}
-        spellCheck={false}
-      />
+      <div className="ed-textarea-wrap">
+        {/* 좌측 거터 — 각 paragraph(슬라이드) 시작 위치에 번호 절대 배치. 스크롤은 transform으로 따라감. */}
+        <div className="ed-gutter" aria-hidden="true">
+          <div
+            className="ed-gutter-inner"
+            style={{ transform: `translateY(${-scrollTop}px)` }}
+          >
+            {paragraphInfo.map((p) => {
+              const isOverflow = overflowSlideIndices.includes(p.slideNum - 1);
+              return (
+                <div
+                  key={p.slideNum}
+                  className={`ed-gutter-num ${isOverflow ? 'is-overflow' : ''}`}
+                  style={{ top: PADDING_TOP + p.startLine * LINE_HEIGHT }}
+                  title={isOverflow ? `${p.slideNum}번 슬라이드 4줄 초과` : `${p.slideNum}번 슬라이드`}
+                >
+                  {p.slideNum}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <textarea
+          ref={taRef}
+          className="ed-textarea"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+          onScroll={onScroll}
+          placeholder={PLACEHOLDER}
+          spellCheck={false}
+        />
+      </div>
 
       <footer className="ed-foot">
         <div className="ed-foot-meta mono">

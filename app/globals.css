@@ -1343,6 +1343,52 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   display: flex;
   gap: 4px;
 }
+/* textarea + 좌측 거터 컨테이너 */
+.ed-textarea-wrap {
+  flex: 1;
+  min-height: 360px;
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  position: relative;
+}
+/* 좌측 거터 — 각 paragraph(슬라이드) 시작 위치에 번호 표시. textarea 스크롤에 맞춰 transform으로 따라감. */
+.ed-gutter {
+  width: 36px;
+  flex-shrink: 0;
+  background: color-mix(in oklab, var(--paper) 80%, white);
+  border-right: 1px solid var(--rule);
+  position: relative;
+  overflow: hidden;
+}
+.ed-gutter-inner {
+  position: absolute;
+  inset: 0;
+  /* transform: translateY로 textarea scrollTop과 sync — onScroll 핸들러가 갱신 */
+}
+.ed-gutter-num {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  /* 텍스트 baseline과 라인 첫 줄의 baseline이 맞도록 살짝 조정 */
+  margin-top: 2px;
+}
+.ed-gutter-num.is-overflow {
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+}
+
 .ed-textarea {
   flex: 1;
   min-height: 360px;
@@ -1353,9 +1399,10 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 16px;
-  line-height: 1.7;
+  /* line-height를 정확한 px로 고정 — gutter 번호 위치 계산이 어긋나지 않게 */
+  line-height: 28px;
   letter-spacing: -0.008em;
-  padding: 22px 28px;
+  padding: 22px 28px 22px 16px;
   resize: vertical;
   border-radius: 0;
 }
