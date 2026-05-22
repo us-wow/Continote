@@ -12,7 +12,7 @@
 //
 // AI 정확도 보완용. 사용자가 모든 부분을 직접 수정/추가할 수 있어야 함.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Section, SectionType, Song } from '@/lib/types';
 import { sectionToText, docHasSongTitle } from '@/lib/text-doc';
 import Mascot from '@/components/Mascot';
@@ -26,6 +26,12 @@ type ExtractedSectionProps = {
   onRemoveSong: (idx: number) => void;
   // 맨 아래 "+ 새 곡 추가" — 빈 곡을 만들고 즉시 제목 편집 모드. 사용자가 직접 가사 입력하는 흐름.
   onAddEmptySong: () => void;
+  // 오타 검토 — 추출 결과를 AI로 한 번 더 검증해서 의심 substring 표시.
+  // suspectMap[songIdx][sectionIdx] = ["주꼐", "사 랑하다"] 형태.
+  // 무시해도 PPT 생성에 문제 X — 단지 사용자 검토 도움용.
+  suspectMap: Record<number, Record<number, string[]>>;
+  onVerifyLyrics: () => void;
+  verifying: boolean;
 };
 
 const SECTION_TYPE_OPTIONS: { type: SectionType; label: string }[] = [
@@ -50,8 +56,16 @@ export default function ExtractedSection({
   onUpdateSong,
   onRemoveSong,
   onAddEmptySong,
+  suspectMap,
+  onVerifyLyrics,
+  verifying,
 }: ExtractedSectionProps) {
   const empty = songs.length === 0;
+  const totalSuspects = Object.values(suspectMap).reduce(
+    (sum, secMap) =>
+      sum + Object.values(secMap).reduce((s2, arr) => s2 + arr.length, 0),
+    0
+  );
 
   return (
     <section className="panel ex-panel" aria-labelledby="extracted-h">
@@ -65,6 +79,26 @@ export default function ExtractedSection({
         </div>
       </div>
 
+      {/* 오타 검토 버튼 — 곡이 있을 때만 노출. 옵트인 (자동 X). */}
+      {!empty && (
+        <div className="ex-verify-bar">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onVerifyLyrics}
+            disabled={verifying}
+            title="원본 악보와 비교해 오타가 있을 만한 부분을 표시합니다 (PPT 생성엔 영향 X)"
+          >
+            🔍 {verifying ? '검토 중…' : '전체 오타 검토'}
+          </button>
+          {totalSuspects > 0 && (
+            <span className="ex-verify-result">
+              빨간 점이 있는 섹션에 {totalSuspects}건 의심
+            </span>
+          )}
+        </div>
+      )}
+
       {extracting && empty && <ExtractingState />}
       {!extracting && empty && <EmptyExtracted />}
       {!empty && (
@@ -77,6 +111,7 @@ export default function ExtractedSection({
               docText={text}
               onUpdate={(next) => onUpdateSong(i, next)}
               onRemove={() => onRemoveSong(i)}
+              sectionSuspects={suspectMap[i] || {}}
             />
           ))}
         </div>
@@ -132,12 +167,15 @@ function SongCard({
   docText,
   onUpdate,
   onRemove,
+  sectionSuspects,
 }: {
   song: Song;
   songIdx: number;
   docText: string;
   onUpdate: (next: Song) => void;
   onRemove: () => void;
+  // 이 곡의 섹션별 의심 substring 목록 — 빨간 점 + 편집 모드 빨간 밑줄 트리거.
+  sectionSuspects: Record<number, string[]>;
 }) {
   // 카드 접기/펼치기 — 기본 펼침
   const [open, setOpen] = useState(true);
@@ -287,6 +325,7 @@ function SongCard({
                 key={secIdx}
                 section={sec}
                 forceEdit={newSectionIdx === secIdx}
+                suspects={sectionSuspects[secIdx] || []}
                 onAdd={() => {
                   const includeTitle = !docHasSongTitle(docText, song.title);
                   dispatchAppend(sectionToText(song, sec, includeTitle));
@@ -345,6 +384,7 @@ function SongCard({
 function SectionChipCard({
   section,
   forceEdit,
+  suspects,
   onAdd,
   onUpdate,
   onDelete,
@@ -353,6 +393,8 @@ function SectionChipCard({
   section: Section;
   // 새로 추가된 카드면 자동으로 편집 모드 진입
   forceEdit: boolean;
+  // 이 섹션의 오타 의심 substring 목록 (검토 안 했으면 빈 배열).
+  suspects: string[];
   onAdd: () => void;
   onUpdate: (patch: Partial<Section>) => void;
   onDelete: () => void;
@@ -362,6 +404,7 @@ function SectionChipCard({
   const [label, setLabel] = useState(section.label);
   const [linesText, setLinesText] = useState(section.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
 
   // section 외부 변경 시 draft 동기화
   useEffect(() => {
@@ -374,14 +417,39 @@ function SectionChipCard({
     if (forceEdit) setEditing(true);
   }, [forceEdit]);
 
-  // textarea autosize — 가사 줄 수에 따라 높이 자동
+  // textarea autosize — 가사 줄 수에 따라 높이 자동.
+  // mirror div도 같은 높이로 맞춰 빨간 밑줄이 글자 위에 정확히 그어지게.
   useEffect(() => {
     if (editing && textareaRef.current) {
       const ta = textareaRef.current;
       ta.style.height = 'auto';
-      ta.style.height = Math.max(80, ta.scrollHeight) + 'px';
+      const h = Math.max(80, ta.scrollHeight);
+      ta.style.height = h + 'px';
+      if (mirrorRef.current) {
+        mirrorRef.current.style.height = h + 'px';
+      }
     }
   }, [editing, linesText]);
+
+  // 현재 본문에 실제 남아있는 의심 substring만 필터링 — 사용자가 수정하면 자동으로 빠짐.
+  const activeSuspects = suspects.filter((s) => linesText.includes(s));
+  // 편집 모드 mirror 오버레이용 HTML — 의심 substring을 <mark>로 감싸 빨간 밑줄.
+  // textarea의 본문은 그대로 두고, 같은 자리에 mirror가 깔리며 mark만 표시.
+  const overlayHtml = useMemo(() => {
+    if (activeSuspects.length === 0) return '';
+    const escape = (s: string) =>
+      s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    // 모든 의심 substring을 한 번에 매치 — 긴 것부터 우선 처리해 substring 충돌 방지.
+    const sorted = [...activeSuspects].sort((a, b) => b.length - a.length);
+    const escapedRe = sorted
+      .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    const re = new RegExp(escapedRe, 'g');
+    return escape(linesText).replace(re, (m) => `<mark class="sec-suspect">${escape(m)}</mark>`);
+  }, [linesText, activeSuspects]);
 
   const save = () => {
     onUpdate({
@@ -440,16 +508,36 @@ function SectionChipCard({
             </button>
           </div>
         </div>
-        <textarea
-          ref={textareaRef}
-          className="sec-edit-textarea"
-          value={linesText}
-          onChange={(e) => setLinesText(e.target.value)}
-          placeholder="가사 한 줄에 하나씩…"
-          spellCheck={false}
-          autoFocus
-        />
-        <div className="sec-edit-hint mono">한 줄에 한 가사 · 빈 줄 그대로 둠</div>
+        {/* textarea + 의심 substring 빨간 밑줄 오버레이.
+            mirror div가 textarea와 같은 폰트/패딩으로 깔리고, <mark>만 시각화 — 사용자 입력은
+            textarea가 받는다. mirror는 pointer-events: none 이라 클릭이 textarea로 통과. */}
+        <div className="sec-edit-textarea-wrap">
+          {overlayHtml && (
+            <div
+              ref={mirrorRef}
+              className="sec-edit-mirror"
+              aria-hidden="true"
+              dangerouslySetInnerHTML={{ __html: overlayHtml + '\n' }}
+            />
+          )}
+          <textarea
+            ref={textareaRef}
+            className="sec-edit-textarea"
+            value={linesText}
+            onChange={(e) => setLinesText(e.target.value)}
+            placeholder="가사 한 줄에 하나씩…"
+            spellCheck={false}
+            autoFocus
+          />
+        </div>
+        <div className="sec-edit-hint mono">
+          한 줄에 한 가사 · 빈 줄 그대로 둠
+          {activeSuspects.length > 0 && (
+            <span className="sec-edit-hint-suspect">
+              {' · '}빨간 밑줄 = 오타 의심 (무시해도 PPT 생성엔 영향 X)
+            </span>
+          )}
+        </div>
       </div>
     );
   }
@@ -461,6 +549,33 @@ function SectionChipCard({
     .filter(Boolean)
     .slice(0, 2);
 
+  // 평소 미리보기 줄에도 의심 substring 빨간 밑줄 표시.
+  const renderPreviewLine = (line: string) => {
+    if (activeSuspects.length === 0) return line;
+    const sorted = [...activeSuspects].sort((a, b) => b.length - a.length);
+    const escapedRe = sorted
+      .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    const re = new RegExp(escapedRe, 'g');
+    const parts: React.ReactNode[] = [];
+    let lastIdx = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+    while ((match = re.exec(line)) !== null) {
+      if (match.index > lastIdx) {
+        parts.push(line.slice(lastIdx, match.index));
+      }
+      parts.push(
+        <mark key={key++} className="sec-suspect">
+          {match[0]}
+        </mark>
+      );
+      lastIdx = match.index + match[0].length;
+    }
+    if (lastIdx < line.length) parts.push(line.slice(lastIdx));
+    return parts.length > 0 ? parts : line;
+  };
+
   return (
     <button
       type="button"
@@ -470,6 +585,10 @@ function SectionChipCard({
     >
       <div className="sec-chip-head">
         <span className="sec-label">{section.label || section.type}</span>
+        {/* 오타 의심 빨간 점 — 사용자가 한눈에 "이 섹션에 검토 결과 있다" 인지 */}
+        {activeSuspects.length > 0 && (
+          <span className="sec-suspect-dot" aria-label={`오타 의심 ${activeSuspects.length}건`} title={`오타 의심 ${activeSuspects.length}건`} />
+        )}
         <span className="sec-head-right">
           <span
             className="sec-edit-btn"
@@ -500,7 +619,7 @@ function SectionChipCard({
         ) : (
           preview.map((l, j) => (
             <div key={j} className="sec-line">
-              {l}
+              {renderPreviewLine(l)}
             </div>
           ))
         )}

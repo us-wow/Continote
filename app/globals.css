@@ -839,6 +839,48 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   color: var(--ink-3);
   font-style: italic;
 }
+
+/* 평소 미리보기 줄에 박힌 의심 글자 — 빨간 wavy 밑줄 */
+.sec-preview mark.sec-suspect {
+  background: transparent;
+  color: inherit;
+  text-decoration: underline wavy var(--danger);
+  text-decoration-thickness: 1.4px;
+  text-underline-offset: 3px;
+}
+
+/* 섹션 칩 라벨 옆 빨간 점 — 검토 결과 있다는 시각 마커 */
+.sec-suspect-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+  margin-left: 6px;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--danger) 20%, transparent);
+}
+
+/* 편집 모드 힌트 — 오타 의심 안내 */
+.sec-edit-hint-suspect {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* 오타 검토 바 — ExtractedSection 상단 */
+.ex-verify-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 14px;
+  padding: 6px 0;
+  flex-wrap: wrap;
+}
+.ex-verify-result {
+  font-size: 12px;
+  color: var(--danger);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
 .sec-more {
   margin-top: 2px;
   font-size: 10px;
@@ -981,8 +1023,43 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   color: var(--danger);
   border-color: var(--danger);
 }
-.sec-edit-textarea {
+/* textarea + mirror overlay 컨테이너 — 위치 기준 */
+.sec-edit-textarea-wrap {
+  position: relative;
   margin-top: 8px;
+}
+/* Mirror div — textarea와 같은 폰트/패딩/lineHeight로 깔리고, <mark>만 시각화.
+   pointer-events: none 이라 클릭은 textarea로 통과. */
+.sec-edit-mirror {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: -0.012em;
+  color: transparent;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.sec-edit-mirror mark.sec-suspect {
+  background: transparent;
+  color: transparent;
+  text-decoration: underline wavy var(--danger);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.sec-edit-textarea {
+  position: relative;
+  z-index: 0;
   width: 100%;
   min-height: 90px;
   padding: 10px 12px;
@@ -996,6 +1073,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   letter-spacing: -0.012em;
   outline: none;
   resize: vertical;
+  display: block;
 }
 .sec-edit-textarea:focus {
   border-color: var(--accent);

@@ -206,6 +206,16 @@ export default function Home() {
   const lastSnapshotRef = useRef<string>('');
   const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingMemoFocusRef = useRef(false);
+  // 추출 시점의 원본 이미지(base64) 보관 — 오타 검토 시 verify-lyrics에 다시 보내야 함.
+  // 사용자가 파일을 다시 업로드하지 않게 메모리에 캐싱.
+  const extractedImagesRef = useRef<{ data: string; mimeType: string }[]>([]);
+
+  // 오타 검토 결과 — { songIdx: { sectionIdx: ["주꼐", "사 랑하다", ...] } }
+  // localStorage에 추출된 곡 제목 시그니처 기반으로 저장.
+  const [suspectMap, setSuspectMap] = useState<
+    Record<number, Record<number, string[]>>
+  >({});
+  const [verifying, setVerifying] = useState(false);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -518,6 +528,10 @@ export default function Home() {
         setSongs((prev) => [...prev, ...data.songs]);
         // 라이브러리 누적은 fire-and-forget — 결과 표시를 막지 않는다.
         void addToLibraryAsync(data.songs);
+        // 오타 검토 시 다시 보내야 하므로 추출 시점 이미지를 메모리에 캐싱.
+        extractedImagesRef.current = images;
+        // 새 추출 → 이전 검토 결과 비움.
+        setSuspectMap({});
         showToast(`${data.songs.length}곡 추출됨`);
       }
     } catch (err: any) {
@@ -527,6 +541,126 @@ export default function Home() {
       setProgressStep(0);
     }
   };
+
+  // ----- 오타 검토 (전체) — 추출 시점 이미지 + 현재 songs를 verify-lyrics에 보냄 -----
+  const handleVerifyLyrics = async () => {
+    if (songs.length === 0) {
+      showToast('검토할 곡이 없어요');
+      return;
+    }
+    if (extractedImagesRef.current.length === 0) {
+      showToast('원본 이미지가 없어요. 가사를 다시 추출해주세요.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/verify-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: extractedImagesRef.current,
+          songs: songs.map((s) => ({
+            title: s.title,
+            sections: s.sections.map((sec) => ({ label: sec.label, text: sec.text })),
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '검토 실패');
+
+      // 응답 → { songIdx → { sectionIdx → suspects[] } } 형태로 변환
+      const map: Record<number, Record<number, string[]>> = {};
+      let totalCount = 0;
+      for (const song of data.songs ?? []) {
+        const songIdx = Number(song.songIdx);
+        if (!Number.isInteger(songIdx)) continue;
+        const secMap: Record<number, string[]> = {};
+        for (const sec of song.sections ?? []) {
+          const secIdx = Number(sec.sectionIdx);
+          const suspects = Array.isArray(sec.suspects)
+            ? sec.suspects.filter((s: unknown) => typeof s === 'string' && s.trim())
+            : [];
+          if (Number.isInteger(secIdx) && suspects.length > 0) {
+            secMap[secIdx] = suspects;
+            totalCount += suspects.length;
+          }
+        }
+        if (Object.keys(secMap).length > 0) map[songIdx] = secMap;
+      }
+      setSuspectMap(map);
+      if (totalCount === 0) {
+        showToast('의심 부분이 없어요 — 추출 결과 깔끔합니다');
+      } else {
+        showToast(`${totalCount}건 의심 — 빨간 점이 있는 섹션 확인해주세요`);
+      }
+    } catch (err: any) {
+      showToast(`검토 실패: ${err.message}`);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // 검토 결과가 사용자 수정으로 더 이상 본문에 없으면 자동으로 정리.
+  // (songs.sections[].text가 바뀔 때마다 실행)
+  useEffect(() => {
+    setSuspectMap((prev) => {
+      let dirty = false;
+      const next: Record<number, Record<number, string[]>> = {};
+      for (const [songIdxStr, secMap] of Object.entries(prev)) {
+        const songIdx = Number(songIdxStr);
+        const song = songs[songIdx];
+        if (!song) {
+          dirty = true;
+          continue;
+        }
+        const nextSecMap: Record<number, string[]> = {};
+        for (const [secIdxStr, suspects] of Object.entries(secMap)) {
+          const secIdx = Number(secIdxStr);
+          const sec = song.sections[secIdx];
+          if (!sec) {
+            dirty = true;
+            continue;
+          }
+          const remaining = suspects.filter((sus) => sec.text.includes(sus));
+          if (remaining.length !== suspects.length) dirty = true;
+          if (remaining.length > 0) nextSecMap[secIdx] = remaining;
+        }
+        if (Object.keys(nextSecMap).length > 0) next[songIdx] = nextSecMap;
+      }
+      return dirty ? next : prev;
+    });
+  }, [songs]);
+
+  // suspectMap localStorage 영속화 — 다음 세션에도 빨간 점 살아있게.
+  // 곡 제목 시그니처와 함께 저장해서 추출 결과가 바뀌면 무효화.
+  const songsSignature = useMemo(
+    () => songs.map((s) => s.title).join('|'),
+    [songs]
+  );
+  // mount 시 복원
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('conti-suspect-map');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { signature: string; map: typeof suspectMap };
+      if (parsed.signature === songsSignature && parsed.map) {
+        setSuspectMap(parsed.map);
+      }
+    } catch {}
+    // 의도적으로 mount 시 1회만 실행
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 변경 시 저장
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        'conti-suspect-map',
+        JSON.stringify({ signature: songsSignature, map: suspectMap })
+      );
+    } catch {}
+  }, [suspectMap, songsSignature]);
 
   // ----- 곡(songs) 조작 — 2번 영역 카드용. text 모델과 무관 -----
 
@@ -1044,6 +1178,9 @@ export default function Home() {
             onUpdateSong={updateSong}
             onRemoveSong={removeSong}
             onAddEmptySong={addEmptySong}
+            suspectMap={suspectMap}
+            onVerifyLyrics={handleVerifyLyrics}
+            verifying={verifying}
           />
           <EditorSection
             text={text}

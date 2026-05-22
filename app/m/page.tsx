@@ -75,6 +75,13 @@ export default function MobilePage() {
   // 안에 사용법 / 데스크탑으로 보기 / 로그아웃 등 잘 안 쓰는 액션 모음.
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // 오타 검토 — page.tsx와 동일 구조
+  const extractedImagesRef = useRef<{ data: string; mimeType: string }[]>([]);
+  const [suspectMap, setSuspectMap] = useState<
+    Record<number, Record<number, string[]>>
+  >({});
+  const [verifying, setVerifying] = useState(false);
+
   // 토스트
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -280,6 +287,9 @@ export default function MobilePage() {
         if (data.songs?.length) {
           setSongs((prev) => [...prev, ...data.songs]);
           void addToLibraryAsync(data.songs);
+          // 오타 검토용 이미지 캐싱 + 이전 검토 결과 초기화
+          extractedImagesRef.current = images;
+          setSuspectMap({});
           showToast(`${data.songs.length}곡 추출됨`);
           setStep(2);
         } else {
@@ -318,6 +328,92 @@ export default function MobilePage() {
     setSongs((prev) => [...prev, { title: '새 곡', sections: [] }]);
     showToast('빈 곡 추가됨 — 제목 클릭해 수정');
   };
+
+  // 전체 오타 검토 — 추출 시점 이미지 + 현재 songs를 verify-lyrics에 보냄.
+  const handleVerifyLyrics = async () => {
+    if (songs.length === 0) {
+      showToast('검토할 곡이 없어요');
+      return;
+    }
+    if (extractedImagesRef.current.length === 0) {
+      showToast('원본 이미지가 없어요. 가사를 다시 추출해주세요.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/verify-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: extractedImagesRef.current,
+          songs: songs.map((s) => ({
+            title: s.title,
+            sections: s.sections.map((sec) => ({ label: sec.label, text: sec.text })),
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '검토 실패');
+      const map: Record<number, Record<number, string[]>> = {};
+      let totalCount = 0;
+      for (const song of data.songs ?? []) {
+        const songIdx = Number(song.songIdx);
+        if (!Number.isInteger(songIdx)) continue;
+        const secMap: Record<number, string[]> = {};
+        for (const sec of song.sections ?? []) {
+          const secIdx = Number(sec.sectionIdx);
+          const suspects = Array.isArray(sec.suspects)
+            ? sec.suspects.filter((s: unknown) => typeof s === 'string' && s.trim())
+            : [];
+          if (Number.isInteger(secIdx) && suspects.length > 0) {
+            secMap[secIdx] = suspects;
+            totalCount += suspects.length;
+          }
+        }
+        if (Object.keys(secMap).length > 0) map[songIdx] = secMap;
+      }
+      setSuspectMap(map);
+      if (totalCount === 0) {
+        showToast('의심 부분 없음 — 추출 결과 깔끔합니다');
+      } else {
+        showToast(`${totalCount}건 의심 — 빨간 점 섹션 확인`);
+      }
+    } catch (err: any) {
+      showToast(`검토 실패: ${err.message}`);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // 사용자 수정으로 의심 substring이 없어지면 자동 클린업
+  useEffect(() => {
+    setSuspectMap((prev) => {
+      let dirty = false;
+      const next: Record<number, Record<number, string[]>> = {};
+      for (const [songIdxStr, secMap] of Object.entries(prev)) {
+        const songIdx = Number(songIdxStr);
+        const song = songs[songIdx];
+        if (!song) {
+          dirty = true;
+          continue;
+        }
+        const nextSecMap: Record<number, string[]> = {};
+        for (const [secIdxStr, suspects] of Object.entries(secMap)) {
+          const secIdx = Number(secIdxStr);
+          const sec = song.sections[secIdx];
+          if (!sec) {
+            dirty = true;
+            continue;
+          }
+          const remaining = suspects.filter((sus) => sec.text.includes(sus));
+          if (remaining.length !== suspects.length) dirty = true;
+          if (remaining.length > 0) nextSecMap[secIdx] = remaining;
+        }
+        if (Object.keys(nextSecMap).length > 0) next[songIdx] = nextSecMap;
+      }
+      return dirty ? next : prev;
+    });
+  }, [songs]);
 
   // ----- 다운로드 헬퍼 -----
   const dateStr = () => {
@@ -635,6 +731,9 @@ export default function MobilePage() {
             onUpdateSong={updateSong}
             onRemoveSong={removeSong}
             onAddEmptySong={addEmptySong}
+            suspectMap={suspectMap}
+            onVerifyLyrics={handleVerifyLyrics}
+            verifying={verifying}
           />
         )}
         {step === 3 && (
