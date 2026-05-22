@@ -28,6 +28,9 @@ type EditorSectionProps = {
   onCopy: () => void;
   onDownloadTxt: () => void;
   onDownloadDocx: () => void;
+  // 4줄 한도 넘는 슬라이드 인덱스 — footer에 빨간 경고 표시.
+  // 해당 슬라이드를 사용자가 줄이면 자동으로 비워져 빨간색 사라짐.
+  overflowSlideIndices?: number[];
   // 진행 중인지(저장 등으로 잠시 잠금) — 옵션
   busy?: boolean;
 };
@@ -47,6 +50,7 @@ export default function EditorSection({
   onCopy,
   onDownloadTxt,
   onDownloadDocx,
+  overflowSlideIndices = [],
   busy = false,
 }: EditorSectionProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -133,6 +137,11 @@ export default function EditorSection({
       <footer className="ed-foot">
         <div className="ed-foot-meta mono">
           {isEmpty ? '비어있음' : `${slideCount}장 슬라이드`}
+          {overflowSlideIndices.length > 0 && (
+            <span className="ed-foot-warn">
+              ⚠ {overflowSlideIndices.map((i) => i + 1).join(', ')}번 4줄 초과
+            </span>
+          )}
         </div>
         <div className="ed-foot-actions">
           <button

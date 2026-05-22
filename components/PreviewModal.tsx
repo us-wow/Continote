@@ -16,6 +16,9 @@ type PreviewModalProps = {
   text: string;
   pptTheme: PptTheme;
   pptFont: PptFont;
+  // 4줄 한도를 넘는 슬라이드 인덱스 — 빨간 테두리 + "4줄 초과" 배지로 강조.
+  // 사용자가 해당 슬라이드를 줄이면 부모가 새 indices를 넘기면서 빨간색 자동 풀림.
+  overflowSlideIndices?: number[];
 };
 
 const THEME_BG: Record<PptTheme, string> = {
@@ -54,6 +57,7 @@ export default function PreviewModal({
   text,
   pptTheme,
   pptFont,
+  overflowSlideIndices = [],
 }: PreviewModalProps) {
   // ESC로 닫기
   useEffect(() => {
@@ -132,6 +136,24 @@ export default function PreviewModal({
           <p className="caption" style={{ marginTop: 6, color: 'var(--ink-3)' }}>
             {slides.length}장 슬라이드 · {PPT_THEME_LABELS[pptTheme]} · {PPT_FONT_LABELS[pptFont]}
           </p>
+          {overflowSlideIndices.length > 0 && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 10,
+                padding: '8px 12px',
+                background: 'color-mix(in oklab, var(--danger) 10%, transparent)',
+                border: '1px solid color-mix(in oklab, var(--danger) 40%, transparent)',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12.5,
+                color: 'var(--danger)',
+                fontWeight: 500,
+              }}
+            >
+              ⚠ {overflowSlideIndices.map((i) => i + 1).join(', ')}번 슬라이드가 <b>4줄을 넘어요</b>.
+              빨간 테두리로 표시된 슬라이드를 줄여주세요.
+            </div>
+          )}
         </header>
 
         {slides.length === 0 ? (
@@ -154,6 +176,7 @@ export default function PreviewModal({
                 key={i}
                 slide={slide}
                 index={i + 1}
+                isOverflow={overflowSlideIndices.includes(i)}
                 themeBg={THEME_BG[pptTheme]}
                 themeFg={THEME_FG[pptTheme]}
                 overlay={overlay}
@@ -170,6 +193,7 @@ export default function PreviewModal({
 function SlidePreview({
   slide,
   index,
+  isOverflow,
   themeBg,
   themeFg,
   overlay,
@@ -177,23 +201,54 @@ function SlidePreview({
 }: {
   slide: Slide;
   index: number;
+  isOverflow: boolean;
   themeBg: string;
   themeFg: string;
   overlay?: string;
   fontFamily: string;
 }) {
   return (
-    <figure style={{ margin: 0 }}>
+    <figure style={{ margin: 0, position: 'relative' }}>
+      {/* 좌상단 번호 뱃지 — 항상 표시. 사용자가 토스트의 "11번 슬라이드"를 즉시 찾을 수 있게.
+          overflow일 땐 빨강, 평소엔 회색. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: 4,
+          left: 4,
+          zIndex: 2,
+          minWidth: 22,
+          height: 22,
+          padding: '0 6px',
+          borderRadius: 11,
+          background: isOverflow ? 'var(--danger)' : 'rgba(31,27,22,0.78)',
+          color: '#fff',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          fontWeight: 700,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          letterSpacing: '0.02em',
+        }}
+      >
+        {index}
+      </div>
       <div
         style={{
           position: 'relative',
           aspectRatio: '16 / 9',
           background: themeBg,
           color: themeFg,
-          border: '1px solid var(--rule)',
+          /* overflow 슬라이드는 빨강 굵은 테두리 + 살짝 빨강 글로우로 즉시 눈에 띄게. */
+          border: isOverflow ? '2px solid var(--danger)' : '1px solid var(--rule)',
           borderRadius: 'var(--radius-sm)',
           overflow: 'hidden',
           fontFamily,
+          boxShadow: isOverflow
+            ? '0 0 0 3px color-mix(in oklab, var(--danger) 20%, transparent)'
+            : undefined,
         }}
       >
         {/* 실사 테마는 흰/검 반투명 오버레이 — lib/pptx.ts 슬라이드 렌더링과 톤 일치 */}
@@ -232,9 +287,18 @@ function SlidePreview({
           )}
         </div>
       </div>
-      <figcaption className="mono" style={{ marginTop: 4, fontSize: 10, color: 'var(--ink-3)' }}>
+      <figcaption
+        className="mono"
+        style={{
+          marginTop: 4,
+          fontSize: 10,
+          color: isOverflow ? 'var(--danger)' : 'var(--ink-3)',
+          fontWeight: isOverflow ? 700 : 400,
+        }}
+      >
         {String(index).padStart(2, '0')} ·{' '}
         {slide.kind === 'title' ? '제목' : slide.kind === 'memo' ? '메모' : '가사'}
+        {isOverflow && ' · 4줄 초과'}
       </figcaption>
     </figure>
   );

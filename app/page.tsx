@@ -648,18 +648,36 @@ export default function Home() {
     });
   };
 
+  // 4줄 한도를 넘는 슬라이드 인덱스(0-base) 목록. UI에서 빨간 강조용.
+  // text가 바뀔 때마다 자동 재계산되어 사용자가 해당 슬라이드 줄여서 통과하면 빨간색이 풀린다.
+  const overflowSlideIndices = useMemo(() => {
+    const slides = buildSlidesFromText(text).map((s) => {
+      if (s.kind === 'title') {
+        const lines = [s.title];
+        if (s.subtitle) lines.push(s.subtitle);
+        return { lines };
+      }
+      if (s.kind === 'memo') return { lines: [s.text] };
+      return { lines: s.lines };
+    });
+    const out: number[] = [];
+    slides.forEach((s, i) => {
+      if (!validateSlide(s).ok) out.push(i);
+    });
+    return out;
+  }, [text]);
+
   const handleSavePptx = async () => {
     const slides = buildPptSlides();
     if (slides.length === 0) {
       showToast('PPT로 만들 슬라이드가 없어요');
       return;
     }
-    const overflow = slides.findIndex((s) => {
-      const v = validateSlide(s);
-      return !v.ok;
-    });
-    if (overflow !== -1) {
-      showToast(`${overflow + 1}번 슬라이드를 분리해주세요 (4줄 한도)`);
+    if (overflowSlideIndices.length > 0) {
+      // 첫 번째 하나만 알려주지 않고 모든 문제 슬라이드 번호를 한 번에 표시.
+      // 사용자가 미리보기 열어서 빨간 테두리 카드를 보고 수정할 수 있게.
+      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
+      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인하세요`);
       return;
     }
     try {
@@ -1034,6 +1052,7 @@ export default function Home() {
             onCopy={handleCopy}
             onDownloadTxt={handleSaveTxt}
             onDownloadDocx={handleSaveDocx}
+            overflowSlideIndices={overflowSlideIndices}
           />
         </div>
 
@@ -1061,6 +1080,7 @@ export default function Home() {
         text={text}
         pptTheme={pptTheme}
         pptFont={pptFont}
+        overflowSlideIndices={overflowSlideIndices}
       />
 
 

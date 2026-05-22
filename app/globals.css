@@ -1377,6 +1377,24 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 .ed-foot-meta {
   color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+/* 4줄 초과 슬라이드 경고 — 슬라이드 카운트 옆에 빨강 점에 알약 모양. 해결되면 자동으로 사라짐. */
+.ed-foot-warn {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 35%, transparent);
+  color: var(--danger);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 .ed-foot-actions {
   display: flex;

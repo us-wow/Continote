@@ -13,7 +13,7 @@
 // 데이터 영속화는 Supabase Auth + Cloud 모듈 통해 자동 동기화되므로,
 // 같은 계정으로 데스크탑/모바일 양쪽 들어가도 콘티 모음/곡/템플릿이 그대로 보임.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Song } from '@/lib/types';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
@@ -396,15 +396,34 @@ export default function MobilePage() {
       return { lines: s.lines };
     });
 
+  // 4줄 한도 초과 슬라이드 인덱스 — text가 바뀔 때마다 자동 재계산. UI에서 빨간 강조용.
+  const overflowSlideIndices = useMemo(() => {
+    const slides = buildSlidesFromText(text).map((s) => {
+      if (s.kind === 'title') {
+        const lines = [s.title];
+        if (s.subtitle) lines.push(s.subtitle);
+        return { lines };
+      }
+      if (s.kind === 'memo') return { lines: [s.text] };
+      return { lines: s.lines };
+    });
+    const out: number[] = [];
+    slides.forEach((s, i) => {
+      if (!validateSlide(s).ok) out.push(i);
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
   const handleSavePptx = async () => {
     const slides = buildPptSlides();
     if (slides.length === 0) {
       showToast('PPT로 만들 슬라이드가 없어요');
       return;
     }
-    const overflow = slides.findIndex((s) => !validateSlide(s).ok);
-    if (overflow !== -1) {
-      showToast(`${overflow + 1}번 슬라이드 4줄 초과`);
+    if (overflowSlideIndices.length > 0) {
+      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
+      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인`);
       return;
     }
     try {
@@ -628,6 +647,7 @@ export default function MobilePage() {
             onCopy={handleCopy}
             onDownloadTxt={handleSaveTxt}
             onDownloadDocx={handleSaveDocx}
+            overflowSlideIndices={overflowSlideIndices}
           />
         )}
         {step === 4 && (
@@ -674,6 +694,7 @@ export default function MobilePage() {
         text={text}
         pptTheme={pptTheme}
         pptFont={pptFont}
+        overflowSlideIndices={overflowSlideIndices}
       />
 
       {/* 토스트 */}
