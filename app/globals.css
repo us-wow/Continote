@@ -1168,13 +1168,15 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  position: relative;
+  z-index: 1;
 }
-.theme-sw-hint {
+/* 이미지 테마(초원/십자가/성경책) — lib/pptx.ts가 실제 PPT에 까는 흰 반투명 레이어 재현 */
+.theme-sw-overlay {
   position: absolute;
-  bottom: 3px;
-  right: 5px;
-  font-size: 10px;
-  opacity: 0.5;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.55);
+  z-index: 0;
 }
 .theme-sw-name {
   font-size: 11px;

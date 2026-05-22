@@ -32,28 +32,28 @@ type PptSectionProps = {
   busy?: boolean;
 };
 
-// 미리보기 swatch — 솔리드 색 또는 그라데이션 fallback (실사 이미지는 public/에서 로드)
+// swatch 배경 — 실제 PPT에 들어가는 색/이미지를 그대로 보여준다 (mock 그라데이션 X).
+// 이미지 테마는 lib/pptx.ts와 동일하게 public/pptx-bg-*.jpg 사용.
 const THEME_SWATCH_BG: Record<PptTheme, string> = {
   black: '#000000',
   white: '#FFFFFF',
   paper: '#FAF5EC',
-  meadow: 'linear-gradient(135deg, #6FA45C 0%, #B8D27A 60%, #E8D58A 100%)',
-  cross: 'linear-gradient(180deg, #3a3128 0%, #1a140e 100%)',
-  bible: 'linear-gradient(135deg, #7a5a36 0%, #c19b6e 50%, #f0dab4 100%)',
+  meadow: "url('/pptx-bg-meadow.jpg') center/cover",
+  cross: "url('/pptx-bg-cross.jpg') center/cover",
+  bible: "url('/pptx-bg-bible.jpg') center/cover",
 };
+// 글자색 — lib/pptx.ts의 text 컬러와 동일. 이미지 테마는 흰 반투명 오버레이 위에 검정 잉크.
 const THEME_SWATCH_FG: Record<PptTheme, string> = {
   black: '#FFFFFF',
   white: '#1F1B16',
   paper: '#1F1B16',
   meadow: '#1F1B16',
-  cross: '#F4E8D2',
+  cross: '#1F1B16',
   bible: '#1F1B16',
 };
-const THEME_HINT: Partial<Record<PptTheme, string>> = {
-  meadow: '🌿',
-  cross: '✦',
-  bible: '📖',
-};
+// 이미지 테마 여부 — 흰 반투명 오버레이 깔지 결정.
+const isImageTheme = (theme: PptTheme): boolean =>
+  theme === 'meadow' || theme === 'cross' || theme === 'bible';
 
 const THEME_ORDER: PptTheme[] = ['black', 'white', 'paper', 'meadow', 'cross', 'bible'];
 const FONT_ORDER: PptFont[] = ['noto-serif-kr', 'nanum-myeongjo', 'nanum-square', 'noto-sans-kr'];
@@ -119,17 +119,17 @@ export default function PptSection({
                     color: THEME_SWATCH_FG[key],
                   }}
                 >
+                  {/* 이미지 테마는 lib/pptx.ts와 동일하게 흰 반투명 레이어 위에 검정 글자.
+                      transparency 35 = 65% 불투명. */}
+                  {isImageTheme(key) && (
+                    <div className="theme-sw-overlay" aria-hidden="true" />
+                  )}
                   <span
                     className="theme-sw-letter"
                     style={{ fontFamily: 'var(--font-display)', color: THEME_SWATCH_FG[key] }}
                   >
                     가
                   </span>
-                  {THEME_HINT[key] && (
-                    <span className="theme-sw-hint" aria-hidden="true">
-                      {THEME_HINT[key]}
-                    </span>
-                  )}
                 </div>
                 <div className="theme-sw-name">{PPT_THEME_LABELS[key].split(' ')[0]}</div>
                 {pptTheme === key && (
