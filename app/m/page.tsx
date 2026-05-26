@@ -819,34 +819,32 @@ export default function MobilePage() {
                 onClick={handleUndo}
                 aria-label="되돌리기"
                 style={{
-                  padding: '6px 10px',
+                  padding: '6px 12px',
                   borderRadius: 6,
                   border: '1px solid var(--rule)',
                   background: 'var(--surface, #fff)',
                   color: 'var(--ink-2)',
                   cursor: 'pointer',
                   fontSize: 14,
-                  minWidth: 40,
                 }}
               >
-                ↶ 되돌리기
+                되돌리기
               </button>
               <button
                 type="button"
                 onClick={handleRedo}
                 aria-label="다시 실행"
                 style={{
-                  padding: '6px 10px',
+                  padding: '6px 12px',
                   borderRadius: 6,
                   border: '1px solid var(--rule)',
                   background: 'var(--surface, #fff)',
                   color: 'var(--ink-2)',
                   cursor: 'pointer',
                   fontSize: 14,
-                  minWidth: 40,
                 }}
               >
-                ↷ 다시 실행
+                다시 실행
               </button>
             </div>
             <EditorSection

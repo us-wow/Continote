@@ -103,8 +103,25 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
                 textAlign: 'left',
               }}
             >
-              <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                {isOpen ? '▾' : '▸'}
+              {/* 화살표가 작아서 안 눌릴까 봐 사용자가 헤매지 않게 크게 키운 SVG 셰브론.
+                  열림/닫힘은 transform: rotate로 표시 — 화살표 크기는 일정하게 유지. */}
+              <span
+                aria-hidden="true"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  color: 'var(--ink-2)',
+                  transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                  transition: 'transform 120ms ease',
+                  flexShrink: 0,
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </span>
               <span style={{ flex: 1 }}>{song.title || 'Untitled'}</span>
               <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>

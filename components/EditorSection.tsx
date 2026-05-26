@@ -15,7 +15,7 @@
 //
 // 푸터엔 텍스트 1차 출구(TXT / DOCX / 클립보드). PPT는 04 PptSection에 별도.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { buildSlidesFromText } from '@/lib/text-doc';
 
 type EditorSectionProps = {
@@ -146,11 +146,82 @@ export default function EditorSection({
     setScrollTop(e.currentTarget.scrollTop);
   };
 
-  // textarea 시각 상수 — CSS의 .ed-textarea 값과 정확히 일치해야 gutter 번호가 어긋나지 않음.
-  // 한국어 줄 wrap이 일어나는 경우 newline 기반 계산이라 살짝 어긋날 수 있으나,
-  // 사용자가 "11번 슬라이드"를 대략 찾을 수 있는 정도면 충분.
+  // textarea 시각 상수 — CSS의 .ed-textarea 값과 정확히 일치해야 fallback 계산이 어긋나지 않음.
+  // 측정 실패 시 폴백으로만 사용. 평시엔 아래 mirror div 측정값을 우선.
   const LINE_HEIGHT = 28;
   const PADDING_TOP = 22;
+
+  // ── 거터 정밀 위치 측정 ────────────────────────────────────────────────
+  // 모바일 좁은 폭에서 한국어 한 줄이 wrap되어 2~3줄로 늘어나면 newline 기준 거터 계산이 어긋남.
+  // 해결: textarea와 같은 CSS의 invisible "mirror div"에 동일 텍스트를 그대로 렌더하고,
+  //       각 paragraph 시작에 invisible <span> 마커를 박아 그 마커의 offsetTop을 측정한다.
+  //       이 값을 거터 번호의 top 위치로 사용하면 wrap이 발생해도 항상 가사 첫 줄과 정렬된다.
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const markerRefs = useRef<Record<number, HTMLSpanElement | null>>({});
+  const [paragraphTops, setParagraphTops] = useState<Record<number, number>>({});
+
+  const recomputeTops = useCallback(() => {
+    const next: Record<number, number> = {};
+    for (const p of paragraphInfo) {
+      const marker = markerRefs.current[p.slideNum];
+      if (marker) next[p.slideNum] = marker.offsetTop;
+    }
+    setParagraphTops(next);
+  }, [paragraphInfo]);
+
+  // text가 바뀐 직후(브라우저 paint 전)에 측정 — 거터 번호가 한 프레임 늦지 않도록.
+  useLayoutEffect(() => {
+    recomputeTops();
+  }, [recomputeTops, text]);
+
+  // 화면 회전·창 크기 변경 시 wrap 폭이 달라지므로 다시 측정.
+  useEffect(() => {
+    const onResize = () => recomputeTops();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [recomputeTops]);
+
+  // mirror div에 textarea와 동일한 텍스트를 그리되, 각 paragraph 시작 위치에 0×0 invisible 마커를 끼움.
+  // 빈 줄은 그대로 유지해야 wrap·줄바꿈이 textarea와 정확히 일치한다.
+  const mirrorNodes = useMemo(() => {
+    const nodes: React.ReactNode[] = [];
+    const allLines = text.split('\n');
+    let i = 0;
+    let slideNum = 0;
+    while (i < allLines.length) {
+      // paragraph 사이 빈 줄들 — 그대로 \n으로 출력
+      while (i < allLines.length && allLines[i].trim() === '') {
+        nodes.push('\n');
+        i++;
+      }
+      if (i >= allLines.length) break;
+      slideNum++;
+      const thisNum = slideNum;
+      nodes.push(
+        <span
+          key={`marker-${thisNum}`}
+          ref={(el) => {
+            markerRefs.current[thisNum] = el;
+          }}
+          data-slide-num={thisNum}
+          style={{
+            display: 'inline-block',
+            width: 0,
+            height: 0,
+            verticalAlign: 'top',
+          }}
+        />
+      );
+      const paraLines: string[] = [];
+      while (i < allLines.length && allLines[i].trim() !== '') {
+        paraLines.push(allLines[i]);
+        i++;
+      }
+      nodes.push(paraLines.join('\n'));
+    }
+    // text 마지막에 줄바꿈이 있는 경우도 그대로 보존
+    return nodes;
+  }, [text]);
 
   return (
     <aside className="panel ed-panel" aria-labelledby="editor-h">
@@ -173,7 +244,7 @@ export default function EditorSection({
       </header>
 
       <div className="ed-textarea-wrap">
-        {/* 좌측 거터 — 각 paragraph(슬라이드) 시작 위치에 번호 절대 배치. 스크롤은 transform으로 따라감. */}
+        {/* 좌측 거터 — paragraph(슬라이드) 시작 위치에 번호 표시. mirror div 측정값을 우선 사용. */}
         <div className="ed-gutter" aria-hidden="true">
           <div
             className="ed-gutter-inner"
@@ -181,11 +252,14 @@ export default function EditorSection({
           >
             {paragraphInfo.map((p) => {
               const isOverflow = overflowSlideIndices.includes(p.slideNum - 1);
+              // 측정값(paragraphTops)이 있으면 그걸, 없으면 newline 기반 폴백.
+              const top =
+                paragraphTops[p.slideNum] ?? PADDING_TOP + p.startLine * LINE_HEIGHT;
               return (
                 <div
                   key={p.slideNum}
                   className={`ed-gutter-num ${isOverflow ? 'is-overflow' : ''}`}
-                  style={{ top: PADDING_TOP + p.startLine * LINE_HEIGHT }}
+                  style={{ top }}
                   title={isOverflow ? `${p.slideNum}번 슬라이드 4줄 초과` : `${p.slideNum}번 슬라이드`}
                 >
                   {p.slideNum}
@@ -193,6 +267,13 @@ export default function EditorSection({
               );
             })}
           </div>
+        </div>
+        {/* 거터 정밀 측정용 invisible mirror — textarea와 같은 영역에 같은 폰트/패딩으로 렌더.
+            paragraph 시작 마커의 offsetTop이 거터 번호 위치로 사용된다. */}
+        <div ref={mirrorRef} className="ed-mirror" aria-hidden="true">
+          {mirrorNodes}
+          {/* 마지막에 공백 한 줄 — wrap 측정이 안 잘리도록 */}
+          {'​'}
         </div>
         <textarea
           ref={taRef}

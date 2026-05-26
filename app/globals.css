@@ -1456,7 +1456,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-3);
   border-radius: 4px;
@@ -1486,6 +1486,27 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   padding: 22px 28px 22px 16px;
   resize: vertical;
   border-radius: 0;
+}
+/* 거터 정밀 위치 측정용 invisible mirror — textarea와 같은 폰트/패딩/wrap 동작.
+   visibility: hidden + pointer-events: none으로 보이지 않지만 레이아웃은 잡혀 measurement 가능. */
+.ed-mirror {
+  position: absolute;
+  top: 0;
+  left: 36px; /* .ed-gutter width 와 동일 */
+  right: 0;
+  bottom: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 28px;
+  letter-spacing: -0.008em;
+  padding: 22px 28px 22px 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 .ed-textarea::placeholder {
   color: var(--ink-3);
