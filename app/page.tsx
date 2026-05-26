@@ -768,32 +768,14 @@ export default function Home() {
   };
 
   // text → PptSlide[]
-  // text-doc.ts의 Slide는 {kind, ...} 형태인데 lib/pptx.ts의 PptSlide는 {lines: string[]}.
-  // 변환 시 title/memo/lyric을 모두 lines 배열로 단순화.
-  const buildPptSlides = (): PptSlide[] => {
-    return buildSlidesFromText(text).map((s) => {
-      if (s.kind === 'title') {
-        const lines = [s.title];
-        if (s.subtitle) lines.push(s.subtitle);
-        return { lines };
-      }
-      if (s.kind === 'memo') return { lines: [s.text] };
-      return { lines: s.lines };
-    });
-  };
+  // PptSlide는 이제 text-doc.ts의 Slide와 동일 타입이라 변환 없이 그대로 사용.
+  // 이렇게 해야 title 슬라이드의 kind 정보가 살아남아 lib/pptx.ts에서 볼드/큰 폰트로 그려진다.
+  const buildPptSlides = (): PptSlide[] => buildSlidesFromText(text);
 
   // 4줄 한도를 넘는 슬라이드 인덱스(0-base) 목록. UI에서 빨간 강조용.
   // text가 바뀔 때마다 자동 재계산되어 사용자가 해당 슬라이드 줄여서 통과하면 빨간색이 풀린다.
   const overflowSlideIndices = useMemo(() => {
-    const slides = buildSlidesFromText(text).map((s) => {
-      if (s.kind === 'title') {
-        const lines = [s.title];
-        if (s.subtitle) lines.push(s.subtitle);
-        return { lines };
-      }
-      if (s.kind === 'memo') return { lines: [s.text] };
-      return { lines: s.lines };
-    });
+    const slides = buildSlidesFromText(text);
     const out: number[] = [];
     slides.forEach((s, i) => {
       if (!validateSlide(s).ok) out.push(i);

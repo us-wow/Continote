@@ -481,28 +481,13 @@ export default function MobilePage() {
     navigator.clipboard.writeText(url).then(() => showToast('공유 링크 복사됨'));
   };
 
-  const buildPptSlides = (): PptSlide[] =>
-    buildSlidesFromText(text).map((s) => {
-      if (s.kind === 'title') {
-        const lines = [s.title];
-        if (s.subtitle) lines.push(s.subtitle);
-        return { lines };
-      }
-      if (s.kind === 'memo') return { lines: [s.text] };
-      return { lines: s.lines };
-    });
+  // PptSlide는 text-doc.ts의 Slide와 동일 타입이라 변환 없이 그대로 사용.
+  // 이렇게 해야 title 슬라이드의 kind 정보가 살아남아 PPT에서 볼드/큰 폰트로 그려진다.
+  const buildPptSlides = (): PptSlide[] => buildSlidesFromText(text);
 
   // 4줄 한도 초과 슬라이드 인덱스 — text가 바뀔 때마다 자동 재계산. UI에서 빨간 강조용.
   const overflowSlideIndices = useMemo(() => {
-    const slides = buildSlidesFromText(text).map((s) => {
-      if (s.kind === 'title') {
-        const lines = [s.title];
-        if (s.subtitle) lines.push(s.subtitle);
-        return { lines };
-      }
-      if (s.kind === 'memo') return { lines: [s.text] };
-      return { lines: s.lines };
-    });
+    const slides = buildSlidesFromText(text);
     const out: number[] = [];
     slides.forEach((s, i) => {
       if (!validateSlide(s).ok) out.push(i);

@@ -8,6 +8,16 @@
 
 import type { PptSlide } from './pptx';
 
+// PptSlide가 union 타입(title | memo | lyric)으로 바뀌어, 외부 export 시 한 줄 배열로
+// 평탄화하는 작은 헬퍼. title은 [제목, 부제], memo는 [본문] 한 줄, lyric은 기존 lines 그대로.
+function slideToLines(slide: PptSlide): string[] {
+  if (slide.kind === 'title') {
+    return slide.subtitle ? [slide.title, slide.subtitle] : [slide.title];
+  }
+  if (slide.kind === 'memo') return [slide.text];
+  return slide.lines;
+}
+
 // doc 기반으로 만든 슬라이드 배열 + 곡 제목 리스트를 받아 형식별 텍스트 생성.
 export type ExportInput = {
   slides: PptSlide[];
@@ -26,7 +36,7 @@ export function buildPlainSlidesTxt(input: ExportInput): string {
   const lines: string[] = [];
   input.slides.forEach((slide, i) => {
     lines.push(`[Slide ${i + 1}]`);
-    for (const line of slide.lines) lines.push(line);
+    for (const line of slideToLines(slide)) lines.push(line);
     lines.push(''); // 슬라이드 사이 빈 줄
   });
   return lines.join('\n');
@@ -43,7 +53,7 @@ export function buildOpenSongXml(input: ExportInput): string {
   input.slides.forEach((slide, i) => {
     // OpenSong 표준은 [V1] [C] [B] 같은 마커. 일단 순서 기반 [V{i+1}]로 통일.
     lyricsBody.push(`[V${i + 1}]`);
-    for (const line of slide.lines) {
+    for (const line of slideToLines(slide)) {
       lyricsBody.push(
         line
           .replace(/&/g, '&amp;')

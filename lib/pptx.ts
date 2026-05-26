@@ -1,3 +1,5 @@
+import type { Slide } from './text-doc';
+
 // 폰트 옵션 4종
 export type PptFont = 'nanum-myeongjo' | 'noto-serif-kr' | 'nanum-square' | 'noto-sans-kr';
 
@@ -40,10 +42,10 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   'bible': { kind: 'image', path: '/pptx-bg-bible.jpg', text: '1F1B16' },
 };
 
-// 한 슬라이드의 입력 — 이미 줄바꿈으로 분리된 lines
-export type PptSlide = {
-  lines: string[]; // 각 항목이 한 줄
-};
+// 한 슬라이드의 입력 — text-doc.ts의 Slide와 동일 구조를 그대로 재사용.
+// 이전에는 { lines: string[] }로 평탄화되어 title/memo도 lyric처럼 그려졌다 →
+// 제목 슬라이드가 PPT에서 볼드 처리가 안 되는 회귀의 원인이었음.
+export type PptSlide = Slide;
 
 export type PptCopyrightInfo = {
   // 사용자가 입력하지 않으면 곡 제목만 자동 표기
@@ -77,7 +79,11 @@ const SLIDE_TEXT_RULES: Record<number, { maxCharsPerLine: number; fontSize: numb
 };
 
 // 한 슬라이드 검증 + 폰트사이즈 자동 결정
+// title/memo 슬라이드는 자체 레이아웃 규칙이 따로 있으니 검증을 건너뛰고 항상 ok 반환.
 export function validateSlide(slide: PptSlide): PptValidation {
+  if (slide.kind === 'title' || slide.kind === 'memo') {
+    return { ok: true, fontSize: 56, lineCount: 1 };
+  }
   const lineCount = slide.lines.length;
 
   // 빈 슬라이드는 사용자가 의도적으로 여백을 넣을 수 있어 허용하고,
@@ -160,18 +166,61 @@ export async function exportToPptx(
     }
   };
 
+  // 슬라이드 박스 공통 위치 — 모든 종류에서 동일
+  const boxFrame = { x: 0.5, y: 0.5, w: 12.333, h: 6.5 } as const;
+
   for (const pptSlide of slides) {
     const slide = pres.addSlide();
     applyThemeBackground(slide);
-    const validation = validateSlide(pptSlide);
 
+    if (pptSlide.kind === 'title') {
+      // 제목 슬라이드 — 제목은 크고 굵게, 부제는 작게.
+      // 미리보기(PreviewModal.tsx)가 fontWeight: 700으로 그리는 것과 일치시킨다.
+      // pptxgenjs의 addText는 [{ text, options }] 배열을 받으면 paragraph마다 다른 스타일이 가능.
+      const paragraphs: { text: string; options: Record<string, unknown> }[] = [
+        { text: pptSlide.title, options: { bold: true, fontSize: 60 } },
+      ];
+      if (pptSlide.subtitle) {
+        paragraphs.push({
+          text: pptSlide.subtitle,
+          // breakLine: true 로 줄바꿈을 명시. 부제는 본문 가독성을 위해 살짝 작게.
+          options: { bold: false, fontSize: 28, breakLine: true },
+        });
+      }
+      slide.addText(paragraphs as any, {
+        ...boxFrame,
+        align: 'center',
+        valign: 'middle',
+        color: config.text,
+        fontFace: FONT_FACE_MAP[font],
+        paraSpaceAfter: 12,
+        fit: 'shrink',
+      });
+      continue;
+    }
+
+    if (pptSlide.kind === 'memo') {
+      // 메모 슬라이드 — 광고/기도제목 같은 자유 텍스트. 가사보다 살짝 작은 폰트.
+      slide.addText(pptSlide.text, {
+        ...boxFrame,
+        align: 'center',
+        valign: 'middle',
+        color: config.text,
+        fontFace: FONT_FACE_MAP[font],
+        fontSize: 36,
+        paraSpaceAfter: 8,
+        bold: false,
+        fit: 'shrink',
+      });
+      continue;
+    }
+
+    // 가사 슬라이드 (kind === 'lyric')
+    const validation = validateSlide(pptSlide);
     // 검증 실패 슬라이드도 파일 생성을 막지 않고, 사용자가 내용을 확인할 수 있게
     // 32pt fallback으로 작게 넣는다.
     slide.addText(pptSlide.lines.join('\n'), {
-      x: 0.5,
-      y: 0.5,
-      w: 12.333,
-      h: 6.5,
+      ...boxFrame,
       align: 'center',
       valign: 'middle',
       color: config.text,

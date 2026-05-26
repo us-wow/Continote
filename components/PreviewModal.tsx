@@ -44,11 +44,16 @@ const THEME_OVERLAY: Partial<Record<PptTheme, string>> = {
   bible: 'rgba(255,255,255,0.55)',
 };
 
+// 미리보기 글씨체를 실제 PPT 출력 폰트와 일치시킨다.
+// 이전에는 4개 폰트 옵션을 단 2개 웹폰트(Noto Serif KR / Pretendard)로 뭉뚱그려 표시했는데,
+// 그러면 사용자가 "나눔명조"를 골라도 미리보기에선 다른 폰트가 보였다.
+// 각 옵션을 같은 이름의 웹폰트로 매핑하고, fallback도 같은 계열로 둔다.
+// (앞단에서 layout.tsx가 해당 웹폰트들을 로드해야 시각적으로 일치)
 const FONT_FAMILY_PREVIEW: Record<PptFont, string> = {
+  'nanum-myeongjo': "'Nanum Myeongjo', 'Noto Serif KR', serif",
   'noto-serif-kr': "'Noto Serif KR', serif",
-  'nanum-myeongjo': "'Noto Serif KR', serif",
-  'nanum-square': "'Pretendard Variable', sans-serif",
-  'noto-sans-kr': "'Pretendard Variable', sans-serif",
+  'nanum-square': "'NanumSquare', 'Noto Sans KR', 'Pretendard Variable', sans-serif",
+  'noto-sans-kr': "'Noto Sans KR', 'Pretendard Variable', sans-serif",
 };
 
 export default function PreviewModal({
@@ -135,6 +140,11 @@ export default function PreviewModal({
           </h2>
           <p className="caption" style={{ marginTop: 6, color: 'var(--ink-3)' }}>
             {slides.length}장 슬라이드 · {PPT_THEME_LABELS[pptTheme]} · {PPT_FONT_LABELS[pptFont]}
+          </p>
+          {/* 사용자 PC에 해당 한국 폰트가 안 깔려 있으면 PowerPoint가 기본 폰트로 대체해 미리보기와
+              달라 보일 수 있다. 한 줄 안내로 사용자가 원인을 빠르게 파악하게 함. */}
+          <p className="caption" style={{ marginTop: 4, color: 'var(--ink-3)', fontSize: 11.5 }}>
+            ※ PowerPoint에서 글씨체가 달라 보이면 사용 PC에 해당 한국 폰트를 설치해 주세요.
           </p>
           {overflowSlideIndices.length > 0 && (
             <div
