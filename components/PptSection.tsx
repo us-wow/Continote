@@ -30,6 +30,12 @@ type PptSectionProps = {
   onDownloadOpenSong: () => void;
   onDownloadPlainSlides: () => void;
   busy?: boolean;
+  // 선택형 CCLI 입력 — 4개 prop 모두 넘어오고 includeCopyright가 켜졌을 때만 입력 폼 노출.
+  // 데스크톱은 교회 템플릿 모달에서 별도 입력하므로 안 넘기고, 모바일에서만 인라인으로 받게 한다.
+  ccliNumber?: string;
+  setCcliNumber?: (next: string) => void;
+  licenseLabel?: string;
+  setLicenseLabel?: (next: string) => void;
 };
 
 // swatch 배경 — 실제 PPT에 들어가는 색/이미지를 그대로 보여준다 (mock 그라데이션 X).
@@ -81,7 +87,18 @@ export default function PptSection({
   onDownloadOpenSong,
   onDownloadPlainSlides,
   busy = false,
+  ccliNumber,
+  setCcliNumber,
+  licenseLabel,
+  setLicenseLabel,
 }: PptSectionProps) {
+  // 4개 prop 모두 들어왔을 때만 인라인 CCLI 입력 폼을 그린다(주로 모바일).
+  // 데스크톱은 교회 템플릿 모달에서 따로 입력받으므로 이 값이 undefined로 들어와 폼 미노출.
+  const canEditCopyrightInline =
+    typeof ccliNumber === 'string' &&
+    typeof setCcliNumber === 'function' &&
+    typeof licenseLabel === 'string' &&
+    typeof setLicenseLabel === 'function';
   const isEmpty = slideCount === 0;
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -179,6 +196,54 @@ export default function PptSection({
               <div className="ppt-toggle-sub">PPT 마지막에 곡 제목 + CCLI 번호 자동 표시</div>
             </div>
           </div>
+          {/* 인라인 CCLI 입력 — 모바일처럼 별도 템플릿 모달이 없는 환경에서 직접 입력받기 위한 폼.
+              4개 prop이 모두 넘어오고 토글이 켜졌을 때만 렌더. 데스크톱은 prop 미전달로 자동 미노출. */}
+          {canEditCopyrightInline && includeCopyright && (
+            <div
+              style={{
+                marginTop: 10,
+                display: 'grid',
+                gap: 8,
+                paddingLeft: 4,
+              }}
+            >
+              <label style={{ display: 'grid', gap: 4, fontSize: 12.5 }}>
+                <span style={{ color: 'var(--ink-3)' }}>CCLI 번호 (선택)</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="예: 1234567"
+                  value={ccliNumber}
+                  onChange={(e) => setCcliNumber!(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--rule)',
+                    background: 'var(--surface, #fff)',
+                    color: 'var(--ink)',
+                    fontSize: 14,
+                  }}
+                />
+              </label>
+              <label style={{ display: 'grid', gap: 4, fontSize: 12.5 }}>
+                <span style={{ color: 'var(--ink-3)' }}>라이선스 표기 (선택)</span>
+                <input
+                  type="text"
+                  placeholder="예: 사용허가 받음"
+                  value={licenseLabel}
+                  onChange={(e) => setLicenseLabel!(e.target.value)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--rule)',
+                    background: 'var(--surface, #fff)',
+                    color: 'var(--ink)',
+                    fontSize: 14,
+                  }}
+                />
+              </label>
+            </div>
+          )}
         </div>
       </div>
 

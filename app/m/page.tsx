@@ -82,6 +82,13 @@ export default function MobilePage() {
   >({});
   const [verifying, setVerifying] = useState(false);
 
+  // Undo/Redo — page.tsx와 동일 구조(text + songs 묶음 스냅샷, 50개 한도, 300ms debounce).
+  // 모바일은 키보드 단축키 대신 콘티 편집 화면에 버튼 UI 2개를 둔다.
+  const lastSnapshotRef = useRef<string>('');
+  const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoStackRef = useRef<{ songs: Song[]; text: string }[]>([]);
+  const redoStackRef = useRef<{ songs: Song[]; text: string }[]>([]);
+
   // 토스트
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,6 +97,75 @@ export default function MobilePage() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(''), 2400);
   }, []);
+
+  // songs/text 변경 감지 → 300ms debounce 후 스냅샷을 undoStack에 push, redoStack 비움.
+  // 빠른 연속 타이핑이 다 별개 스냅샷으로 쌓이지 않도록 debounce.
+  useEffect(() => {
+    const snapshot = JSON.stringify({ songs, text });
+    if (snapshot === lastSnapshotRef.current) return;
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    snapshotTimerRef.current = setTimeout(() => {
+      if (snapshot === lastSnapshotRef.current) return;
+      if (lastSnapshotRef.current) {
+        undoStackRef.current.push(JSON.parse(lastSnapshotRef.current));
+        if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+        redoStackRef.current = [];
+      }
+      lastSnapshotRef.current = snapshot;
+    }, 300);
+    return () => {
+      if (snapshotTimerRef.current) {
+        clearTimeout(snapshotTimerRef.current);
+        snapshotTimerRef.current = null;
+      }
+    };
+  }, [songs, text]);
+
+  const handleUndo = useCallback(() => {
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    // 편집 중인 미반영 변경이 있다면 먼저 스냅샷 push (안 그러면 한 번 undo가 무시되는 느낌)
+    const snapshot = JSON.stringify({ songs, text });
+    if (snapshot !== lastSnapshotRef.current && lastSnapshotRef.current) {
+      undoStackRef.current.push(JSON.parse(lastSnapshotRef.current));
+      if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+      lastSnapshotRef.current = snapshot;
+    }
+    const prev = undoStackRef.current.pop();
+    if (!prev) {
+      showToast('되돌릴 게 없어요');
+      return;
+    }
+    redoStackRef.current.push({ songs, text });
+    if (redoStackRef.current.length > 50) redoStackRef.current.shift();
+    setSongs(prev.songs);
+    setText(prev.text);
+    lastSnapshotRef.current = JSON.stringify(prev);
+    showToast('되돌리기');
+  }, [text, showToast, songs]);
+
+  const handleRedo = useCallback(() => {
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    const next = redoStackRef.current.pop();
+    if (!next) {
+      showToast('다시 실행할 게 없어요');
+      return;
+    }
+    undoStackRef.current.push({ songs, text });
+    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+    setSongs(next.songs);
+    setText(next.text);
+    lastSnapshotRef.current = JSON.stringify(next);
+    showToast('다시 실행');
+  }, [text, showToast, songs]);
 
   // 라우팅은 middleware.ts가 담당 — client redirect 제거 (핑퐁 루프 방지).
 
@@ -722,17 +798,64 @@ export default function MobilePage() {
           />
         )}
         {step === 3 && (
-          <EditorSection
-            text={text}
-            setText={setText}
-            onClear={() => {
-              if (confirm('콘티를 모두 비울까요?')) setText('');
-            }}
-            onCopy={handleCopy}
-            onDownloadTxt={handleSaveTxt}
-            onDownloadDocx={handleSaveDocx}
-            overflowSlideIndices={overflowSlideIndices}
-          />
+          <>
+            {/* Undo/Redo 액션 바 — 모바일엔 단축키가 없어 버튼으로 노출.
+                EditorSection은 그대로 두고 위에 별도 바를 둬서 공용 컴포넌트는 영향 없음. */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 6,
+                marginBottom: 8,
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleUndo}
+                aria-label="되돌리기"
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--rule)',
+                  background: 'var(--surface, #fff)',
+                  color: 'var(--ink-2)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  minWidth: 40,
+                }}
+              >
+                ↶ 되돌리기
+              </button>
+              <button
+                type="button"
+                onClick={handleRedo}
+                aria-label="다시 실행"
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--rule)',
+                  background: 'var(--surface, #fff)',
+                  color: 'var(--ink-2)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  minWidth: 40,
+                }}
+              >
+                ↷ 다시 실행
+              </button>
+            </div>
+            <EditorSection
+              text={text}
+              setText={setText}
+              onClear={() => {
+                if (confirm('콘티를 모두 비울까요?')) setText('');
+              }}
+              onCopy={handleCopy}
+              onDownloadTxt={handleSaveTxt}
+              onDownloadDocx={handleSaveDocx}
+              overflowSlideIndices={overflowSlideIndices}
+            />
+          </>
         )}
         {step === 4 && (
           <PptSection
@@ -748,6 +871,11 @@ export default function MobilePage() {
             onCopyShareLink={handleCopyShareLink}
             onDownloadOpenSong={handleSaveOpenSong}
             onDownloadPlainSlides={handleSavePlainSlides}
+            // 모바일은 교회 템플릿 모달이 없으므로 PptSection 안에서 인라인으로 CCLI 입력받게 함.
+            ccliNumber={ccliNumber}
+            setCcliNumber={setCcliNumber}
+            licenseLabel={licenseLabel}
+            setLicenseLabel={setLicenseLabel}
           />
         )}
       </main>
