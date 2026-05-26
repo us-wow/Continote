@@ -857,6 +857,9 @@ export default function MobilePage() {
               onDownloadTxt={handleSaveTxt}
               onDownloadDocx={handleSaveDocx}
               overflowSlideIndices={overflowSlideIndices}
+              // 모바일에선 textarea를 컨텐츠 높이만큼 자연 늘림 + 페이지 스크롤로 통일.
+              // (자체 스크롤 + transform 동기화는 모바일에서 거터 어긋남의 원인)
+              autoResize
             />
           </>
         )}

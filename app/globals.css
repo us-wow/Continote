@@ -1433,6 +1433,16 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   background: var(--surface);
   position: relative;
 }
+/* 모바일용 autoResize 모드 — textarea와 거터가 컨텐츠 높이만큼 자연 늘어나 페이지 스크롤로 통일.
+   flex 강제와 min-height를 풀어 textarea의 동적 height가 wrap 전체에 반영되게 한다. */
+.ed-textarea-wrap.is-auto-resize {
+  flex: none;
+  min-height: 0;
+  align-items: stretch;
+}
+.ed-textarea-wrap.is-auto-resize .ed-textarea {
+  min-height: 320px; /* 초기 표시 최소치 — 너무 작아 보이지 않게 */
+}
 /* 좌측 거터 — 각 paragraph(슬라이드) 시작 위치에 번호 표시. textarea 스크롤에 맞춰 transform으로 따라감. */
 .ed-gutter {
   width: 36px;

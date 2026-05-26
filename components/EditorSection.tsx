@@ -33,6 +33,10 @@ type EditorSectionProps = {
   overflowSlideIndices?: number[];
   // 진행 중인지(저장 등으로 잠시 잠금) — 옵션
   busy?: boolean;
+  // 모바일용 — textarea를 컨텐츠 높이만큼 자동 늘림 + 자체 스크롤 끔.
+  // 모바일은 페이지 전체 스크롤이 자연스러워 textarea 자체 스크롤 + transform 동기화가 깨진다.
+  // 켜면 거터/번호/가사가 모두 페이지 흐름 안에서 같이 움직여 어긋남이 사라진다.
+  autoResize?: boolean;
 };
 
 const PLACEHOLDER = `여기에 가사를 직접 입력하거나, 왼쪽 곡 카드의 섹션을 눌러주세요.
@@ -52,6 +56,7 @@ export default function EditorSection({
   onDownloadDocx,
   overflowSlideIndices = [],
   busy = false,
+  autoResize = false,
 }: EditorSectionProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -181,6 +186,17 @@ export default function EditorSection({
     return () => window.removeEventListener('resize', onResize);
   }, [recomputeTops]);
 
+  // autoResize 모드 — textarea 높이를 컨텐츠에 맞춰 동적으로. 페이지 스크롤로 통일된다.
+  // text 변경마다 scrollHeight를 기준으로 height를 재설정. 'auto'로 한 번 줄였다가 재측정하는 게
+  // 라인이 줄어들 때도 함께 줄어들게 하는 흔한 트릭.
+  useLayoutEffect(() => {
+    if (!autoResize) return;
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [text, autoResize]);
+
   // mirror div에 textarea와 동일한 텍스트를 그리되, 각 paragraph 시작 위치에 0×0 invisible 마커를 끼움.
   // 빈 줄은 그대로 유지해야 wrap·줄바꿈이 textarea와 정확히 일치한다.
   const mirrorNodes = useMemo(() => {
@@ -243,12 +259,13 @@ export default function EditorSection({
         </div>
       </header>
 
-      <div className="ed-textarea-wrap">
-        {/* 좌측 거터 — paragraph(슬라이드) 시작 위치에 번호 표시. mirror div 측정값을 우선 사용. */}
+      <div className={`ed-textarea-wrap ${autoResize ? 'is-auto-resize' : ''}`}>
+        {/* 좌측 거터 — paragraph(슬라이드) 시작 위치에 번호 표시. mirror div 측정값을 우선 사용.
+            autoResize면 페이지 스크롤로 통일되어 transform 동기화 불필요(오히려 잘못 적용되면 어긋남). */}
         <div className="ed-gutter" aria-hidden="true">
           <div
             className="ed-gutter-inner"
-            style={{ transform: `translateY(${-scrollTop}px)` }}
+            style={{ transform: autoResize ? 'none' : `translateY(${-scrollTop}px)` }}
           >
             {paragraphInfo.map((p) => {
               const isOverflow = overflowSlideIndices.includes(p.slideNum - 1);
@@ -284,6 +301,8 @@ export default function EditorSection({
           onScroll={onScroll}
           placeholder={PLACEHOLDER}
           spellCheck={false}
+          // autoResize면 자체 스크롤 끄고(페이지로 통일) 사용자 resize도 차단.
+          style={autoResize ? { overflow: 'hidden', resize: 'none' } : undefined}
         />
       </div>
 
