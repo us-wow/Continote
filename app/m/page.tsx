@@ -799,6 +799,50 @@ export default function MobilePage() {
         )}
         {step === 3 && (
           <>
+            {/* 추출된 곡 드롭다운 — Step 3 진입 시 Step 2에서 만든 곡을 그대로 보여준다.
+                모바일은 데스크톱처럼 좌우 분할이 안 되니, 곡 카드를 위에 접힘 가능한 형태로 띄워서
+                칩(chip) 클릭 → conti:append 이벤트로 EditorSection에 가사가 누적되도록 한다.
+                기본 펼침(open) 상태로 시작해 사용자가 바로 가사를 골라 콘티에 추가할 수 있게.
+                ExtractedSection은 Step 2와 동일 컴포넌트 그대로 재사용. */}
+            {songs.length > 0 && (
+              <details
+                open
+                style={{
+                  marginBottom: 12,
+                  border: '1px solid var(--rule)',
+                  borderRadius: 8,
+                  background: 'var(--surface, #fff)',
+                  overflow: 'hidden',
+                }}
+              >
+                <summary
+                  style={{
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    fontSize: 13.5,
+                    color: 'var(--ink-2)',
+                    fontWeight: 500,
+                    listStyle: 'none',
+                    background: 'var(--paper-2, #f4ecdd)',
+                  }}
+                >
+                  ▾ 추출된 곡 {songs.length}개 — 펼쳐서 가사를 콘티에 추가
+                </summary>
+                <div style={{ padding: '6px 6px 10px' }}>
+                  <ExtractedSection
+                    songs={songs}
+                    text={text}
+                    extracting={extracting}
+                    onUpdateSong={updateSong}
+                    onRemoveSong={removeSong}
+                    onAddEmptySong={addEmptySong}
+                    suspectMap={suspectMap}
+                    onVerifyLyrics={handleVerifyLyrics}
+                    verifying={verifying}
+                  />
+                </div>
+              </details>
+            )}
             {/* Undo/Redo 액션 바 — 모바일엔 단축키가 없어 버튼으로 노출.
                 EditorSection은 그대로 두고 위에 별도 바를 둬서 공용 컴포넌트는 영향 없음. */}
             <div
