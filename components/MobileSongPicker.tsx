@@ -112,12 +112,14 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
               </span>
             </button>
 
-            {/* 섹션 chip 목록 — 펼침일 때만 렌더 */}
+            {/* 섹션 chip 목록 — 펼침일 때만 렌더.
+                라벨만 있으면 사용자가 어떤 가사인지 모르고 누르기 어려우므로 첫 줄 미리보기도 같이 표시.
+                좁은 화면에서 가독성 위해 가로 나열(wrap) 대신 세로 리스트로 한 줄에 하나씩 배치. */}
             {isOpen && (
               <div
                 style={{
                   display: 'flex',
-                  flexWrap: 'wrap',
+                  flexDirection: 'column',
                   gap: 6,
                   padding: '0 10px 10px',
                 }}
@@ -127,26 +129,61 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
                     섹션이 없어요. Step 2로 돌아가서 추가하세요.
                   </div>
                 )}
-                {song.sections.map((sec, secIdx) => (
-                  <button
-                    key={secIdx}
-                    type="button"
-                    onClick={() => handleChipClick(song, secIdx)}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: 999,
-                      border: '1px solid var(--rule)',
-                      background: 'var(--paper-2, #f4ecdd)',
-                      color: 'var(--ink-2)',
-                      cursor: 'pointer',
-                      fontSize: 12.5,
-                      fontWeight: 500,
-                    }}
-                    aria-label={`${sec.label || sec.type} 가사를 콘티에 추가`}
-                  >
-                    + {sec.label || sec.type}
-                  </button>
-                ))}
+                {song.sections.map((sec, secIdx) => {
+                  // 첫 줄 미리보기 — 공백만 있는 줄은 건너뛰고 실제 글자가 있는 첫 줄을 표시.
+                  const firstLine =
+                    (sec.text || '')
+                      .split('\n')
+                      .map((l) => l.trim())
+                      .find(Boolean) || '(빈 섹션)';
+                  return (
+                    <button
+                      key={secIdx}
+                      type="button"
+                      onClick={() => handleChipClick(song, secIdx)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--rule)',
+                        background: 'var(--paper-2, #f4ecdd)',
+                        color: 'var(--ink-2)',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        textAlign: 'left',
+                        // 화면을 넘는 긴 가사는 ellipsis로 잘라서 한 줄로 유지.
+                        width: '100%',
+                      }}
+                      aria-label={`${sec.label || sec.type} 가사를 콘티에 추가: ${firstLine}`}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color: 'var(--ink)',
+                          minWidth: 64,
+                          flexShrink: 0,
+                          fontSize: 12.5,
+                        }}
+                      >
+                        {sec.label || sec.type}
+                      </span>
+                      <span
+                        style={{
+                          color: 'var(--ink-3)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        {firstLine}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
