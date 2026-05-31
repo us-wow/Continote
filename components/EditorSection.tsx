@@ -197,45 +197,45 @@ export default function EditorSection({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [text, autoResize]);
 
-  // mirror div에 textarea와 동일한 텍스트를 그리되, 각 paragraph 시작 위치에 0×0 invisible 마커를 끼움.
-  // 빈 줄은 그대로 유지해야 wrap·줄바꿈이 textarea와 정확히 일치한다.
+  // mirror div에 textarea와 "정확히 똑같은 텍스트"를 한 줄씩 그린다.
+  // 각 줄 뒤에 항상 '\n'을 붙이고(마지막 줄 제외), paragraph 첫 줄 앞에만 0×0 invisible 마커를 끼운다.
+  //
+  // ⚠️ 과거 버그(거터 번호 누적 드리프트): 예전엔 paragraph 본문을 join('\n')으로 한 덩어리로 묶고
+  //    빈 줄만 따로 '\n'으로 출력했는데, 그러면 paragraph 마지막 줄의 줄바꿈 하나가 빠져
+  //    mirror가 textarea보다 paragraph마다 한 줄씩 짧아졌다 → 아래로 갈수록 측정 위치가 위로 밀림.
+  //    이제 textarea와 1:1로 줄을 재현해서 어긋남이 생기지 않는다.
   const mirrorNodes = useMemo(() => {
     const nodes: React.ReactNode[] = [];
     const allLines = text.split('\n');
-    let i = 0;
     let slideNum = 0;
-    while (i < allLines.length) {
-      // paragraph 사이 빈 줄들 — 그대로 \n으로 출력
-      while (i < allLines.length && allLines[i].trim() === '') {
-        nodes.push('\n');
-        i++;
+    let prevBlank = true; // 직전 줄이 빈 줄이었는지 — false→비어있다가 채워지는 순간이 paragraph 시작
+    allLines.forEach((line, idx) => {
+      const isBlank = line.trim() === '';
+      // 빈 줄 다음(또는 맨 처음)에 오는 첫 글자 줄 = 새 슬라이드 시작 → 그 줄 앞에 마커.
+      if (!isBlank && prevBlank) {
+        slideNum++;
+        const thisNum = slideNum;
+        nodes.push(
+          <span
+            key={`marker-${thisNum}`}
+            ref={(el) => {
+              markerRefs.current[thisNum] = el;
+            }}
+            data-slide-num={thisNum}
+            style={{
+              display: 'inline-block',
+              width: 0,
+              height: 0,
+              verticalAlign: 'top',
+            }}
+          />
+        );
       }
-      if (i >= allLines.length) break;
-      slideNum++;
-      const thisNum = slideNum;
-      nodes.push(
-        <span
-          key={`marker-${thisNum}`}
-          ref={(el) => {
-            markerRefs.current[thisNum] = el;
-          }}
-          data-slide-num={thisNum}
-          style={{
-            display: 'inline-block',
-            width: 0,
-            height: 0,
-            verticalAlign: 'top',
-          }}
-        />
-      );
-      const paraLines: string[] = [];
-      while (i < allLines.length && allLines[i].trim() !== '') {
-        paraLines.push(allLines[i]);
-        i++;
-      }
-      nodes.push(paraLines.join('\n'));
-    }
-    // text 마지막에 줄바꿈이 있는 경우도 그대로 보존
+      nodes.push(line);
+      // 마지막 줄을 제외하고 모든 줄 뒤에 줄바꿈 — textarea 원본과 글자 단위로 동일하게.
+      if (idx < allLines.length - 1) nodes.push('\n');
+      prevBlank = isBlank;
+    });
     return nodes;
   }, [text]);
 

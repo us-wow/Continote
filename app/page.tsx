@@ -1483,24 +1483,26 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </ul>
         </Section>
 
-        <Section title="한 슬라이드에 들어가는 글자 수 (자동 조정됨)">
+        <Section title="글씨 크기는 자동으로 맞춰져요">
           <p className="caption" style={{ color: 'var(--ink-3)', marginBottom: 10 }}>
-            줄 수에 따라 글씨 크기가 자동으로 정해져요. 한도 넘으면 빨간 알림이 떠요.
+            이제는 줄을 직접 안 나눠도 돼요. 줄 수가 많거나 한 줄이 길면 그 슬라이드만 글씨를
+            자동으로 줄여서 한 화면에 담아줘요. 너무 작아지지 않게 최소 24pt까지만 줄이고,
+            그래도 줄이 길면 PowerPoint가 알아서 줄바꿈해요.
           </p>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--rule)' }}>
                 <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>줄 수</th>
-                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>글씨 크기</th>
-                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>한 줄 글자 수</th>
+                <th style={{ textAlign: 'left', padding: '8px 4px', color: 'var(--ink-2)' }}>기본 글씨 크기</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>56pt</td><td style={{ padding: '6px 4px' }}>19자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>48pt</td><td style={{ padding: '6px 4px' }}>24자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>38pt</td><td style={{ padding: '6px 4px' }}>29자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>32pt</td><td style={{ padding: '6px 4px' }}>36자까지</td></tr>
-              <tr><td style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>5줄 이상</td><td colSpan={2} style={{ padding: '6px 4px', color: 'var(--accent-ink)' }}>슬라이드를 두 개로 나눠야 해요</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>1줄</td><td style={{ padding: '6px 4px' }}>56pt</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>2줄</td><td style={{ padding: '6px 4px' }}>48pt</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>3줄</td><td style={{ padding: '6px 4px' }}>38pt</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>4줄</td><td style={{ padding: '6px 4px' }}>32pt</td></tr>
+              <tr><td style={{ padding: '6px 4px' }}>5~7줄</td><td style={{ padding: '6px 4px' }}>28~24pt로 자동 축소</td></tr>
+              <tr><td style={{ padding: '6px 4px', color: 'var(--ink-3)' }}>한 줄이 길면</td><td style={{ padding: '6px 4px', color: 'var(--ink-3)' }}>그 줄 길이에 맞춰 더 작게 (최소 24pt)</td></tr>
             </tbody>
           </table>
         </Section>

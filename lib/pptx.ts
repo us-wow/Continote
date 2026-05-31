@@ -54,11 +54,10 @@ export type PptCopyrightInfo = {
   licenseLabel?: string;
 };
 
-// 검증/사이징 결과
-export type PptValidation =
-  | { ok: true; fontSize: number; lineCount: number }
-  | { ok: false; reason: 'too-many-lines'; lineCount: number }
-  | { ok: false; reason: 'line-too-long'; lineCount: number; maxCharsPerLine: number };
+// 사이징 결과 — 이제는 "통과/실패"가 아니라 항상 통과시키고 글씨 크기만 돌려준다.
+// (2026-05-31 변경: 줄 수/길이로 내보내기를 막지 않고, 글씨를 자동으로 줄여서 담는다.)
+// ok 필드는 기존 호출부(app/page.tsx, app/m/page.tsx)와의 호환을 위해 남겨두며 항상 true다.
+export type PptValidation = { ok: true; fontSize: number; lineCount: number };
 
 const FONT_FACE_MAP: Record<PptFont, string> = {
   'nanum-myeongjo': 'Nanum Myeongjo',
@@ -67,41 +66,68 @@ const FONT_FACE_MAP: Record<PptFont, string> = {
   'noto-sans-kr': 'Noto Sans KR',
 };
 
-// 한도는 실제 PowerPoint에서 한국어 명조 + 16:9 가운데 정렬 박스 폭 기준 실측치.
-// 2026-05-22 사용자 요청: 전반적으로 글자가 좀 커서 12% 정도 축소.
-// 글자가 작아진 만큼 한 줄에 들어가는 글자수도 같이 늘려서(약 14%) 사용자가 같은 가사를 자연스럽게 넣을 수 있게.
-// 추가 안전망으로 addText에 fit:'shrink'를 켜서 박스를 넘치면 PowerPoint가 자동으로 살짝 더 축소한다.
-const SLIDE_TEXT_RULES: Record<number, { maxCharsPerLine: number; fontSize: number }> = {
-  1: { maxCharsPerLine: 19, fontSize: 56 },
-  2: { maxCharsPerLine: 24, fontSize: 48 },
-  3: { maxCharsPerLine: 29, fontSize: 38 },
-  4: { maxCharsPerLine: 36, fontSize: 32 },
+// ── 가사 슬라이드 글씨 크기 자동 결정 ──────────────────────────────────
+// 2026-05-31 변경: 예전에는 "한 슬라이드 4줄 + 줄당 글자수" 한도를 넘으면
+// 빨간 경고를 띄우고 PPT 내보내기를 막았다(사용자가 직접 줄을 나눠야 했음).
+// 이제는 막지 않고 "글씨를 알아서 줄여서 한 슬라이드에 담는다"는 방향으로 바꾼다.
+//   1) 줄 수가 많을수록 글씨를 줄인다 (세로로 안 넘치게).
+//   2) 한 줄이 길수록 글씨를 줄인다 (가로로 안 넘치게).
+//   3) 단, MIN_FONT_SIZE 밑으로는 안 내려간다 (예배 화면 가독성 최소 한계 — 사용자 요청).
+//      그래도 줄이 길면 PowerPoint 텍스트 박스가 알아서 다음 줄로 줄바꿈하고,
+//      addText의 fit:'shrink'가 마지막 안전망으로 살짝 더 맞춰준다.
+
+// 글씨 크기 상·하한 (pt)
+const MAX_FONT_SIZE = 56; // 1줄 짧은 가사일 때 가장 큰 크기
+const MIN_FONT_SIZE = 24; // 이 밑으로는 자동으로 안 줄임 — 너무 작으면 예배 화면에서 안 보이니까
+
+// 줄 수에 따른 '세로 기준' 글씨 크기. 줄이 많아질수록 한 화면에 다 담기도록 작아진다.
+// (16:9 와이드 가운데 박스 실측 기반. 표에 없는 줄 수(8줄 이상)는 최소값을 쓴다.)
+const HEIGHT_FONT_BY_LINES: Record<number, number> = {
+  1: 56,
+  2: 48,
+  3: 38,
+  4: 32,
+  5: 28,
+  6: 26,
+  7: 24,
 };
 
-// 한 슬라이드 검증 + 폰트사이즈 자동 결정
-// title/memo 슬라이드는 자체 레이아웃 규칙이 따로 있으니 검증을 건너뛰고 항상 ok 반환.
+// '가로 기준' 용량 상수 — (글씨크기 × 한 줄 글자수)가 대략 이 값을 넘으면 가로로 넘친다.
+// 기존 한도표(56×19 ≈ 48×24 ≈ 38×29 ≈ 32×36 ≈ 1100)에서 뽑은 평균값.
+const BOX_CHAR_CAPACITY = 1080;
+
+// 한 가사 슬라이드의 글씨 크기를 계산한다 (결과는 항상 MIN~MAX 사이).
+function computeLyricFontSize(lines: string[]): number {
+  // 실제 글자가 있는 줄만 센다 (공백 줄은 크기 계산에서 제외).
+  const visible = lines.filter((line) => line.trim().length > 0);
+  if (visible.length === 0) return MAX_FONT_SIZE;
+
+  // 세로 기준 — 줄 수가 표에 없으면(8줄 이상) 최소 글씨로.
+  const heightFont = HEIGHT_FONT_BY_LINES[visible.length] ?? MIN_FONT_SIZE;
+
+  // 가로 기준 — 가장 긴 줄의 글자수로 결정.
+  // Array.from으로 세면 한글·이모지 같은 유니코드 문자를 화면 글자 단위에 가깝게 센다.
+  const longest = Math.max(...visible.map((line) => Array.from(line).length));
+  const widthFont = longest > 0 ? Math.floor(BOX_CHAR_CAPACITY / longest) : MAX_FONT_SIZE;
+
+  // 세로·가로 중 더 빡빡한(작은) 쪽을 택하고, 최소~최대 범위로 자른다.
+  const raw = Math.min(heightFont, widthFont);
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, raw));
+}
+
+// 한 슬라이드의 글씨 크기 결정. 더 이상 줄 수/길이로 막지 않고 항상 통과시킨다.
+// title/memo 슬라이드는 자체 레이아웃 규칙이 따로 있어 고정 크기를 돌려준다.
 export function validateSlide(slide: PptSlide): PptValidation {
   if (slide.kind === 'title' || slide.kind === 'memo') {
     return { ok: true, fontSize: 56, lineCount: 1 };
   }
   const lineCount = slide.lines.length;
 
-  // 빈 슬라이드는 사용자가 의도적으로 여백을 넣을 수 있어 허용하고,
-  // 실제 표시 텍스트가 없으므로 1줄 fallback 사이즈를 돌려준다.
-  if (lineCount === 0) return { ok: true, fontSize: 56, lineCount: 0 };
+  // 빈 슬라이드(의도적 여백)는 표시 텍스트가 없으므로 큰 크기로 fallback.
+  if (lineCount === 0) return { ok: true, fontSize: MAX_FONT_SIZE, lineCount: 0 };
 
-  // 16:9 와이드 슬라이드의 가운데 텍스트 박스에서 읽기 좋은 최대 줄 수를 4줄로 제한한다.
-  // 5줄 이상은 예배/발표 화면에서 한눈에 읽기 어려워 검증 실패로 처리한다.
-  if (lineCount >= 5) return { ok: false, reason: 'too-many-lines', lineCount };
-
-  const { maxCharsPerLine, fontSize } = SLIDE_TEXT_RULES[lineCount];
-
-  // Array.from으로 세면 한글과 이모지 같은 유니코드 문자를 화면 글자 단위에 가깝게 다룰 수 있다.
-  if (slide.lines.some((line) => Array.from(line).length > maxCharsPerLine)) {
-    return { ok: false, reason: 'line-too-long', lineCount, maxCharsPerLine };
-  }
-
-  return { ok: true, fontSize, lineCount };
+  // 줄 수·길이에 맞춰 글씨를 자동으로 줄여서 한 슬라이드에 담는다.
+  return { ok: true, fontSize: computeLyricFontSize(slide.lines), lineCount };
 }
 
 // public/ 경로의 이미지 파일을 fetch해서 base64로 변환.
@@ -216,20 +242,19 @@ export async function exportToPptx(
     }
 
     // 가사 슬라이드 (kind === 'lyric')
-    const validation = validateSlide(pptSlide);
-    // 검증 실패 슬라이드도 파일 생성을 막지 않고, 사용자가 내용을 확인할 수 있게
-    // 32pt fallback으로 작게 넣는다.
+    // 줄 수·줄 길이에 맞춰 자동 계산된 글씨 크기를 쓴다 (항상 24~56pt 사이).
+    const { fontSize } = validateSlide(pptSlide);
     slide.addText(pptSlide.lines.join('\n'), {
       ...boxFrame,
       align: 'center',
       valign: 'middle',
       color: config.text,
       fontFace: FONT_FACE_MAP[font],
-      fontSize: validation.ok ? validation.fontSize : 32,
+      fontSize,
       paraSpaceAfter: 8,
       bold: false,
-      // 한도 통과 후에도 폰트마다 미세하게 박스를 넘는 케이스가 있어
-      // PowerPoint의 자동 축소(shrink-to-fit)를 켜서 한 줄에 들어가게 보장한다.
+      // 자동 글씨 크기가 최소(24pt)에 닿았는데도 줄이 길면, PowerPoint가 박스 안에서
+      // 자동으로 줄바꿈 + 살짝 더 축소(shrink-to-fit)해서 한 슬라이드에 담기게 한다.
       fit: 'shrink',
     });
   }
