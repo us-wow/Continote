@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { buildSlidesFromText, type Slide } from '@/lib/text-doc';
-import { PPT_FONT_LABELS, PPT_THEME_LABELS, type PptFont, type PptTheme } from '@/lib/pptx';
+import { PPT_FONT_LABELS, PPT_THEME_LABELS, validateSlide, type PptFont, type PptTheme } from '@/lib/pptx';
 
 type PreviewModalProps = {
   open: boolean;
@@ -217,6 +217,14 @@ function SlidePreview({
   overlay?: string;
   fontFamily: string;
 }) {
+  // 실제 슬라이드(가로 13.333in ≈ 960px)와 같은 비율로 카드에 글씨를 그린다.
+  // pt → cqw(카드 폭의 %) 환산. 카드가 커지든 작아지든 실제 PPT와 같은 글자/줄 배치가 유지된다.
+  // 0.95는 폰트 미세 차이로 글자 한두 개가 줄을 이탈하지 않게 살짝 작게 잡는 안전 여유.
+  const ptToCqw = (pt: number) => `${((pt / 960) * 95).toFixed(2)}cqw`;
+  // 가사 슬라이드는 줄 수·줄 길이에 맞춰 자동 계산된 크기(lib/pptx.ts와 동일)를 그대로 비율 적용.
+  const lyricFontSize =
+    slide.kind === 'lyric' ? ptToCqw(validateSlide(slide).fontSize) : undefined;
+
   return (
     <figure style={{ margin: 0, position: 'relative' }}>
       {/* 좌상단 번호 뱃지 — 항상 표시. 사용자가 토스트의 "11번 슬라이드"를 즉시 찾을 수 있게.
@@ -256,6 +264,8 @@ function SlidePreview({
           borderRadius: 'var(--radius-sm)',
           overflow: 'hidden',
           fontFamily,
+          // 카드 폭을 cqw 단위 기준점으로 삼아 글씨를 실제 슬라이드 비율대로 축소한다.
+          containerType: 'inline-size',
           boxShadow: isOverflow
             ? '0 0 0 3px color-mix(in oklab, var(--danger) 20%, transparent)'
             : undefined,
@@ -275,21 +285,23 @@ function SlidePreview({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '12px 14px',
+            // 가로 여백을 카드 폭 비례(cqw)로 줘서, 실제 슬라이드의 텍스트 박스(전체 폭의 92.5%)와
+            // 같은 비율을 유지한다 → 실제 PPT에서 한 줄에 들어가는 가사는 미리보기에서도 한 줄.
+            padding: '12px 3.75cqw',
             textAlign: 'center',
           }}
         >
           {slide.kind === 'title' ? (
             <div>
-              <div style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.2 }}>{slide.title}</div>
+              <div style={{ fontWeight: 700, fontSize: ptToCqw(60), lineHeight: 1.2 }}>{slide.title}</div>
               {slide.subtitle && (
-                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.8 }}>{slide.subtitle}</div>
+                <div style={{ marginTop: '0.4em', fontSize: ptToCqw(28), opacity: 0.8 }}>{slide.subtitle}</div>
               )}
             </div>
           ) : slide.kind === 'memo' ? (
-            <div style={{ fontStyle: 'italic', fontSize: 13, lineHeight: 1.4 }}>{slide.text}</div>
+            <div style={{ fontStyle: 'italic', fontSize: ptToCqw(36), lineHeight: 1.4 }}>{slide.text}</div>
           ) : (
-            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <div style={{ fontSize: lyricFontSize, lineHeight: 1.4 }}>
               {slide.lines.map((l, j) => (
                 <div key={j}>{l}</div>
               ))}
