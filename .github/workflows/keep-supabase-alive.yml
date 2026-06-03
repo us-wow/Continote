@@ -1,0 +1,36 @@
+name: Keep Supabase Alive
+
+# 무료 Supabase 프로젝트는 약 1주일간 아무 요청이 없으면 자동으로 일시중지된다.
+# 일시중지되면 로그인/클라우드 저장이 끊겨, 공유받은 사람이 들어와도 못 쓴다.
+# 이 워크플로는 매일 한 번 DB에 가벼운 쿼리를 보내 "활동"을 만들어 일시중지를 막는다.
+# (GitHub 서버가 돌려주므로 내 컴퓨터가 꺼져 있어도 동작한다.)
+
+on:
+  schedule:
+    # 매일 06:00 UTC = 한국 시간 15:00. 하루 한 번이면 7일 한도에 충분한 여유.
+    - cron: '0 6 * * *'
+  # 깃허브 Actions 화면에서 "Run workflow" 버튼으로 직접 실행도 가능.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          # conti_sets 테이블에 limit 1 SELECT를 날린다. 실제로 DB 쿼리가 실행되어 활동으로 잡힌다.
+          # (RLS로 행이 0개여도 쿼리 자체는 실행되므로 깨우기에는 충분하다.)
+          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/conti_sets?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "Supabase 응답: HTTP $code"
+          # 2xx가 아니면 실패 처리 → GitHub가 이메일로 알려줘 문제를 빨리 알 수 있다.
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Supabase 응답이 비정상입니다 (HTTP $code). 프로젝트 상태를 확인하세요."
+            exit 1
+          fi
+          echo "Supabase 깨우기 성공"
