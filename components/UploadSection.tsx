@@ -79,7 +79,7 @@ export default function UploadSection({
           style={{
             width: '100%',
             display: 'block',
-            padding: '32px 24px 28px',
+            padding: '24px 24px 22px',
             textAlign: 'center',
             cursor: 'pointer',
           }}
@@ -96,7 +96,7 @@ export default function UploadSection({
           <div
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 19,
+              fontSize: 18,
               lineHeight: 1.35,
               color: 'var(--ink)',
               letterSpacing: '-0.01em',

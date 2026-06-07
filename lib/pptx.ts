@@ -23,6 +23,17 @@ export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'bible': '성경책 (실사 이미지)',
 };
 
+// 슬라이드 세로 정렬 — 가사/제목을 화면의 위/가운데/아래 어디에 둘지 선택.
+// 기본은 'middle'(가운데, 기존 동작). 예배실 스크린 위치나 하단 자막 영역에 따라 위·아래로 옮긴다.
+// 이 값 하나가 미리보기(PreviewModal)와 실제 PPT 출력(아래 addText valign)에 동시에 적용된다.
+export type PptVAlign = 'top' | 'middle' | 'bottom';
+
+export const PPT_VALIGN_LABELS: Record<PptVAlign, string> = {
+  'top': '상단',
+  'middle': '가운데',
+  'bottom': '하단',
+};
+
 type ThemeConfig =
   | { kind: 'solid'; bg: string; text: string }
   | { kind: 'image'; path: string; text: string };
@@ -152,7 +163,9 @@ export async function exportToPptx(
   font: PptFont,
   fileName: string,
   theme: PptTheme = 'black',
-  copyright?: PptCopyrightInfo
+  copyright?: PptCopyrightInfo,
+  // 세로 정렬 — 기본값 'middle'로 두어 기존 호출/동작과 호환. 제목·메모·가사 슬라이드에 적용한다.
+  verticalAlign: PptVAlign = 'middle'
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
@@ -216,7 +229,7 @@ export async function exportToPptx(
       slide.addText(paragraphs as any, {
         ...boxFrame,
         align: 'center',
-        valign: 'middle',
+        valign: verticalAlign,
         color: config.text,
         fontFace: FONT_FACE_MAP[font],
         paraSpaceAfter: 12,
@@ -230,7 +243,7 @@ export async function exportToPptx(
       slide.addText(pptSlide.text, {
         ...boxFrame,
         align: 'center',
-        valign: 'middle',
+        valign: verticalAlign,
         color: config.text,
         fontFace: FONT_FACE_MAP[font],
         fontSize: 36,
@@ -247,7 +260,7 @@ export async function exportToPptx(
     slide.addText(pptSlide.lines.join('\n'), {
       ...boxFrame,
       align: 'center',
-      valign: 'middle',
+      valign: verticalAlign,
       color: config.text,
       fontFace: FONT_FACE_MAP[font],
       fontSize,

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  isSupportedImageMime,
+  rateLimit,
+  rejectLargeRequest,
+} from '@/lib/request-guards';
 
 export const runtime = 'nodejs';
 // 정확도 모드에서 큰 PDF 처리 시간 여유 확보. Vercel Hobby 플랜에서 함수 실행 한도가 늘어남.
@@ -12,6 +17,12 @@ export const maxDuration = 120;
 // 모듈 최상단에서 한 번만 읽고 서버 인스턴스 수명 동안 캐싱한다(cold start에서만 디스크 IO 발생).
 const RULES_PATH = path.join(process.cwd(), 'lib', 'prompts', 'score-analysis-rules.md');
 const SYSTEM_PROMPT = fs.readFileSync(RULES_PATH, 'utf-8');
+const MAX_REQUEST_BYTES = 42 * 1024 * 1024;
+const MAX_IMAGE_BASE64_BYTES = 30 * 1024 * 1024;
+const MAX_TEXT_CHARS = 200_000;
+const MAX_HINT_CHARS = 8_000;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX = 20;
 
 function extractJSON(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -26,6 +37,12 @@ function extractJSON(text: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const sizeError = rejectLargeRequest(req, MAX_REQUEST_BYTES);
+    if (sizeError) return sizeError;
+
+    const limited = rateLimit(req, 'analyze', RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    if (limited) return limited;
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
@@ -44,6 +61,14 @@ export async function POST(req: NextRequest) {
       hint?: string;
     };
 
+    if (typeof text === 'string' && text.length > MAX_TEXT_CHARS) {
+      return NextResponse.json({ error: '텍스트가 너무 깁니다' }, { status: 400 });
+    }
+
+    if (hint !== undefined && (typeof hint !== 'string' || hint.length > MAX_HINT_CHARS)) {
+      return NextResponse.json({ error: '힌트가 너무 깁니다' }, { status: 400 });
+    }
+
     // 큰 이미지 요청은 Gemini 호출 전에 차단해 서버 메모리 사용량과
     // 함수 실행 타임아웃 가능성을 미리 낮춘다.
     if (images && images.length > 10) {
@@ -52,7 +77,19 @@ export async function POST(req: NextRequest) {
 
     if (
       images &&
-      images.reduce((total, image) => total + image.data.length, 0) > 30 * 1024 * 1024
+      images.some(
+        (image) =>
+          !image ||
+          typeof image.data !== 'string' ||
+          !isSupportedImageMime(image.mimeType)
+      )
+    ) {
+      return NextResponse.json({ error: '지원하지 않는 이미지 형식입니다' }, { status: 400 });
+    }
+
+    if (
+      images &&
+      images.reduce((total, image) => total + image.data.length, 0) > MAX_IMAGE_BASE64_BYTES
     ) {
       return NextResponse.json({ error: '총 용량 30MB 초과' }, { status: 400 });
     }
@@ -117,14 +154,14 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('JSON 파싱 실패:', responseText);
       return NextResponse.json(
-        { error: 'AI 응답을 JSON으로 변환할 수 없습니다', raw: responseText },
+        { error: 'AI 응답을 JSON으로 변환할 수 없습니다' },
         { status: 500 }
       );
     }
 
     if (!parsed.songs || !Array.isArray(parsed.songs)) {
       return NextResponse.json(
-        { error: 'songs 배열이 없는 응답', raw: parsed },
+        { error: 'songs 배열이 없는 응답' },
         { status: 500 }
       );
     }

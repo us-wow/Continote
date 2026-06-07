@@ -5,8 +5,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-export function getSupabaseServerClient() {
-  const cookieStore = cookies();
+export async function getSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   // Next 14 Route Handler에서는 cookieStore.set()이 응답 쿠키에 직접 쓰여진다.
   // try/catch로 감싸는 이유 — Server Component 컨텍스트에서는 set이 불가능해 throw가 발생할 수 있고,

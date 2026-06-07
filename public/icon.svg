@@ -1,0 +1,17 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="콘티노트 앱 아이콘">
+  <rect width="512" height="512" rx="116" fill="#FFF3D4"/>
+  <circle cx="256" cy="250" r="122" fill="#F7CA52"/>
+  <path d="M147 226c-25-29-36-70-16-104 22-37 74-37 105-3M365 226c25-29 36-70 16-104-22-37-74-37-105-3" stroke="#C77A56" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="211" cy="235" r="17" fill="#4E342A"/>
+  <circle cx="301" cy="235" r="17" fill="#4E342A"/>
+  <circle cx="217" cy="228" r="5" fill="#FFFDF8"/>
+  <circle cx="307" cy="228" r="5" fill="#FFFDF8"/>
+  <path d="M241 268h30l-15 17-15-17z" fill="#E58A2A"/>
+  <circle cx="181" cy="269" r="14" fill="#F3A3A0" opacity=".75"/>
+  <circle cx="331" cy="269" r="14" fill="#F3A3A0" opacity=".75"/>
+  <path d="M174 153c-34 0-62 28-62 62v30M338 153c34 0 62 28 62 62v30" stroke="#7C4A39" stroke-width="22" stroke-linecap="round"/>
+  <rect x="91" y="224" width="62" height="86" rx="25" fill="#C77A56"/>
+  <rect x="359" y="224" width="62" height="86" rx="25" fill="#C77A56"/>
+  <path d="M356 340c0-38 25-61 62-61v92c0 15-12 27-27 27h-35v-58z" fill="#FFFDF8"/>
+  <path d="M389 298v56c0 9 7 16 16 16h13" stroke="#C77A56" stroke-width="15" stroke-linecap="round"/>
+</svg>

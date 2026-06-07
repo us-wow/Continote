@@ -12,7 +12,7 @@
 //   - 미리보기 / PPT 다운로드
 //   - "다른 형식으로 내보내기" → 공유 링크 / OpenSong / Plain Slides 등 보조 출구
 
-import { PPT_FONT_LABELS, PPT_THEME_LABELS, type PptFont, type PptTheme } from '@/lib/pptx';
+import { PPT_FONT_LABELS, PPT_THEME_LABELS, PPT_VALIGN_LABELS, type PptFont, type PptTheme, type PptVAlign } from '@/lib/pptx';
 import { useState } from 'react';
 
 type PptSectionProps = {
@@ -21,6 +21,9 @@ type PptSectionProps = {
   setPptFont: (f: PptFont) => void;
   pptTheme: PptTheme;
   setPptTheme: (t: PptTheme) => void;
+  // 세로 정렬 — 상단/가운데/하단. 선택 즉시 미리보기와 PPT 출력에 함께 반영된다.
+  pptVAlign: PptVAlign;
+  setPptVAlign: (v: PptVAlign) => void;
   includeCopyright: boolean;
   setIncludeCopyright: (next: boolean) => void;
   onOpenPreview: () => void;
@@ -63,6 +66,10 @@ const isImageTheme = (theme: PptTheme): boolean =>
 
 const THEME_ORDER: PptTheme[] = ['black', 'white', 'paper', 'meadow', 'cross', 'bible'];
 const FONT_ORDER: PptFont[] = ['noto-serif-kr', 'nanum-myeongjo', 'nanum-square', 'noto-sans-kr'];
+// 세로 정렬 버튼 순서 — 화면 위→아래 순으로 자연스럽게 배치.
+const VALIGN_ORDER: PptVAlign[] = ['top', 'middle', 'bottom'];
+// 각 정렬을 한눈에 알리는 화살표 아이콘 (↑ 위 / ↕ 가운데 / ↓ 아래).
+const VALIGN_ICON: Record<PptVAlign, string> = { top: '↑', middle: '↕', bottom: '↓' };
 // 추천 폰트 — 한글 호환성 최고
 const RECOMMENDED_FONT: PptFont = 'noto-serif-kr';
 
@@ -79,6 +86,8 @@ export default function PptSection({
   setPptFont,
   pptTheme,
   setPptTheme,
+  pptVAlign,
+  setPptVAlign,
   includeCopyright,
   setIncludeCopyright,
   onOpenPreview,
@@ -175,6 +184,30 @@ export default function PptSection({
                   {PPT_FONT_LABELS[key]}
                 </div>
                 {key === RECOMMENDED_FONT && <div className="ppt-font-rec">추천</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 세로 정렬 — 가사를 슬라이드 위/가운데/아래 어디에 둘지. 미리보기와 PPT에 즉시 반영. */}
+        <div className="ppt-ctrl-block">
+          <div className="ppt-ctrl-label label">세로 정렬</div>
+          <div className="ppt-fonts">
+            {VALIGN_ORDER.map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={`ppt-font ${pptVAlign === key ? 'is-active' : ''}`}
+                onClick={() => setPptVAlign(key)}
+                aria-pressed={pptVAlign === key}
+                aria-label={`${PPT_VALIGN_LABELS[key]} 정렬`}
+              >
+                <div className="ppt-font-name">
+                  <span aria-hidden="true" style={{ marginRight: 5, opacity: 0.7 }}>
+                    {VALIGN_ICON[key]}
+                  </span>
+                  {PPT_VALIGN_LABELS[key]}
+                </div>
               </button>
             ))}
           </div>

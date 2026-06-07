@@ -49,6 +49,7 @@ import {
   type PptCopyrightInfo,
   type PptSlide,
   type PptTheme,
+  type PptVAlign,
 } from '@/lib/pptx';
 import { buildPlainSlidesTxt, buildOpenSongXml, downloadText } from '@/lib/export-formats';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
@@ -170,6 +171,8 @@ export default function Home() {
   const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
   // PPT 배경 테마 — 어두운 예배실 기본은 검정.
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
+  // PPT 세로 정렬 — 기본은 가운데(기존 동작). 상단/하단 선택 시 미리보기·PPT 동시 적용.
+  const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
   // 한국 교회 PPT 관행상 저작권 슬라이드는 기본으로 포함한다.
   const [ccliNumber, setCcliNumber] = useState('');
   const [licenseLabel, setLicenseLabel] = useState('');
@@ -803,7 +806,7 @@ export default function Home() {
         ccliNumber: ccliNumber.trim() || undefined,
         licenseLabel: licenseLabel.trim() || undefined,
       } : undefined;
-      await exportToPptx(slides, pptFont, fname, pptTheme, copyright);
+      await exportToPptx(slides, pptFont, fname, pptTheme, copyright, pptVAlign);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -1080,8 +1083,9 @@ export default function Home() {
 
       {/* ----- 히어로 ----- */}
       <section
+        className="hero-section"
         style={{
-          padding: '56px 32px 36px',
+          padding: '34px 32px 22px',
           maxWidth: 1240,
           margin: '0 auto',
           position: 'relative',
@@ -1101,8 +1105,9 @@ export default function Home() {
           </span>
         </h1>
         <p
+          className="hero-copy"
           style={{
-            marginTop: 18,
+            marginTop: 14,
             maxWidth: 620,
             fontSize: 16.5,
             lineHeight: 1.65,
@@ -1125,7 +1130,7 @@ export default function Home() {
       {/* Row 1: 1번 악보 업로드 (full width)
           Row 2: 2번 추출된 곡 | 3번 콘티 편집 (1:1 equal width — 실시간 추가 확인)
           Row 3: 4번 PPT 만들기 (full width — 슬라이드 필요한 사람만) */}
-      <main className="work-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '20px 32px 56px' }}>
+      <main className="work-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '8px 32px 56px' }}>
         <UploadSection
           dragging={dragging}
           onDragOver={(e) => {
@@ -1182,6 +1187,8 @@ export default function Home() {
           setPptFont={setPptFont}
           pptTheme={pptTheme}
           setPptTheme={setPptTheme}
+          pptVAlign={pptVAlign}
+          setPptVAlign={setPptVAlign}
           includeCopyright={includeCopyright}
           setIncludeCopyright={setIncludeCopyright}
           onOpenPreview={() => setPreviewOpen(true)}
@@ -1199,6 +1206,7 @@ export default function Home() {
         text={text}
         pptTheme={pptTheme}
         pptFont={pptFont}
+        pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}
       />
 
@@ -2558,5 +2566,3 @@ function ChurchTemplateModal({
     </div>
   );
 }
-
-

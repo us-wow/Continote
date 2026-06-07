@@ -1,4 +1,4 @@
-// 데스크탑 ↔ 모바일 자동 라우팅 — middleware가 단일 진실 공급원(single source of truth).
+// 데스크탑 ↔ 모바일 자동 라우팅 — proxy가 단일 진실 공급원(single source of truth).
 //
 // 우선순위:
 //   1) ?view=desktop|mobile|auto 쿼리 → 쿠키 저장 + 쿼리 제거된 URL로 redirect (one-shot 설정)
@@ -6,7 +6,7 @@
 //   3) 둘 다 없으면 User-Agent로 모바일/데스크탑 판단
 //
 // 이전엔 client useEffect도 라우팅을 같이 만져서 middleware와 핑퐁이 일어남 → 무한 redirect 루프.
-// 이제 client는 라우팅을 건드리지 않고, 사용자 선택은 ?view 쿼리로 middleware에 전달.
+// 이제 client는 라우팅을 건드리지 않고, 사용자 선택은 ?view 쿼리로 proxy에 전달.
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -15,7 +15,7 @@ const COOKIE_NAME = 'conti-view';
 // 쿠키 유효 기간 — 1년. 사용자가 '데스크탑으로 보기' 한 번 누르면 그 후엔 그대로.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const force = url.searchParams.get('view');
 

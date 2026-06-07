@@ -6,6 +6,20 @@ import './globals.css';
 export const metadata: Metadata = {
   title: '콘티노트 — ContiNote',
   description: '악보를 콘티 가사로, 클릭 한 번에. 찬양팀·예배 사역자를 위한 AI 콘티 메이커',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '콘티노트',
+  },
   openGraph: {
     title: '콘티노트',
     description: '악보를 콘티 가사로, 클릭 한 번에',

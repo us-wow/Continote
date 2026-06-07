@@ -189,36 +189,37 @@ function HeadlineLine2() {
   );
 }
 
-// 브랜드 마크 인라인 SVG — components/BrandMark.tsx 와 동일
+// 브랜드 마크 — 실제 병아리 캐릭터 이미지 사용
 function BrandMarkInline({ size = 36 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 34 34" aria-hidden="true">
-      <rect x="2" y="2" width="30" height="30" rx="7" fill="var(--accent)" />
-      <path
-        d="M9 9 L20 9 L25 14 L25 25 L9 25 Z"
-        fill="rgba(255,255,255,0.18)"
-        stroke="rgba(255,255,255,0.95)"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
+    <span
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.max(9, Math.round(size * 0.24)),
+        background: '#FFF3D4',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        lineHeight: 0,
+      }}
+      aria-hidden="true"
+    >
+      <img
+        src="/mascot/idle.png"
+        alt=""
+        width={Math.round(size * 1.12)}
+        height={Math.round(size * 1.12)}
+        style={{
+          display: 'block',
+          width: '112%',
+          height: '112%',
+          objectFit: 'contain',
+          transform: 'translateY(2%)',
+        }}
       />
-      <path
-        d="M20 9 L20 14 L25 14"
-        fill="none"
-        stroke="rgba(255,255,255,0.95)"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <circle cx="14" cy="20" r="1.6" fill="#fff" />
-      <path
-        d="M15.5 20 L15.5 14.5 L20 13.5 L20 18.5"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="18.5" cy="18.5" r="1.6" fill="#fff" />
-    </svg>
+    </span>
   );
 }
 

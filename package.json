@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3030",
-    "build": "next build",
+    "dev": "next dev --webpack -p 3030",
+    "build": "next build --webpack",
     "start": "next start -p 3030",
     "lint": "next lint"
   },
@@ -17,11 +17,14 @@
     "@supabase/supabase-js": "^2.105.1",
     "@vercel/analytics": "^2.0.1",
     "docx": "^9.0.3",
-    "next": "14.2.18",
+    "next": "^16.2.7",
     "pdfjs-dist": "^4.7.76",
     "pptxgenjs": "^3.12.0",
     "react": "^18",
     "react-dom": "^18"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   },
   "devDependencies": {
     "@types/node": "^20",

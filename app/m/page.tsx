@@ -22,7 +22,7 @@ import { encodeStateToHash } from '@/lib/url-sync';
 import { recordCorrection, buildCorrectionHint } from '@/lib/ocr-learning';
 import { buildPlainSlidesTxt, buildOpenSongXml, downloadText } from '@/lib/export-formats';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import { exportToPptx, validateSlide, type PptCopyrightInfo, type PptFont, type PptSlide, type PptTheme } from '@/lib/pptx';
+import { exportToPptx, validateSlide, type PptCopyrightInfo, type PptFont, type PptSlide, type PptTheme, type PptVAlign } from '@/lib/pptx';
 import { buildSlidesFromText } from '@/lib/text-doc';
 import { addToLibraryAsync, migrateSongLibraryToCloud } from '@/lib/song-library-cloud';
 import { migrateLocalToCloud } from '@/lib/conti-cloud';
@@ -62,6 +62,8 @@ export default function MobilePage() {
   // PPT 옵션
   const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
+  // PPT 세로 정렬 — 기본 가운데. 데스크탑과 동일하게 미리보기·PPT 동시 적용.
+  const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
   const [ccliNumber, setCcliNumber] = useState('');
   const [licenseLabel, setLicenseLabel] = useState('');
   const [includeCopyright, setIncludeCopyright] = useState(false);
@@ -593,7 +595,7 @@ export default function MobilePage() {
             licenseLabel: licenseLabel.trim() || undefined,
           }
         : undefined;
-      await exportToPptx(slides, pptFont, fname, pptTheme, copyright);
+      await exportToPptx(slides, pptFont, fname, pptTheme, copyright, pptVAlign);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -870,6 +872,8 @@ export default function MobilePage() {
             setPptFont={setPptFont}
             pptTheme={pptTheme}
             setPptTheme={setPptTheme}
+            pptVAlign={pptVAlign}
+            setPptVAlign={setPptVAlign}
             includeCopyright={includeCopyright}
             setIncludeCopyright={setIncludeCopyright}
             onOpenPreview={() => setPreviewOpen(true)}
@@ -912,6 +916,7 @@ export default function MobilePage() {
         text={text}
         pptTheme={pptTheme}
         pptFont={pptFont}
+        pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}
       />
 

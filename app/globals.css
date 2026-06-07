@@ -260,13 +260,18 @@ a:focus-visible {
   border-radius: 3px;
   cursor: pointer;
   transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04), inset 0 -1.5px 0 rgba(0,0,0,0.12);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 10px 24px -18px var(--accent);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-strong);
   transform: translateY(-1px);
 }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:disabled {
+  background: var(--paper-3);
+  color: var(--ink-3);
+  box-shadow: none;
+  cursor: not-allowed;
+}
 
 /* ── mockup의 통합 .btn 베이스 클래스 (Phase 2 컴포넌트에서 .btn .btn-primary 형태로 사용)
  *    기존 standalone .btn-primary 와 충돌하지 않고 보완 역할만 한다. */
@@ -628,8 +633,8 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .work-main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-top: 18px;
+  gap: 14px;
+  padding-top: 10px;
 }
 .work-grid {
   display: grid;
@@ -1598,10 +1603,17 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .mascot-float { animation: floatY 4s ease-in-out infinite; }
 
 /* 히어로 마스코트만 절대 배치해 데스크톱 헤드라인 옆 장식으로 쓰고, 다른 마스코트 사용처와 분리한다. */
+.hero-section .h-display {
+  font-size: 52px;
+  line-height: 1.22;
+}
+.hero-copy {
+  margin-bottom: 0;
+}
 .hero-mascot {
   position: absolute;
   right: 32px;
-  top: 36px;
+  top: 24px;
   opacity: 0.95;
 }
 .hero-mascot img {
@@ -1654,6 +1666,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
     justify-content: flex-end;
     margin-top: 18px;
   }
+  .hero-section .h-display {
+    font-size: 42px;
+  }
   .hero-mascot img {
     width: 88px;
     height: auto;
@@ -1670,6 +1685,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 
 /* 초소형 화면에서는 마스코트를 숨겨 업로드 동선과 헤드라인 공간을 우선한다. */
 @media (max-width: 480px) {
+  .hero-section .h-display {
+    font-size: 36px;
+  }
   .hero-mascot {
     display: none;
   }

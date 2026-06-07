@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { buildSlidesFromText, type Slide } from '@/lib/text-doc';
-import { PPT_FONT_LABELS, PPT_THEME_LABELS, validateSlide, type PptFont, type PptTheme } from '@/lib/pptx';
+import { PPT_FONT_LABELS, PPT_THEME_LABELS, validateSlide, type PptFont, type PptTheme, type PptVAlign } from '@/lib/pptx';
 
 type PreviewModalProps = {
   open: boolean;
@@ -16,6 +16,8 @@ type PreviewModalProps = {
   text: string;
   pptTheme: PptTheme;
   pptFont: PptFont;
+  // 세로 정렬 — 실제 PPT 출력과 동일하게 미리보기 카드 안 텍스트 위치를 위/가운데/아래로 맞춘다.
+  pptVAlign: PptVAlign;
   // 4줄 한도를 넘는 슬라이드 인덱스 — 빨간 테두리 + "4줄 초과" 배지로 강조.
   // 사용자가 해당 슬라이드를 줄이면 부모가 새 indices를 넘기면서 빨간색 자동 풀림.
   overflowSlideIndices?: number[];
@@ -62,6 +64,7 @@ export default function PreviewModal({
   text,
   pptTheme,
   pptFont,
+  pptVAlign,
   overflowSlideIndices = [],
 }: PreviewModalProps) {
   // ESC로 닫기
@@ -78,6 +81,10 @@ export default function PreviewModal({
 
   const slides = buildSlidesFromText(text);
   const overlay = THEME_OVERLAY[pptTheme];
+  // 세로 정렬값(top/middle/bottom)을 flexbox의 alignItems로 변환.
+  // 카드 안 텍스트 박스는 flex(row)라 cross축(세로)을 alignItems가 제어한다 → top=위, bottom=아래.
+  const vAlignItems =
+    pptVAlign === 'top' ? 'flex-start' : pptVAlign === 'bottom' ? 'flex-end' : 'center';
 
   return (
     <div
@@ -191,6 +198,7 @@ export default function PreviewModal({
                 themeFg={THEME_FG[pptTheme]}
                 overlay={overlay}
                 fontFamily={FONT_FAMILY_PREVIEW[pptFont]}
+                vAlignItems={vAlignItems}
               />
             ))}
           </div>
@@ -208,6 +216,7 @@ function SlidePreview({
   themeFg,
   overlay,
   fontFamily,
+  vAlignItems,
 }: {
   slide: Slide;
   index: number;
@@ -216,6 +225,7 @@ function SlidePreview({
   themeFg: string;
   overlay?: string;
   fontFamily: string;
+  vAlignItems: 'flex-start' | 'center' | 'flex-end';
 }) {
   // 실제 슬라이드(가로 13.333in ≈ 960px)와 같은 비율로 카드에 글씨를 그린다.
   // pt → cqw(카드 폭의 %) 환산. 카드가 커지든 작아지든 실제 PPT와 같은 글자/줄 배치가 유지된다.
@@ -283,7 +293,8 @@ function SlidePreview({
             position: 'absolute',
             inset: 0,
             display: 'flex',
-            alignItems: 'center',
+            // 세로 정렬 — 사용자가 고른 상단/가운데/하단을 그대로 반영 (실제 PPT valign과 일치).
+            alignItems: vAlignItems,
             justifyContent: 'center',
             // 가로 여백을 카드 폭 비례(cqw)로 줘서, 실제 슬라이드의 텍스트 박스(전체 폭의 92.5%)와
             // 같은 비율을 유지한다 → 실제 PPT에서 한 줄에 들어가는 가사는 미리보기에서도 한 줄.
