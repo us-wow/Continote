@@ -27,6 +27,10 @@ const THEME_BG: Record<PptTheme, string> = {
   black: '#000000',
   white: '#FFFFFF',
   paper: '#FAF5EC',
+  // 홀리 그라데이션 3종 — 실제 .jpg + 로드 전 폴백색(그라데이션의 주조색).
+  light: "url('/pptx-bg-light.jpg') center/cover, #070B1E",
+  dawn: "url('/pptx-bg-dawn.jpg') center/cover, #20102C",
+  serene: "url('/pptx-bg-serene.jpg') center/cover, #E9E3D2",
   meadow: "url('/pptx-bg-meadow.jpg') center/cover, #B8D27A",
   cross: "url('/pptx-bg-cross.jpg') center/cover, #1a140e",
   bible: "url('/pptx-bg-bible.jpg') center/cover, #c19b6e",
@@ -35,6 +39,10 @@ const THEME_FG: Record<PptTheme, string> = {
   black: '#FFFFFF',
   white: '#1F1B16',
   paper: '#1F1B16',
+  // 빛내림/새벽은 흰 글자, 고요한빛은 검정 글자 (lib/pptx.ts와 동일).
+  light: '#FFFFFF',
+  dawn: '#FFFFFF',
+  serene: '#1F1B16',
   meadow: '#1F1B16',
   cross: '#F4E8D2',
   bible: '#1F1B16',

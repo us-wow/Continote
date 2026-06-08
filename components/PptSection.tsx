@@ -47,6 +47,10 @@ const THEME_SWATCH_BG: Record<PptTheme, string> = {
   black: '#000000',
   white: '#FFFFFF',
   paper: '#FAF5EC',
+  // 홀리 그라데이션 3종 — 실제 .jpg를 스와치 배경으로 그대로 보여준다(미리보기=실제 출력).
+  light: "url('/pptx-bg-light.jpg') center/cover",
+  dawn: "url('/pptx-bg-dawn.jpg') center/cover",
+  serene: "url('/pptx-bg-serene.jpg') center/cover",
   meadow: "url('/pptx-bg-meadow.jpg') center/cover",
   cross: "url('/pptx-bg-cross.jpg') center/cover",
   bible: "url('/pptx-bg-bible.jpg') center/cover",
@@ -56,6 +60,10 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
   black: '#FFFFFF',
   white: '#1F1B16',
   paper: '#1F1B16',
+  // 빛내림/새벽은 어두운 배경 → 흰 글자, 고요한빛은 밝은 배경 → 검정 글자.
+  light: '#FFFFFF',
+  dawn: '#FFFFFF',
+  serene: '#1F1B16',
   meadow: '#1F1B16',
   cross: '#1F1B16',
   bible: '#1F1B16',
@@ -64,7 +72,8 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
 const isImageTheme = (theme: PptTheme): boolean =>
   theme === 'meadow' || theme === 'cross' || theme === 'bible';
 
-const THEME_ORDER: PptTheme[] = ['black', 'white', 'paper', 'meadow', 'cross', 'bible'];
+// 순서: 단색 3종 → 홀리 그라데이션 3종 → 실사 사진 3종.
+const THEME_ORDER: PptTheme[] = ['black', 'white', 'paper', 'light', 'dawn', 'serene', 'meadow', 'cross', 'bible'];
 const FONT_ORDER: PptFont[] = ['noto-serif-kr', 'nanum-myeongjo', 'nanum-square', 'noto-sans-kr'];
 // 세로 정렬 버튼 순서 — 화면 위→아래 순으로 자연스럽게 배치.
 const VALIGN_ORDER: PptVAlign[] = ['top', 'middle', 'bottom'];

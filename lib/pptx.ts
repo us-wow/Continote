@@ -12,12 +12,16 @@ export const PPT_FONT_LABELS: Record<PptFont, string> = {
 };
 
 // 슬라이드 배경 템플릿 — 예배 분위기에 따라 선택
-export type PptTheme = 'black' | 'white' | 'paper' | 'meadow' | 'cross' | 'bible';
+export type PptTheme = 'black' | 'white' | 'paper' | 'light' | 'dawn' | 'serene' | 'meadow' | 'cross' | 'bible';
 
 export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'black': '검정 (어두운 예배실)',
   'white': '흰색 (밝은 예배실)',
   'paper': '종이 톤 (따뜻한 분위기)',
+  // 홀리 그라데이션 3종 — scripts/gen-holy-bg.mjs로 생성한 빛/글로우 배경.
+  'light': '빛내림 (어두운 예배실)',
+  'dawn': '새벽 (따뜻한 톤)',
+  'serene': '고요한빛 (밝은 예배실)',
   'meadow': '초원 (실사 이미지)',
   'cross': '십자가 (실사 이미지)',
   'bible': '성경책 (실사 이미지)',
@@ -36,7 +40,9 @@ export const PPT_VALIGN_LABELS: Record<PptVAlign, string> = {
 
 type ThemeConfig =
   | { kind: 'solid'; bg: string; text: string }
-  | { kind: 'image'; path: string; text: string };
+  // overlay: 글자 가독성용 흰 반투명 레이어 사용 여부. 실사 사진은 true(기본),
+  // 자체 대비가 충분한 그라데이션 배경은 false로 둬서 색이 흐려지지 않게 한다.
+  | { kind: 'image'; path: string; text: string; overlay?: boolean };
 
 const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   // 검정은 어두운 예배실 투사 환경에서 가장 높은 대비를 주기 위해 선택했다.
@@ -51,6 +57,11 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   'meadow': { kind: 'image', path: '/pptx-bg-meadow.jpg', text: '1F1B16' },
   'cross': { kind: 'image', path: '/pptx-bg-cross.jpg', text: '1F1B16' },
   'bible': { kind: 'image', path: '/pptx-bg-bible.jpg', text: '1F1B16' },
+  // 홀리 그라데이션 3종 — 자체 대비가 충분하므로 overlay를 끈다(흰 반투명 레이어 생략).
+  // light/dawn는 어두운 배경이라 흰 글자, serene는 밝은 배경이라 검정 글자.
+  'light': { kind: 'image', path: '/pptx-bg-light.jpg', text: 'FFFFFF', overlay: false },
+  'dawn': { kind: 'image', path: '/pptx-bg-dawn.jpg', text: 'FFFFFF', overlay: false },
+  'serene': { kind: 'image', path: '/pptx-bg-serene.jpg', text: '1F1B16', overlay: false },
 };
 
 // 한 슬라이드의 입력 — text-doc.ts의 Slide와 동일 구조를 그대로 재사용.
@@ -175,12 +186,16 @@ export async function exportToPptx(
 
   // 테마에 맞는 배경/글자색 선택. 이미지는 한 번만 만들어 모든 슬라이드 재사용.
   const config = THEME_CONFIG[theme];
+  // 흰 반투명 오버레이 사용 여부 — 실사 사진은 기본 ON, 그라데이션(overlay:false)은 OFF.
+  const useOverlay = config.kind === 'image' ? config.overlay !== false : false;
+  // 흰 글자 테마(빛내림/새벽)인지 — 이미지 로드 실패 시 폴백 배경색을 정하는 데 쓴다.
+  const isLightText = config.kind === 'image' && config.text.toUpperCase() === 'FFFFFF';
   let bgData: string | undefined;
   if (config.kind === 'image') {
     try {
       bgData = await loadPublicImageAsBase64(config.path);
     } catch (err) {
-      console.warn('이미지 배경 로드 실패 → 흰색 단색으로 대체:', err);
+      console.warn('이미지 배경 로드 실패 → 단색으로 대체:', err);
     }
   }
 
@@ -189,19 +204,21 @@ export async function exportToPptx(
       slide.background = { color: config.bg };
     } else if (bgData) {
       slide.background = { data: bgData };
-      // 이미지 위 글자 가독성을 위해 슬라이드 전체에 흰 반투명 레이어를 깐다.
-      // 텍스트는 이 레이어 위에 검정색으로 올려 배경 디테일과 충돌하지 않게 한다.
-      slide.addShape('rect', {
-        x: 0,
-        y: 0,
-        w: 13.333,
-        h: 7.5,
-        fill: { color: 'FFFFFF', transparency: 35 },
-        line: { type: 'none' },
-      });
+      // 실사 이미지는 글자 가독성을 위해 흰 반투명 레이어를 깐다.
+      // 그라데이션 배경은 자체 대비가 충분해 레이어를 생략(useOverlay=false)한다.
+      if (useOverlay) {
+        slide.addShape('rect', {
+          x: 0,
+          y: 0,
+          w: 13.333,
+          h: 7.5,
+          fill: { color: 'FFFFFF', transparency: 35 },
+          line: { type: 'none' },
+        });
+      }
     } else {
-      // 이미지 로드 실패 시 검정 글자가 보이도록 흰색 단색 fallback을 사용한다.
-      slide.background = { color: 'FFFFFF' };
+      // 이미지 로드 실패 시 글자색과 대비되는 단색으로 폴백 (흰 글자면 어두운 배경).
+      slide.background = { color: isLightText ? '111111' : 'FFFFFF' };
     }
   };
 
