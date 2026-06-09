@@ -1795,9 +1795,13 @@ function SavedSetsModal({
       await refresh();
       setName('');
       onSaved(saved);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('저장에 실패했어요. 잠시 후 다시 시도해주세요.');
+      alert(
+        err?.message === '로그인하면 저장돼요'
+          ? '🔒 로그인하면 저장돼요 (지금은 저장이 안 돼요)'
+          : '저장에 실패했어요. 잠시 후 다시 시도해주세요.'
+      );
     } finally {
       setBusy(false);
     }
@@ -1935,7 +1939,7 @@ function SavedSetsModal({
             </>
           ) : (
             <>
-              <strong>💾 이 브라우저에만 저장</strong> — 로그인하면 클라우드로 자동 옮겨져 다른 기기에서도 볼 수 있어요.
+              <strong>🔒 로그인해야 저장돼요</strong> — 지금은 저장 안 됨(새로고침하면 초기화). 로그인하면 클라우드에 저장돼 다른 기기에서도 볼 수 있어요.
             </>
           )}
         </div>
@@ -2171,7 +2175,7 @@ function SongLibraryModal({
             </>
           ) : (
             <>
-              <strong>💾 이 브라우저에만 저장</strong> — 로그인하면 클라우드로 자동 옮겨져 다른 기기에서도 보여요.
+              <strong>🔒 로그인해야 저장돼요</strong> — 지금은 저장 안 됨(새로고침하면 초기화). 로그인하면 클라우드에 저장돼 다른 기기에서도 보여요.
             </>
           )}
         </div>
@@ -2343,9 +2347,13 @@ function ChurchTemplateModal({
       await refresh();
       setName('');
       showToast(`"${saved.name}" 템플릿 저장 완료`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('저장에 실패했어요.');
+      alert(
+        err?.message === '로그인하면 저장돼요'
+          ? '🔒 로그인하면 저장돼요'
+          : '저장에 실패했어요.'
+      );
     } finally {
       setBusy(false);
     }
@@ -2451,7 +2459,7 @@ function ChurchTemplateModal({
             </>
           ) : (
             <>
-              <strong>💾 이 브라우저에만 저장</strong> — 로그인하면 클라우드로 자동 옮겨져 다른 기기에서도 보여요.
+              <strong>🔒 로그인해야 저장돼요</strong> — 지금은 저장 안 됨(새로고침하면 초기화). 로그인하면 클라우드에 저장돼 다른 기기에서도 보여요.
             </>
           )}
         </div>

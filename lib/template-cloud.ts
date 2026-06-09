@@ -32,7 +32,7 @@ function rowToTemplate(row: any): ChurchTemplate {
 
 export async function listTemplatesAsync(): Promise<ChurchTemplate[]> {
   const userId = await getCurrentUserId();
-  if (!userId) return listLocal();
+  if (!userId) return []; // 컷: 비로그인은 클라우드만
 
   const sb = getSupabaseClient()!;
   const { data, error } = await sb
@@ -50,7 +50,8 @@ export async function saveTemplateAsync(
   t: Omit<ChurchTemplate, 'id' | 'createdAt'>
 ): Promise<ChurchTemplate> {
   const userId = await getCurrentUserId();
-  if (!userId) return saveLocal(t);
+  // 컷: 비로그인은 저장 불가 → 호출부가 "로그인하면 저장돼요" 안내.
+  if (!userId) throw new Error('로그인하면 저장돼요');
 
   const sb = getSupabaseClient()!;
   const { data, error } = await sb
@@ -74,10 +75,7 @@ export async function saveTemplateAsync(
 
 export async function removeTemplateAsync(id: string): Promise<void> {
   const userId = await getCurrentUserId();
-  if (!userId) {
-    removeLocal(id);
-    return;
-  }
+  if (!userId) return; // 컷: 비로그인은 로컬 데이터가 없음
   const sb = getSupabaseClient()!;
   const { error } = await sb.from('templates').delete().eq('id', id);
   if (error) console.error('[template-cloud] remove 실패:', error.message);

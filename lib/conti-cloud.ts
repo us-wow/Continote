@@ -47,7 +47,7 @@ function rowToSavedSet(row: any): SavedSet {
 // 모든 콘티 세트 조회 (최근 순). 로그인 안 했으면 localStorage 반환.
 export async function listSetsAsync(): Promise<SavedSet[]> {
   const userId = await getCurrentUserId();
-  if (!userId) return listLocal();
+  if (!userId) return []; // 컷: 비로그인은 클라우드만(로컬 보관함 없음)
 
   const sb = getSupabaseClient()!;
   const { data, error } = await sb
@@ -70,7 +70,8 @@ export async function saveSetAsync(
   doc: string
 ): Promise<SavedSet> {
   const userId = await getCurrentUserId();
-  if (!userId) return saveLocal(name, songs, doc);
+  // 컷: 비로그인은 저장 불가 → 호출부가 잡아서 "로그인하면 저장돼요" 안내.
+  if (!userId) throw new Error('로그인하면 저장돼요');
 
   const sb = getSupabaseClient()!;
   const { data, error } = await sb
@@ -93,7 +94,7 @@ export async function saveSetAsync(
 // 특정 id 세트 삭제. 로그인 안 했으면 localStorage에서 삭제.
 export async function removeSetAsync(id: string): Promise<void> {
   const userId = await getCurrentUserId();
-  if (!userId) return removeLocal(id);
+  if (!userId) return; // 컷: 비로그인은 로컬 데이터가 없음
 
   const sb = getSupabaseClient()!;
   const { error } = await sb.from('conti_sets').delete().eq('id', id);

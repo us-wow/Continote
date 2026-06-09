@@ -19,7 +19,7 @@ const INTRO_HEAD_EM = '가장 쉽게'; // 두 번째 줄에서 강조될 부분 
 const INTRO_BODY =
   '악보 사진·PDF만 올리면 가사를 자동으로 뽑아 PPT까지 클릭 몇 번으로 만듭니다. 무료로.';
 const INTRO_SKIP = '이미 써본 적 있어요 → 바로 1단계로';
-const INTRO_GOOGLE_NOTE = 'Google 로그인하면 다른 기기에서도 콘티가 그대로 보여요. (선택)';
+const INTRO_GOOGLE_NOTE = 'Google 로그인하면 곡·콘티가 저장돼요. 로그인 안 하면 그때그때만 사용(저장 안 됨).';
 
 const INTRO_STEPS = [
   { num: '01', label: '악보 업로드', hint: '사진·PDF 12장까지', icon: 'upload' as const },

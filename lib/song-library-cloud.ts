@@ -39,7 +39,8 @@ function rowToLibrarySong(row: any): LibrarySong {
 
 export async function listLibraryAsync(): Promise<LibrarySong[]> {
   const userId = await getCurrentUserId();
-  if (!userId) return listLocal();
+  // 컷: 비로그인은 저장 안 함 → 라이브러리는 클라우드(로그인)만. 로컬 조회 X.
+  if (!userId) return [];
 
   const sb = getSupabaseClient()!;
   const { data, error } = await sb
@@ -58,10 +59,8 @@ export async function listLibraryAsync(): Promise<LibrarySong[]> {
 export async function addToLibraryAsync(songs: Song[]): Promise<void> {
   if (!songs || songs.length === 0) return;
   const userId = await getCurrentUserId();
-  if (!userId) {
-    addLocal(songs);
-    return;
-  }
+  // 컷: 비로그인은 누적 저장 안 함(로컬 X). 로그인해야 클라우드에 쌓임.
+  if (!userId) return;
 
   const sb = getSupabaseClient()!;
   // 사용자의 기존 곡 제목 목록을 한 번에 가져와 client-side에서 매칭.
@@ -113,10 +112,7 @@ export async function addToLibraryAsync(songs: Song[]): Promise<void> {
 
 export async function removeFromLibraryAsync(id: string): Promise<void> {
   const userId = await getCurrentUserId();
-  if (!userId) {
-    removeLocal(id);
-    return;
-  }
+  if (!userId) return; // 컷: 비로그인은 로컬 데이터가 없음
   const sb = getSupabaseClient()!;
   const { error } = await sb.from('songs').delete().eq('id', id);
   if (error) console.error('[song-cloud] remove 실패:', error.message);
