@@ -38,6 +38,7 @@ import {
   listLibraryAsync,
   addToLibraryAsync,
   removeFromLibraryAsync,
+  updateLibrarySongTitleAsync,
   migrateSongLibraryToCloud,
 } from '@/lib/song-library-cloud';
 import {
@@ -2031,6 +2032,10 @@ function SongLibraryModal({
   const [query, setQuery] = useState('');
   const [allLibrary, setAllLibrary] = useState<LibrarySong[]>([]);
   const [loading, setLoading] = useState(true);
+  // 제목 인라인 수정
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState('');
+  const cancelEditRef = useRef(false); // Escape 취소 시 onBlur 저장을 건너뛰는 플래그
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -2082,6 +2087,15 @@ function SongLibraryModal({
 
   const handleRemove = async (id: string) => {
     await removeFromLibraryAsync(id);
+    await refresh();
+  };
+
+  // 제목 저장 — id 기준 클라우드 업데이트 후 목록 새로고침.
+  const saveTitle = async (id: string) => {
+    const t = titleDraft.trim();
+    setEditingId(null);
+    if (!t) return;
+    await updateLibrarySongTitleAsync(id, t);
     await refresh();
   };
 
@@ -2205,18 +2219,62 @@ function SongLibraryModal({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: 'var(--serif)',
-                        fontWeight: 600,
-                        fontSize: 18,
-                        color: 'var(--ink)',
-                        lineHeight: 1.35,
-                        overflowWrap: 'anywhere',
-                      }}
-                    >
-                      {song.title || 'Untitled'}
-                    </div>
+                    {editingId === song.id ? (
+                      <input
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                          else if (e.key === 'Escape') {
+                            cancelEditRef.current = true;
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        onBlur={() => {
+                          if (cancelEditRef.current) {
+                            cancelEditRef.current = false;
+                            setEditingId(null);
+                            return;
+                          }
+                          void saveTitle(song.id);
+                        }}
+                        autoFocus
+                        style={{
+                          fontFamily: 'var(--serif)',
+                          fontWeight: 600,
+                          fontSize: 18,
+                          color: 'var(--ink)',
+                          width: '100%',
+                          padding: '2px 6px',
+                          border: '1px solid var(--accent)',
+                          borderRadius: 4,
+                          background: 'var(--surface, #fff)',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        onClick={() => {
+                          setTitleDraft(song.title || '');
+                          setEditingId(song.id);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title="제목 클릭해서 수정"
+                        style={{
+                          fontFamily: 'var(--serif)',
+                          fontWeight: 600,
+                          fontSize: 18,
+                          color: 'var(--ink)',
+                          lineHeight: 1.35,
+                          overflowWrap: 'anywhere',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {song.title || 'Untitled'}
+                        <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--ink-3)' }}>✎</span>
+                      </div>
+                    )}
                     <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 11 }}>
                       섹션 {song.sections.length}개 · {formatLibrarySavedAt(song.savedAt)}
                     </div>

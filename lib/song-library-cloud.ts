@@ -118,6 +118,18 @@ export async function removeFromLibraryAsync(id: string): Promise<void> {
   if (error) console.error('[song-cloud] remove 실패:', error.message);
 }
 
+// 라이브러리 곡 제목 수정 (id 기준). 컷 이후 라이브러리는 클라우드만이라 로그인 필요.
+export async function updateLibrarySongTitleAsync(id: string, title: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+  const sb = getSupabaseClient()!;
+  const { error } = await sb
+    .from('songs')
+    .update({ title: title.trim() || 'Untitled' })
+    .eq('id', id);
+  if (error) console.error('[song-cloud] 제목 수정 실패:', error.message);
+}
+
 // 로그인 마이그레이션 — localStorage 곡들을 클라우드로 "병합" 업로드.
 // (예전엔 "클라우드가 비었을 때만" 올려서, 한 번이라도 로그인했던 계정은 로컬 곡이 누락됐음.
 //  이제 클라우드에 데이터가 있어도 항상 병합한다.)
