@@ -632,11 +632,7 @@ export default function MobilePage() {
     setDesignTheme((t) => (t === 'paper' ? 'wanted' : 'paper'));
   };
 
-  // ?view=desktop 쿼리로 진입하면 middleware가 쿠키 저장하고 깔끔한 URL로 다시 redirect.
-  // 그 후엔 모바일 UA여도 데스크탑 페이지를 그대로 보여줌 (사용자 명시 선택).
-  const swapToDesktop = () => {
-    window.location.assign('/?view=desktop');
-  };
+  // "데스크탑으로 보기" 제거 — 모바일은 모바일 전용 화면만 쓴다(사용자 요청).
 
   // SSR + hydration 깜빡임 방지 — introSeen이 결정되기 전까진 빈 화면
   if (introSeen === null) {
@@ -694,7 +690,6 @@ export default function MobilePage() {
             setMenuOpen(false);
             setShowGuide(true);
           }}
-          onSwapToDesktop={swapToDesktop}
           authUser={authUser}
           authBusy={authBusy}
           onSignIn={() => {
@@ -881,7 +876,6 @@ export default function MobilePage() {
 function MobileMenuSheet({
   onClose,
   onOpenGuide,
-  onSwapToDesktop,
   authUser,
   authBusy,
   onSignIn,
@@ -890,7 +884,6 @@ function MobileMenuSheet({
 }: {
   onClose: () => void;
   onOpenGuide: () => void;
-  onSwapToDesktop: () => void;
   authUser: User | null;
   authBusy: boolean;
   onSignIn: () => void;
@@ -926,10 +919,6 @@ function MobileMenuSheet({
 
         <div className="m-sheet-list">
           {/* "콘티노트 인트로" 항목 제거 — IntroScreen 폐기, 사용법은 아래 "사용법 보기"로 일원화 */}
-          <button type="button" className="m-sheet-item" onClick={onSwapToDesktop}>
-            <span className="m-sheet-item-label">데스크탑으로 보기</span>
-            <span className="m-sheet-item-sub">큰 화면(2단 레이아웃)으로 전환</span>
-          </button>
           <button type="button" className="m-sheet-item" onClick={onOpenGuide}>
             <span className="m-sheet-item-label">사용법 보기</span>
             <span className="m-sheet-item-sub">4단계로 보는 그림 가이드</span>
