@@ -186,10 +186,10 @@ export default function MobilePage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const seen = window.localStorage.getItem('intro-seen');
+      const seen = window.localStorage.getItem('contino-guide-seen.v1');
       if (seen !== '1') {
         setShowGuide(true); // 첫 방문 → 캐러셀 자동 열기
-        window.localStorage.setItem('intro-seen', '1');
+        window.localStorage.setItem('contino-guide-seen.v1', '1');
       }
     } catch {
       // localStorage 차단 환경 → 캐러셀 생략하고 바로 wizard

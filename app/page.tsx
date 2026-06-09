@@ -206,12 +206,12 @@ export default function Home() {
 
   // 데스크톱 첫 방문 → 사용법 가이드(OnboardingGuide) 한 번 자동으로 띄움.
   // 모바일과 달리 데스크톱엔 인트로 화면이 없어서, 처음 온 사람이 흐름을 모른다.
-  // localStorage 'onboarding-seen'으로 두 번째 방문부터는 안 뜨게 한다.
+  // localStorage 'contino-guide-seen.v1'으로 두 번째 방문부터는 안 뜨게 한다.
   useEffect(() => {
     try {
-      if (localStorage.getItem('onboarding-seen') !== '1') {
+      if (localStorage.getItem('contino-guide-seen.v1') !== '1') {
         setShowHelp(true);
-        localStorage.setItem('onboarding-seen', '1');
+        localStorage.setItem('contino-guide-seen.v1', '1');
       }
     } catch {
       // 시크릿 모드 등 localStorage 접근 불가 → 자동 표시 생략
