@@ -70,7 +70,7 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
           letterSpacing: 0.2,
         }}
       >
-        칩(chip)을 누르면 아래 콘티에 가사가 추가됩니다 · 수정은 Step 2로 돌아가서
+        칩을 누르면 아래 콘티에 가사가 추가돼요 · 수정은 Step 2에서
       </div>
 
       {songs.map((song, songIdx) => {
@@ -143,7 +143,7 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
               >
                 {song.sections.length === 0 && (
                   <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '2px 0' }}>
-                    섹션이 없어요. Step 2로 돌아가서 추가하세요.
+                    묶음이 없어요. Step 2에서 추가하세요.
                   </div>
                 )}
                 {song.sections.map((sec, secIdx) => {
@@ -152,7 +152,7 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
                     (sec.text || '')
                       .split('\n')
                       .map((l) => l.trim())
-                      .find(Boolean) || '(빈 섹션)';
+                      .find(Boolean) || '(비어있음)';
                   return (
                     <button
                       key={secIdx}

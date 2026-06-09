@@ -88,7 +88,7 @@ export default function ExtractedSection({
             className="btn btn-ghost btn-sm"
             onClick={onVerifyLyrics}
             disabled={verifying}
-            title="원본 악보와 비교해 오타가 있을 만한 부분을 표시합니다 (PPT 생성엔 영향 X)"
+            title="악보와 비교해 오타가 있을 만한 곳을 표시해요 (PPT엔 영향 없음)"
           >
             🔍 {verifying ? '검토 중…' : '전체 오타 검토'}
           </button>
@@ -139,7 +139,7 @@ function ExtractingState() {
       <div style={{ textAlign: 'center' }}>
         <div className="ex-extracting-title">가사를 읽고 있어요</div>
         <div className="mono" style={{ fontSize: 12, marginTop: 3, color: 'var(--ink-3)' }}>
-          OCR · 가사 정리 중…
+          가사 정리 중…
         </div>
       </div>
       <div className="ex-progress" aria-hidden="true">
@@ -570,7 +570,7 @@ function SectionChipCard({
           한 줄에 한 가사
           {activeSuspects.length > 0 && (
             <span className="sec-edit-hint-suspect">
-              {' · '}빨간 밑줄 = 오타 의심 (무시해도 PPT 생성엔 영향 X)
+              {' · '}빨간 밑줄 = 오타 의심 (무시해도 괜찮아요)
             </span>
           )}
         </div>

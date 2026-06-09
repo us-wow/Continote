@@ -48,13 +48,13 @@ type EditorSectionProps = {
   autoResize?: boolean;
 };
 
-const PLACEHOLDER = `여기에 가사를 직접 입력하거나, 왼쪽 곡 카드의 섹션을 눌러주세요.
+const PLACEHOLDER = `여기에 가사를 직접 입력하거나, 왼쪽 곡 카드를 눌러주세요.
 
-빈 줄로 슬라이드를 구분합니다.
-한 슬라이드 안에서는 줄바꿈만 하면 됩니다.
+빈 줄(엔터 두 번)로 슬라이드를 나눠요.
+한 슬라이드 안에서는 줄바꿈(엔터 한 번)만 하면 돼요.
 
-[# 제목]을 적으면 제목 슬라이드,
-[> 메모]를 적으면 메모 슬라이드가 됩니다.`;
+맨 앞에 # 를 붙이면 제목 슬라이드,
+> 를 붙이면 메모 슬라이드가 돼요.`;
 
 export default function EditorSection({
   text,
