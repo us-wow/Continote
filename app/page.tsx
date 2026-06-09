@@ -937,8 +937,8 @@ export default function Home() {
         Boolean(active?.isContentEditable);
 
       if (e.key === 's' || e.key === 'S') {
+        // 콘티 모음(저장) 기능 제거됨 — Ctrl/⌘+S는 브라우저 저장창만 막고 아무 동작 안 함.
         e.preventDefault();
-        setShowSets(true);
         return;
       }
 
@@ -1069,20 +1069,11 @@ export default function Home() {
       {/* 헤더의 "내 보관함" 버튼이 트리거하는 드로어 — 콘티 모음/곡 라이브러리/교회 템플릿 3개 옵션 */}
       {showMenu && (
         <MenuDrawer onClose={() => setShowMenu(false)}>
-          <MenuItem
-            label="콘티 모음"
-            sub="저장/불러오기"
-            onClick={() => { setShowMenu(false); setShowSets(true); }}
-          />
+          {/* 콘티 모음·교회 템플릿은 제거(사용자 요청) — 곡 라이브러리만 유지 */}
           <MenuItem
             label="곡 라이브러리"
             sub="추출한 곡 재사용"
             onClick={() => { setShowMenu(false); setShowLibrary(true); }}
-          />
-          <MenuItem
-            label="교회 템플릿"
-            sub="PPT 기본값 저장"
-            onClick={() => { setShowMenu(false); setShowTemplates(true); }}
           />
         </MenuDrawer>
       )}
@@ -1195,6 +1186,10 @@ export default function Home() {
           setPptTheme={setPptTheme}
           pptVAlign={pptVAlign}
           setPptVAlign={setPptVAlign}
+          ccliNumber={ccliNumber}
+          setCcliNumber={setCcliNumber}
+          licenseLabel={licenseLabel}
+          setLicenseLabel={setLicenseLabel}
           includeCopyright={includeCopyright}
           setIncludeCopyright={setIncludeCopyright}
           onOpenPreview={() => setPreviewOpen(true)}
@@ -1392,14 +1387,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </h4>
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
             <li>
-              <b>콘티 모음</b> — 만든 콘티에 이름 붙여서 저장. 다음에 똑같이 불러올 수 있어요.
-              <span style={{ color: 'var(--ink-3)' }}> (내 브라우저 안에만 저장됨)</span>
-            </li>
-            <li>
-              <b>곡 라이브러리</b> — 한 번 추출한 곡은 여기 자동으로 모여요. 다음 주에 같은 곡 또 쓰면 검색해서 바로 추가.
-            </li>
-            <li>
-              <b>교회 템플릿</b> — 우리 교회 기본 폰트·배경·CCLI 번호를 저장. 매번 같은 설정 다시 안 골라도 돼요.
+              <b>곡 라이브러리</b> — 로그인하면 추출한 곡이 자동으로 모여요. 다음에 같은 곡 또 쓸 때 검색해서 바로 추가.
             </li>
           </ul>
 
@@ -1554,7 +1542,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 
         <Section title="단축키 (Mac은 ⌘, Windows는 Ctrl)">
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
-            <li><b>Ctrl/⌘ + S</b> — 콘티 모음 (저장/불러오기) 열기</li>
             <li><b>Ctrl/⌘ + Enter</b> — 가사 추출하기 (편집 중 아닐 때)</li>
             <li><b>Ctrl/⌘ + Z</b> — 방금 한 거 되돌리기</li>
             <li><b>Ctrl/⌘ + Shift + Z</b> — 되돌린 거 다시 실행</li>
@@ -1563,7 +1550,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 
         <Section title="저장 위치 (개인정보 안내)">
           <ul style={{ paddingLeft: 20, margin: 0, lineHeight: 1.8 }}>
-            <li><b>콘티 모음 / 곡 라이브러리 / 교회 템플릿</b> — <span style={{ color: 'var(--ink-3)' }}>전부 내 브라우저 안에만 저장 (서버 X)</span>. 다른 컴퓨터 가면 안 보여요.</li>
+            <li><b>곡 라이브러리</b> — <span style={{ color: 'var(--ink-3)' }}>로그인해야 저장돼요(클라우드)</span>. 로그인 안 하면 그때그때만 쓰고 새로고침하면 사라져요.</li>
             <li><b>공유 링크 복사</b> — <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>URL 자체에 콘티가 통째로 담겨있음</span>. 링크 받은 누구나 그 콘티 볼 수 있어요. (서버에 저장되는 게 아니에요)</li>
             <li><b>악보 이미지/PDF</b> — 가사 추출할 때만 잠깐 AI(Gemini)에 보내고, 추출 끝나면 우리 서버엔 안 남아요.</li>
           </ul>
