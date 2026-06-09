@@ -189,15 +189,16 @@ function HeadlineLine2() {
   );
 }
 
-// 브랜드 마크 — 실제 병아리 캐릭터 이미지 사용
+// 브랜드 마크 — C+N+음표 로고 심볼 (병아리에서 교체)
 function BrandMarkInline({ size = 36 }: { size?: number }) {
   return (
     <span
       style={{
         width: size,
         height: size,
-        borderRadius: Math.max(9, Math.round(size * 0.24)),
-        background: '#FFF3D4',
+        borderRadius: Math.max(9, Math.round(size * 0.26)),
+        background: '#FCF8EF', // 로고 원본과 같은 크림 → 투명 심볼이 자연스럽게 얹힌다
+        border: '1px solid rgba(0,0,0,0.06)',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -207,16 +208,13 @@ function BrandMarkInline({ size = 36 }: { size?: number }) {
       aria-hidden="true"
     >
       <img
-        src="/mascot/idle.png"
+        src="/logo-mark.png"
         alt=""
-        width={Math.round(size * 1.12)}
-        height={Math.round(size * 1.12)}
         style={{
           display: 'block',
-          width: '112%',
-          height: '112%',
+          width: '74%',
+          height: '74%',
           objectFit: 'contain',
-          transform: 'translateY(2%)',
         }}
       />
     </span>
