@@ -34,7 +34,6 @@ import MobileSongPicker from '@/components/MobileSongPicker';
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
-import IntroScreen from '@/components/IntroScreen';
 import OnboardingGuide from '@/components/OnboardingGuide';
 import type { DesignTheme } from '@/components/Header';
 
@@ -65,9 +64,7 @@ export default function MobilePage() {
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본 가운데. 데스크탑과 동일하게 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
-  const [ccliNumber, setCcliNumber] = useState('');
-  const [licenseLabel, setLicenseLabel] = useState('');
-  const [includeCopyright, setIncludeCopyright] = useState(false);
+  // 저작권(CCLI) 상태 제거됨 — 한국 교회 미사용
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Auth + 디자인
@@ -200,12 +197,7 @@ export default function MobilePage() {
     setIntroSeen(true); // 항상 wizard 렌더(SSR 블랭크 깜빡임만 방지)
   }, []);
 
-  const dismissIntro = useCallback(() => {
-    try {
-      window.localStorage.setItem('intro-seen', '1');
-    } catch {}
-    setIntroSeen(true);
-  }, []);
+  // dismissIntro 제거됨 — IntroScreen 폐기. 첫 진입 표시는 위 useEffect에서 직접 처리.
   useEffect(() => {
     if (typeof document === 'undefined') return;
     document.documentElement.dataset.theme = designTheme;
@@ -596,14 +588,8 @@ export default function MobilePage() {
     }
     try {
       const fname = `contionote-${Date.now()}.pptx`;
-      const copyright: PptCopyrightInfo | undefined = includeCopyright
-        ? {
-            songTitles: songs.map((s) => s.title || 'Untitled'),
-            ccliNumber: ccliNumber.trim() || undefined,
-            licenseLabel: licenseLabel.trim() || undefined,
-          }
-        : undefined;
-      await exportToPptx(slides, pptFont, fname, pptTheme, copyright, pptVAlign);
+      // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -869,18 +855,11 @@ export default function MobilePage() {
             setPptTheme={setPptTheme}
             pptVAlign={pptVAlign}
             setPptVAlign={setPptVAlign}
-            includeCopyright={includeCopyright}
-            setIncludeCopyright={setIncludeCopyright}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
             onCopyShareLink={handleCopyShareLink}
             onDownloadOpenSong={handleSaveOpenSong}
             onDownloadPlainSlides={handleSavePlainSlides}
-            // 모바일은 교회 템플릿 모달이 없으므로 PptSection 안에서 인라인으로 CCLI 입력받게 함.
-            ccliNumber={ccliNumber}
-            setCcliNumber={setCcliNumber}
-            licenseLabel={licenseLabel}
-            setLicenseLabel={setLicenseLabel}
           />
         )}
       </main>

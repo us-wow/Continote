@@ -24,8 +24,6 @@ type PptSectionProps = {
   // 세로 정렬 — 상단/가운데/하단. 선택 즉시 미리보기와 PPT 출력에 함께 반영된다.
   pptVAlign: PptVAlign;
   setPptVAlign: (v: PptVAlign) => void;
-  includeCopyright: boolean;
-  setIncludeCopyright: (next: boolean) => void;
   onOpenPreview: () => void;
   onDownloadPptx: () => void;
   // "다른 형식으로 내보내기" — 토글 펼치면 보임
@@ -33,12 +31,6 @@ type PptSectionProps = {
   onDownloadOpenSong: () => void;
   onDownloadPlainSlides: () => void;
   busy?: boolean;
-  // 선택형 CCLI 입력 — 4개 prop 모두 넘어오고 includeCopyright가 켜졌을 때만 입력 폼 노출.
-  // 데스크톱은 교회 템플릿 모달에서 별도 입력하므로 안 넘기고, 모바일에서만 인라인으로 받게 한다.
-  ccliNumber?: string;
-  setCcliNumber?: (next: string) => void;
-  licenseLabel?: string;
-  setLicenseLabel?: (next: string) => void;
 };
 
 // swatch 배경 — 실제 PPT에 들어가는 색/이미지를 그대로 보여준다 (mock 그라데이션 X).
@@ -97,26 +89,13 @@ export default function PptSection({
   setPptTheme,
   pptVAlign,
   setPptVAlign,
-  includeCopyright,
-  setIncludeCopyright,
   onOpenPreview,
   onDownloadPptx,
   onCopyShareLink,
   onDownloadOpenSong,
   onDownloadPlainSlides,
   busy = false,
-  ccliNumber,
-  setCcliNumber,
-  licenseLabel,
-  setLicenseLabel,
 }: PptSectionProps) {
-  // 4개 prop 모두 들어왔을 때만 인라인 CCLI 입력 폼을 그린다(주로 모바일).
-  // 데스크톱은 교회 템플릿 모달에서 따로 입력받으므로 이 값이 undefined로 들어와 폼 미노출.
-  const canEditCopyrightInline =
-    typeof ccliNumber === 'string' &&
-    typeof setCcliNumber === 'function' &&
-    typeof licenseLabel === 'string' &&
-    typeof setLicenseLabel === 'function';
   const isEmpty = slideCount === 0;
   const [moreOpen, setMoreOpen] = useState(false);
 
