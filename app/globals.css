@@ -81,10 +81,10 @@
   --rule:         rgba(112, 115, 124, 0.22);
   --rule-2:       rgba(112, 115, 124, 0.40);
 
-  --accent:       #0066FF;
-  --accent-strong:#0048b5;
-  --accent-ink:   #0048b5;
-  --accent-tint:  #eaf2fe;
+  --accent:       #157a6e; /* 콘티노트 로고 틸 — 기존 파랑(#0066FF)에서 브랜드색으로 통일 */
+  --accent-strong:#0f5c53;
+  --accent-ink:   #0f5c53;
+  --accent-tint:  #e1f0ed;
 
   --positive:     #00bf40;
   --positive-tint:#e5f9ec;
@@ -271,6 +271,7 @@ a:focus-visible {
   color: var(--ink-3);
   box-shadow: none;
   cursor: not-allowed;
+  border: 1px solid var(--rule); /* 비활성이어도 '버튼' 형태는 유지 — 텍스트처럼 묻히지 않게 */
 }
 
 /* ── mockup의 통합 .btn 베이스 클래스 (Phase 2 컴포넌트에서 .btn .btn-primary 형태로 사용)
@@ -1891,6 +1892,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   border-radius: 999px;
   font-weight: 600;
 }
+.up-panel { --panel-accent: #3b82f6; }   /* 01 악보 — 블루 */
 .ex-panel { --panel-accent: #c98a2b; }   /* 02 곡 확인 — 앰버 */
 .ed-panel { --panel-accent: #157a6e; }   /* 03 콘티 — 틸(로고색) */
 .ppt-panel { --panel-accent: #5b53c7; }  /* 04 PPT — 보라 */

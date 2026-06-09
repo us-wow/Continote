@@ -61,10 +61,13 @@ export default function UploadSection({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="stack" style={{ ['--gap' as any]: '20px' }}>
+    <div className="stack up-panel" style={{ ['--gap' as any]: '20px' }}>
       <div>
-        <div className="label" style={{ marginBottom: 12 }}>
-          1. 악보 업로드
+        <div className="section-head">
+          <div className="left">
+            <span className="step-num-inline">01</span>
+            <h2>악보 업로드</h2>
+          </div>
         </div>
 
         <button
