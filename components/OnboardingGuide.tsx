@@ -247,60 +247,79 @@ export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
 
 const CARD = { width: 210, height: 130 };
 
-// 소개 — 악보 → 가사 → PPT 한 줄 흐름 (앱이 뭘 하는지 한눈에)
+// 소개 — 악보 → 가사 → PPT 한 줄 흐름. 셋을 모양·높이·색·라벨로 확실히 구분한다.
+//   악보 = 세로 종이 + 오선 + 음표 / 가사 = AI 배지+반짝이+글줄(오선 없음) / PPT = 가로 어두운 슬라이드
 function IllustOverview() {
+  const label = {
+    fill: 'var(--ink-2)',
+    textAnchor: 'middle' as const,
+    style: { font: "600 9px 'Pretendard Variable', sans-serif" },
+  };
   return (
-    <svg viewBox="0 0 210 130" width={CARD.width} height={CARD.height} aria-hidden="true">
-      {/* 1) 악보 카드 */}
-      <g transform="translate(6 42)">
-        <rect width="46" height="50" rx="5" fill="#fdfcf8" stroke="var(--rule)" strokeWidth="1" />
-        <g stroke="rgba(0,0,0,0.4)" strokeWidth="0.5">
-          <line x1="7" y1="12" x2="39" y2="12" />
-          <line x1="7" y1="17" x2="39" y2="17" />
-          <line x1="7" y1="22" x2="39" y2="22" />
+    <svg viewBox="0 0 220 140" width={210} height={140} aria-hidden="true">
+      {/* ── 1) 악보 — 세로 종이 + 오선 + 음표 (한눈에 '악보') ── */}
+      <g transform="translate(6 12)">
+        <rect width="52" height="70" rx="4" fill="#fdfcf8" stroke="var(--rule)" strokeWidth="1" />
+        <g stroke="rgba(0,0,0,0.38)" strokeWidth="0.7">
+          <line x1="8" y1="20" x2="44" y2="20" />
+          <line x1="8" y1="25" x2="44" y2="25" />
+          <line x1="8" y1="30" x2="44" y2="30" />
+          <line x1="8" y1="35" x2="44" y2="35" />
+          <line x1="8" y1="40" x2="44" y2="40" />
         </g>
-        <g fill="rgba(0,0,0,0.7)">
-          <circle cx="13" cy="20" r="2" />
-          <circle cx="23" cy="17" r="2" />
-          <circle cx="33" cy="21" r="2" />
+        <g fill="rgba(0,0,0,0.8)">
+          <ellipse cx="14" cy="36" rx="3" ry="2.1" transform="rotate(-20 14 36)" />
+          <rect x="16.4" y="24" width="0.9" height="12" />
+          <ellipse cx="25" cy="31" rx="3" ry="2.1" transform="rotate(-20 25 31)" />
+          <rect x="27.4" y="19" width="0.9" height="12" />
+          <ellipse cx="36" cy="38" rx="3" ry="2.1" transform="rotate(-20 36 38)" />
+          <rect x="38.4" y="26" width="0.9" height="12" />
         </g>
-        <g fill="rgba(0,0,0,0.3)">
-          <rect x="7" y="32" width="22" height="3" rx="1.5" />
-          <rect x="7" y="39" width="30" height="3" rx="1.5" />
+        <g fill="rgba(0,0,0,0.22)">
+          <rect x="8" y="50" width="30" height="3" rx="1.5" />
+          <rect x="8" y="57" width="24" height="3" rx="1.5" />
         </g>
       </g>
-      {/* 화살표 */}
+      <text x="32" y="98" {...label}>악보</text>
+
+      {/* 화살표 1 */}
       <g stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        <path d="M56 67 H70" />
-        <path d="M65 62 L70 67 L65 72" />
+        <path d="M62 47 H74" />
+        <path d="M69 42 L74 47 L69 52" />
       </g>
-      {/* 2) 가사 목록 카드 (AI) */}
-      <g transform="translate(76 42)">
-        <rect width="46" height="50" rx="5" fill="var(--surface)" stroke="var(--rule)" strokeWidth="1" />
-        <rect x="7" y="8" width="16" height="9" rx="4.5" fill="var(--accent)" />
-        <text x="15" y="14.5" textAnchor="middle" fill="#fff" style={{ font: "700 6px 'JetBrains Mono', monospace" }}>
+
+      {/* ── 2) 가사 — AI 배지 + 반짝이 + 글줄 (오선 없음 → '추출된 가사') ── */}
+      <g transform="translate(80 20)">
+        <rect width="54" height="56" rx="7" fill="var(--surface)" stroke="var(--rule)" strokeWidth="1" />
+        <rect x="8" y="8" width="20" height="12" rx="6" fill="var(--accent)" />
+        <text x="18" y="16.6" textAnchor="middle" fill="#fff" style={{ font: "700 7px 'JetBrains Mono', monospace" }}>
           AI
         </text>
-        <g fill="var(--ink)" opacity="0.75">
-          <rect x="7" y="24" width="32" height="3" rx="1.5" />
-          <rect x="7" y="31" width="26" height="3" rx="1.5" />
-          <rect x="7" y="38" width="30" height="3" rx="1.5" />
+        <path d="M42 9 l1.3 3.2 3.2 1.3 -3.2 1.3 -1.3 3.2 -1.3 -3.2 -3.2 -1.3 3.2 -1.3 z" fill="var(--accent)" opacity="0.65" />
+        <g fill="var(--ink)" opacity="0.8">
+          <rect x="8" y="29" width="38" height="3.6" rx="1.8" />
+          <rect x="8" y="37" width="30" height="3.6" rx="1.8" />
+          <rect x="8" y="45" width="35" height="3.6" rx="1.8" />
         </g>
       </g>
-      {/* 화살표 */}
+      <text x="107" y="98" {...label}>가사</text>
+
+      {/* 화살표 2 */}
       <g stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        <path d="M126 67 H140" />
-        <path d="M135 62 L140 67 L135 72" />
+        <path d="M138 47 H150" />
+        <path d="M145 42 L150 47 L145 52" />
       </g>
-      {/* 3) PPT 슬라이드 카드 */}
-      <g transform="translate(146 42)">
-        <rect width="50" height="50" rx="5" fill="var(--ink)" />
-        <circle cx="44" cy="8" r="9" fill="var(--accent)" opacity="0.3" />
+
+      {/* ── 3) PPT — 가로 어두운 슬라이드 (한눈에 '예배 화면') ── */}
+      <g transform="translate(154 30)">
+        <rect width="60" height="40" rx="4" fill="var(--ink)" />
+        <circle cx="52" cy="7" r="11" fill="var(--accent)" opacity="0.32" />
         <g fill="#fff">
-          <rect x="11" y="24" width="28" height="4" rx="2" />
-          <rect x="15" y="32" width="20" height="4" rx="2" />
+          <rect x="14" y="17" width="32" height="4.5" rx="2.25" />
+          <rect x="20" y="27" width="20" height="4.5" rx="2.25" />
         </g>
       </g>
+      <text x="184" y="98" {...label}>PPT</text>
     </svg>
   );
 }
