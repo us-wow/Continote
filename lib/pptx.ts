@@ -289,33 +289,7 @@ export async function exportToPptx(
     });
   }
 
-  if (copyright && copyright.songTitles.length > 0) {
-    const slide = pres.addSlide();
-    applyThemeBackground(slide);
-    const licenseInfo = [
-      copyright.ccliNumber ? `CCLI ${copyright.ccliNumber}` : '',
-      copyright.licenseLabel ?? '',
-    ].filter(Boolean).join(' · ');
-    const text = licenseInfo
-      ? `${copyright.songTitles.join('\n')}\n${licenseInfo}`
-      : copyright.songTitles.join('\n');
-
-    // 한국 교회 관행상 PPT 마지막에 곡 정보 표기. 사용자가 입력 안 하면 자동으로 곡 제목만
-    slide.addText(text, {
-      x: 0.5,
-      y: 0.5,
-      w: 12.333,
-      h: 6.5,
-      align: 'center',
-      valign: 'middle',
-      color: config.text,
-      fontFace: FONT_FACE_MAP[font],
-      fontSize: 18,
-      paraSpaceAfter: 8,
-      bold: false,
-      fit: 'shrink',
-    });
-  }
+  // 저작권(CCLI) 슬라이드 제거됨 — 한국 교회는 거의 안 써서. copyright 파라미터는 호환 위해 남겨두고 미사용.
 
   // 브라우저 환경에서는 pptxgenjs의 writeFile이 다운로드 처리를 맡는다.
   await pres.writeFile({ fileName });

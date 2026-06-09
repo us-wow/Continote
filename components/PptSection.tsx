@@ -222,71 +222,7 @@ export default function PptSection({
           </div>
         </div>
 
-        {/* 저작권 슬라이드 토글 */}
-        <div className="ppt-ctrl-block">
-          <div className="ppt-toggle-row">
-            <button
-              type="button"
-              className="toggle-pill"
-              role="switch"
-              aria-checked={includeCopyright}
-              data-on={includeCopyright}
-              onClick={() => setIncludeCopyright(!includeCopyright)}
-            />
-            <div className="ppt-toggle-text">
-              <div className="ppt-toggle-title">저작권 슬라이드 포함</div>
-              <div className="ppt-toggle-sub">PPT 마지막에 곡 제목 + CCLI 번호 자동 표시</div>
-            </div>
-          </div>
-          {/* 인라인 CCLI 입력 — 모바일처럼 별도 템플릿 모달이 없는 환경에서 직접 입력받기 위한 폼.
-              4개 prop이 모두 넘어오고 토글이 켜졌을 때만 렌더. 데스크톱은 prop 미전달로 자동 미노출. */}
-          {canEditCopyrightInline && includeCopyright && (
-            <div
-              style={{
-                marginTop: 10,
-                display: 'grid',
-                gap: 8,
-                paddingLeft: 4,
-              }}
-            >
-              <label style={{ display: 'grid', gap: 4, fontSize: 12.5 }}>
-                <span style={{ color: 'var(--ink-3)' }}>CCLI 번호 (선택)</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="예: 1234567"
-                  value={ccliNumber}
-                  onChange={(e) => setCcliNumber!(e.target.value)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 6,
-                    border: '1px solid var(--rule)',
-                    background: 'var(--surface, #fff)',
-                    color: 'var(--ink)',
-                    fontSize: 14,
-                  }}
-                />
-              </label>
-              <label style={{ display: 'grid', gap: 4, fontSize: 12.5 }}>
-                <span style={{ color: 'var(--ink-3)' }}>라이선스 표기 (선택)</span>
-                <input
-                  type="text"
-                  placeholder="예: 사용허가 받음"
-                  value={licenseLabel}
-                  onChange={(e) => setLicenseLabel!(e.target.value)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 6,
-                    border: '1px solid var(--rule)',
-                    background: 'var(--surface, #fff)',
-                    color: 'var(--ink)',
-                    fontSize: 14,
-                  }}
-                />
-              </label>
-            </div>
-          )}
-        </div>
+        {/* 저작권 슬라이드 토글·CCLI 입력 제거됨 (한국 교회는 거의 안 써서) */}
       </div>
 
       {/* 미리보기 / PPT 다운로드 */}
