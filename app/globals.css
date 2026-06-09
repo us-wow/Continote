@@ -1581,8 +1581,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   font-weight: 500;
 }
 .ppt-font-rec {
-  display: inline-block;
-  margin-top: 4px;
+  position: absolute; /* 흐름에서 빼서 박스 높이를 안 키움 → 폰트 4박스 높이 균일 */
+  top: 8px;
+  right: 8px;
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--positive-tint);

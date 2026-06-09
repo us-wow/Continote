@@ -154,7 +154,7 @@ export default function Home() {
   // 정확도 우선 모드는 서버 분석 프롬프트를 더 보수적으로 쓰게 하므로, 업로드/붙여넣기 요청에 함께 전달한다.
   const [accuracyMode, setAccuracyMode] = useState(false);
   // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
-  // 기본 폰트는 '본명조 Pro' — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
+  // 기본 폰트는 '본명조'(Noto Serif KR) — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
   const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
   // PPT 배경 테마 — 어두운 예배실 기본은 검정.
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');

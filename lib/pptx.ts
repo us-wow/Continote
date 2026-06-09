@@ -6,7 +6,7 @@ export type PptFont = 'nanum-myeongjo' | 'noto-serif-kr' | 'nanum-square' | 'not
 // 폰트 표시 라벨 (UI에서 사용)
 export const PPT_FONT_LABELS: Record<PptFont, string> = {
   'nanum-myeongjo': '나눔명조',
-  'noto-serif-kr': '본명조 Pro',
+  'noto-serif-kr': '본명조',
   'nanum-square': '나눔스퀘어',
   'noto-sans-kr': '본고딕',
 };

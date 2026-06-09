@@ -7,7 +7,7 @@
 //
 // 컨트롤:
 //   - 테마 6종 (검정/흰색/종이/초원/십자가/성경책)
-//   - 폰트 4종 (본명조 Pro 추천)
+//   - 폰트 4종 (본명조 추천)
 //   - 저작권 슬라이드 토글 (CCLI 자동 표시)
 //   - 미리보기 / PPT 다운로드
 //   - "다른 형식으로 내보내기" → 공유 링크 / OpenSong / Plain Slides 등 보조 출구
@@ -77,11 +77,13 @@ const VALIGN_ICON: Record<PptVAlign, string> = { top: '↑', middle: '↕', bott
 // 추천 폰트 — 한글 호환성 최고
 const RECOMMENDED_FONT: PptFont = 'noto-serif-kr';
 
+// 각 옵션 라벨을 실제 폰트로 보여준다(레이아웃의 웹폰트 로드 기준). 폴백도 같은 계열.
+// 예전엔 나눔명조→Noto Serif, 나눔스퀘어/본고딕→Pretendard로 잘못 매핑돼 라벨이 다 비슷해 보였음.
 const FONT_FAMILY_PREVIEW: Record<PptFont, string> = {
   'noto-serif-kr': "'Noto Serif KR', serif",
-  'nanum-myeongjo': "'Noto Serif KR', serif",
-  'nanum-square': "'Pretendard Variable', sans-serif",
-  'noto-sans-kr': "'Pretendard Variable', sans-serif",
+  'nanum-myeongjo': "'Nanum Myeongjo', 'Noto Serif KR', serif",
+  'nanum-square': "'NanumSquare', 'Noto Sans KR', sans-serif",
+  'noto-sans-kr': "'Noto Sans KR', sans-serif",
 };
 
 export default function PptSection({

@@ -158,7 +158,7 @@ export default function DetailedManual({ onClose }: { onClose: () => void }) {
         <Section title="4단계 · PPT 만들기">
           <List
             items={[
-              <><b>배경</b>(검정·흰색·종이 + 홀리 3종 + 사진 3종), <b>글꼴</b>(4종, 본명조 Pro 추천), <b>세로 정렬</b>(위·가운데·아래)을 골라요. 고르면 미리보기와 PPT에 바로 반영돼요.</>,
+              <><b>배경</b>(검정·흰색·종이 + 홀리 3종 + 사진 3종), <b>글꼴</b>(4종, 본명조 추천), <b>세로 정렬</b>(위·가운데·아래)을 골라요. 고르면 미리보기와 PPT에 바로 반영돼요.</>,
               <><b>전체 미리보기</b>로 모든 슬라이드를 한눈에 확인해요.</>,
               <><b>PPT 다운로드</b>를 누르면 .pptx 파일이 만들어져요.</>,
               <>다른 도구용이 필요하면 <b>다른 형식으로 내보내기</b> — 공유 링크 · Plain Slides · OpenSong.</>,
@@ -188,7 +188,7 @@ export default function DetailedManual({ onClose }: { onClose: () => void }) {
             ]}
           />
           <p style={{ margin: '12px 0 4px' }}><b>PPT를 열었더니 글씨체가 달라 보여요.</b></p>
-          <p style={{ margin: 0 }}>그 컴퓨터에 같은 글꼴이 깔려 있어야 똑같이 보여요. 본명조 Pro가 가장 잘 맞아요.</p>
+          <p style={{ margin: 0 }}>그 컴퓨터에 같은 글꼴이 깔려 있어야 똑같이 보여요. 본명조가 가장 잘 맞아요.</p>
           <p style={{ margin: '12px 0 4px' }}><b>한 슬라이드가 너무 꽉 차요.</b></p>
           <p style={{ margin: 0 }}>4줄이 넘으면 빨간 표시가 떠요. 빈 줄로 나누면 되고, 그래도 길면 글씨가 자동으로 줄어 한 화면에 담겨요.</p>
         </Section>
