@@ -74,6 +74,9 @@ export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
           background: 'var(--paper)',
           width: '100%',
           maxWidth: 420,
+          // 작은/낮은 화면(모바일 가로 등)에서 내용이 넘치면 카드 안에서 스크롤되게.
+          maxHeight: '90vh',
+          overflowY: 'auto',
           borderRadius: 14,
           padding: '20px 22px 18px',
           position: 'relative',

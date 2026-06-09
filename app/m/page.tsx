@@ -184,15 +184,20 @@ export default function MobilePage() {
     } catch {}
   }, []);
 
-  // ----- 인트로 게이트 — 처음 들어왔으면 IntroScreen, 한 번 본 적 있으면 wizard 직행 -----
+  // ----- 첫 진입 게이트 — 처음 온 사람에겐 사용법 캐러셀을 한 번 띄운다 -----
+  // 예전엔 별도 IntroScreen 전체화면을 띄웠지만, 이제 OnboardingGuide 캐러셀로 통일.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const seen = window.localStorage.getItem('intro-seen');
-      setIntroSeen(seen === '1');
+      if (seen !== '1') {
+        setShowGuide(true); // 첫 방문 → 캐러셀 자동 열기
+        window.localStorage.setItem('intro-seen', '1');
+      }
     } catch {
-      setIntroSeen(true); // localStorage 차단 환경에선 그냥 wizard로
+      // localStorage 차단 환경 → 캐러셀 생략하고 바로 wizard
     }
+    setIntroSeen(true); // 항상 wizard 렌더(SSR 블랭크 깜빡임만 방지)
   }, []);
 
   const dismissIntro = useCallback(() => {
@@ -662,33 +667,17 @@ export default function MobilePage() {
     return <div className="m-app" />;
   }
 
-  // 첫 진입(또는 사용자가 명시적으로 인트로 다시 보기) → IntroScreen
-  if (introSeen === false) {
-    return (
-      <IntroScreen
-        theme={designTheme}
-        onChangeTheme={setDesignTheme}
-        onStart={dismissIntro}
-        onGoogleSignIn={handleSignIn}
-        authBusy={authBusy}
-        authUser={authUser}
-        supabaseEnabled={isSupabaseConfigured()}
-      />
-    );
-  }
-
   return (
     <div className="m-app">
       {/* ===== Top Bar — 미니 헤더 ===== */}
       <header className="m-header">
-        {/* 브랜드 클릭 → 인트로 화면으로 돌아감 (localStorage는 그대로 두고 introSeen만 false로).
-            "시작하기" 다시 눌러도 어차피 dismissIntro가 동일 값으로 setItem해서 무해. */}
+        {/* 브랜드(로고) 클릭 → 사용법 캐러셀 다시 보기 */}
         <button
           type="button"
           className="m-brand m-brand-button"
-          onClick={() => setIntroSeen(false)}
-          aria-label="초기화면으로 돌아가기"
-          title="콘티노트 인트로로"
+          onClick={() => setShowGuide(true)}
+          aria-label="사용법 보기"
+          title="사용법 다시 보기"
         >
           <BrandMark size={28} />
           <span className="m-brand-name">콘티노트</span>
@@ -725,10 +714,6 @@ export default function MobilePage() {
       {menuOpen && (
         <MobileMenuSheet
           onClose={() => setMenuOpen(false)}
-          onBackToIntro={() => {
-            setMenuOpen(false);
-            setIntroSeen(false);
-          }}
           onOpenGuide={() => {
             setMenuOpen(false);
             setShowGuide(true);
@@ -942,7 +927,6 @@ export default function MobilePage() {
 // ────────────────────────────────────────────────────────────────────────
 function MobileMenuSheet({
   onClose,
-  onBackToIntro,
   onOpenGuide,
   onSwapToDesktop,
   authUser,
@@ -952,7 +936,6 @@ function MobileMenuSheet({
   supabaseEnabled,
 }: {
   onClose: () => void;
-  onBackToIntro: () => void;
   onOpenGuide: () => void;
   onSwapToDesktop: () => void;
   authUser: User | null;
@@ -989,10 +972,7 @@ function MobileMenuSheet({
         </div>
 
         <div className="m-sheet-list">
-          <button type="button" className="m-sheet-item" onClick={onBackToIntro}>
-            <span className="m-sheet-item-label">콘티노트 인트로</span>
-            <span className="m-sheet-item-sub">처음 화면으로 돌아가기</span>
-          </button>
+          {/* "콘티노트 인트로" 항목 제거 — IntroScreen 폐기, 사용법은 아래 "사용법 보기"로 일원화 */}
           <button type="button" className="m-sheet-item" onClick={onSwapToDesktop}>
             <span className="m-sheet-item-label">데스크탑으로 보기</span>
             <span className="m-sheet-item-sub">큰 화면(2단 레이아웃)으로 전환</span>
