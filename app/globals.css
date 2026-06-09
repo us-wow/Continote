@@ -1288,6 +1288,114 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   from { opacity: 0; transform: translateY(-3px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ── 슬라이드 순서·삭제 (3번 콘티 편집 보조, 펼침형) ── */
+.slide-reorder {
+  margin-top: 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+.slide-reorder-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  user-select: none;
+}
+.slide-reorder-summary::-webkit-details-marker {
+  display: none;
+}
+.slide-reorder-count {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.slide-reorder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.slide-reorder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+.slide-reorder-num {
+  flex-shrink: 0;
+  min-width: 20px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+.slide-reorder-kind {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+.slide-reorder-kind.kind-memo {
+  background: color-mix(in oklab, #8a5fa6 18%, transparent);
+  color: #6b4585;
+}
+.slide-reorder-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slide-reorder-acts {
+  flex-shrink: 0;
+  display: inline-flex;
+  gap: 3px;
+}
+.slide-reorder-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 120ms;
+}
+.slide-reorder-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+.slide-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.slide-reorder-del:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+}
 .sec-add-menu {
   border: 1.5px solid var(--accent);
   background: var(--surface);

@@ -61,6 +61,7 @@ import Header, { type DesignTheme } from '@/components/Header';
 import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
 import EditorSection from '@/components/EditorSection';
+import SlideReorder from '@/components/SlideReorder';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
 import {
@@ -1180,6 +1181,8 @@ export default function Home() {
             onDownloadDocx={handleSaveDocx}
             overflowSlideIndices={overflowSlideIndices}
           />
+          {/* 슬라이드 순서 바꾸기·삭제 — 편집창 바로 아래 (펼침형) */}
+          <SlideReorder text={text} setText={setText} />
         </div>
 
         {/* Row 3: 04 PPT 만들기 */}
