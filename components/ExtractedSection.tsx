@@ -389,7 +389,7 @@ function SplitMode({
   return (
     <div className="song-split">
       <div className="song-split-hint">
-        가사를 <b>빈 줄(엔터 두 번)</b>로 나눠요. 빈 줄 위가 한 묶음(=칩 하나)이 됩니다. (절·후렴 몰라도 됨)
+        <b>빈 줄</b>로 나눠요 — 빈 줄 위가 한 묶음(=칩 하나)이 됩니다.
       </div>
       <textarea
         ref={taRef}

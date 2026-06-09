@@ -122,29 +122,18 @@ export async function removeFromLibraryAsync(id: string): Promise<void> {
   if (error) console.error('[song-cloud] remove 실패:', error.message);
 }
 
-// 첫 로그인 마이그레이션 — 클라우드 곡이 0개일 때만 localStorage 곡들을 통째 업로드.
+// 로그인 마이그레이션 — localStorage 곡들을 클라우드로 "병합" 업로드.
+// (예전엔 "클라우드가 비었을 때만" 올려서, 한 번이라도 로그인했던 계정은 로컬 곡이 누락됐음.
+//  이제 클라우드에 데이터가 있어도 항상 병합한다.)
 export async function migrateSongLibraryToCloud(): Promise<{ migrated: number }> {
   const userId = await getCurrentUserId();
   if (!userId) return { migrated: 0 };
-  const sb = getSupabaseClient()!;
-  const { count } = await sb
-    .from('songs')
-    .select('id', { count: 'exact', head: true });
-  if ((count ?? 0) > 0) return { migrated: 0 };
 
   const local = listLocal();
   if (local.length === 0) return { migrated: 0 };
 
-  const rows = local.map((s) => ({
-    user_id: userId,
-    title: s.title || 'Untitled',
-    sections: s.sections,
-    created_at: new Date(s.savedAt).toISOString(),
-  }));
-  const { error } = await sb.from('songs').insert(rows);
-  if (error) {
-    console.error('[song-cloud] migrate 실패:', error.message);
-    return { migrated: 0 };
-  }
+  // addToLibraryAsync가 제목 매칭으로 update/insert를 처리 → 클라우드 상태와 무관하게
+  // 로컬 곡이 전부 올라가고, 같은 제목은 갱신되어 중복이 안 생긴다.
+  await addToLibraryAsync(local);
   return { migrated: local.length };
 }
