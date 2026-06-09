@@ -460,7 +460,8 @@ export default function Home() {
         if (!data.songs?.length) {
           showToast('가사를 찾을 수 없어요');
         } else {
-          setSongs((prev) => [...prev, ...data.songs]);
+          // confirmed:false → "나누기 모드"로 시작. 사용자가 빈 줄로 묶음을 직접 나눈 뒤 확정한다.
+          setSongs((prev) => [...prev, ...data.songs.map((s: Song) => ({ ...s, confirmed: false }))]);
           // 라이브러리 누적은 fire-and-forget — 사용자가 결과를 보는 흐름은 막지 않는다.
           // 실패 시 console에 남고 토스트는 별도로 안 띄움(부수 효과라 덜 중요).
           void addToLibraryAsync(data.songs);
@@ -528,7 +529,8 @@ export default function Home() {
       if (!data.songs?.length) {
         showToast('가사를 찾을 수 없어요');
       } else {
-        setSongs((prev) => [...prev, ...data.songs]);
+        // confirmed:false → "나누기 모드"로 시작 (사용자가 직접 묶음을 나눈 뒤 확정).
+        setSongs((prev) => [...prev, ...data.songs.map((s: Song) => ({ ...s, confirmed: false }))]);
         // 라이브러리 누적은 fire-and-forget — 결과 표시를 막지 않는다.
         void addToLibraryAsync(data.songs);
         // 오타 검토 시 다시 보내야 하므로 추출 시점 이미지를 메모리에 캐싱.
@@ -674,10 +676,10 @@ export default function Home() {
   };
 
   // 빈 곡 추가 — 추출 없이 사용자가 직접 가사를 입력하는 경로.
-  // 자동으로 카드가 펼쳐지고 제목 편집 모드로 시작하도록 ExtractedSection 안에서 처리.
+  // confirmed:false → 나누기 모드(빈 편집창)로 시작. 사용자가 가사를 붙여넣고 빈 줄로 나눈 뒤 확정.
   const addEmptySong = () => {
-    setSongs((prev) => [...prev, { title: '새 곡', sections: [] }]);
-    showToast('빈 곡 추가됨 — 제목을 클릭해 수정하세요');
+    setSongs((prev) => [...prev, { title: '새 곡', sections: [], confirmed: false }]);
+    showToast('빈 곡 추가됨 — 가사를 붙여넣고 빈 줄로 나눠보세요');
   };
 
   // 곡 단위 갱신 — ExtractedSection 안 인라인 편집(제목/섹션/+추가/삭제)에서 호출.

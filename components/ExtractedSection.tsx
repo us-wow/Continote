@@ -1,19 +1,22 @@
 'use client';
 
-// 2번 영역 — 추출된 곡 (인라인 편집 + 새 섹션 추가)
+// 2번 영역 — 추출된 곡
 //
-// 핵심 동작 (PRD "고정" 사항 #2 #3):
-//   - 곡 제목 클릭 → 인라인 input 편집 (Enter/blur로 저장, ESC로 취소)
-//   - 세션 라벨 클릭 → 인라인 input 편집
-//   - ✎ 아이콘 클릭 → textarea 편집 모드 (라벨 + 가사 통째 수정)
-//   - 칩 본문 클릭 → 콘티에 chunk append (반복 가능 — 후렴 4번이면 4번 클릭)
-//   - "+ 새 섹션 추가" → 6종 라벨 메뉴 → 빈 가사 새 카드 즉시 편집 모드
-//   - 곡 카드 ✕ → 곡 단위 삭제 (confirm)
+// 두 모드로 동작한다 (song.confirmed로 구분):
+//   ① 나누기 모드 (confirmed === false)
+//      - AI가 분류 없이 뽑아준 가사를 편집창에 보여준다.
+//      - 사용자가 빈 줄(엔터 두 번)로 "묶음"을 직접 나눈다 — 음악용어(verse/chorus) 몰라도 됨.
+//      - [확정] 누르면 묶음들이 칩이 되고 칩 모드로 전환.
+//   ② 칩 모드 (confirmed !== false)
+//      - 나뉜 묶음을 칩으로 보여준다. 칩 본문 클릭 → 콘티에 추가(반복 가능).
+//      - ✎ 로 한 묶음 가사 수정, 🗑 로 삭제. "다시 나누기"로 ①로 복귀.
 //
-// AI 정확도 보완용. 사용자가 모든 부분을 직접 수정/추가할 수 있어야 함.
+// 왜 이렇게 바꿨나(사용자 의도): AI 분류는 오류가 잦은데, 한국어 서툰 아이들이
+// 잘못 분류된 칩을 지우고·옮기고·고치는 게 너무 힘들다. 그래서 분류 단계를 없애고
+// "사람이 엔터로 직접 나누기"로 단순화했다. AI는 가사 OCR + 줄 정리만 한다.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Section, SectionType, Song } from '@/lib/types';
+import type { Section, Song } from '@/lib/types';
 import { sectionToText, docHasSongTitle } from '@/lib/text-doc';
 import Mascot from '@/components/Mascot';
 
@@ -24,29 +27,27 @@ type ExtractedSectionProps = {
   // 곡 단위 조작
   onUpdateSong: (idx: number, next: Song) => void;
   onRemoveSong: (idx: number) => void;
-  // 맨 아래 "+ 새 곡 추가" — 빈 곡을 만들고 즉시 제목 편집 모드. 사용자가 직접 가사 입력하는 흐름.
+  // 맨 아래 "+ 새 곡 추가" — 빈 곡을 만들고 나누기 모드로 시작.
   onAddEmptySong: () => void;
   // 오타 검토 — 추출 결과를 AI로 한 번 더 검증해서 의심 substring 표시.
   // suspectMap[songIdx][sectionIdx] = ["주꼐", "사 랑하다"] 형태.
-  // 무시해도 PPT 생성에 문제 X — 단지 사용자 검토 도움용.
   suspectMap: Record<number, Record<number, string[]>>;
   onVerifyLyrics: () => void;
   verifying: boolean;
 };
 
-const SECTION_TYPE_OPTIONS: { type: SectionType; label: string }[] = [
-  { type: 'verse', label: 'Verse' },
-  { type: 'prechorus', label: 'Pre-Chorus' },
-  { type: 'chorus', label: 'Chorus' },
-  { type: 'bridge', label: 'Bridge' },
-  { type: 'ending', label: 'Ending' },
-  { type: 'intro', label: 'Intro' },
-];
-
 // chip 클릭 시 EditorSection이 받을 커스텀 이벤트 dispatch
 function dispatchAppend(chunk: string) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('conti:append', { detail: { chunk } }));
+}
+
+// 빈 줄(엔터 두 번) 기준으로 가사를 묶음으로 쪼갠다 — text-doc의 buildSlidesFromText와 같은 규칙.
+function splitIntoBlocks(text: string): string[] {
+  return text
+    .split(/\n[ \t]*\n+/)
+    .map((b) => b.replace(/^\n+|\n+$/g, '').trimEnd())
+    .filter((b) => b.trim().length > 0);
 }
 
 export default function ExtractedSection({
@@ -93,7 +94,7 @@ export default function ExtractedSection({
           </button>
           {totalSuspects > 0 && (
             <span className="ex-verify-result">
-              빨간 점이 있는 섹션에 {totalSuspects}건 의심
+              빨간 점이 있는 묶음에 {totalSuspects}건 의심
             </span>
           )}
         </div>
@@ -107,7 +108,6 @@ export default function ExtractedSection({
             <SongCard
               key={i}
               song={song}
-              songIdx={i}
               docText={text}
               onUpdate={(next) => onUpdateSong(i, next)}
               onRemove={() => onRemoveSong(i)}
@@ -139,7 +139,7 @@ function ExtractingState() {
       <div style={{ textAlign: 'center' }}>
         <div className="ex-extracting-title">가사를 읽고 있어요</div>
         <div className="mono" style={{ fontSize: 12, marginTop: 3, color: 'var(--ink-3)' }}>
-          OCR · 가사 정리 · 섹션 라벨링 중…
+          OCR · 가사 정리 중…
         </div>
       </div>
       <div className="ex-progress" aria-hidden="true">
@@ -163,18 +163,16 @@ function EmptyExtracted() {
 
 function SongCard({
   song,
-  songIdx,
   docText,
   onUpdate,
   onRemove,
   sectionSuspects,
 }: {
   song: Song;
-  songIdx: number;
   docText: string;
   onUpdate: (next: Song) => void;
   onRemove: () => void;
-  // 이 곡의 섹션별 의심 substring 목록 — 빨간 점 + 편집 모드 빨간 밑줄 트리거.
+  // 이 곡의 묶음별 의심 substring 목록 — 빨간 점 + 편집 모드 빨간 밑줄 트리거.
   sectionSuspects: Record<number, string[]>;
 }) {
   // 카드 접기/펼치기 — 기본 펼침
@@ -182,16 +180,14 @@ function SongCard({
   // 제목 인라인 편집
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(song.title);
-  // "+ 새 섹션 추가" 메뉴 표시 여부
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
   // 외부 song.title이 바뀌면 draft도 동기화
   useEffect(() => {
     setTitleDraft(song.title);
   }, [song.title]);
 
-  // 새 섹션 카드 ID 추적 — 추가 직후 자동으로 편집 모드 진입시키려고
-  const [newSectionIdx, setNewSectionIdx] = useState<number | null>(null);
+  // confirmed === false 면 나누기 모드. (undefined/true는 칩 모드 — 라이브러리/저장본 호환)
+  const splitMode = song.confirmed === false;
 
   const updateSection = (secIdx: number, patch: Partial<Section>) => {
     onUpdate({
@@ -200,23 +196,11 @@ function SongCard({
     });
   };
   const deleteSection = (secIdx: number) => {
-    if (!confirm('이 섹션을 삭제할까요?')) return;
+    if (!confirm('이 묶음을 삭제할까요?')) return;
     onUpdate({
       ...song,
       sections: song.sections.filter((_, i) => i !== secIdx),
     });
-  };
-  const addSection = (type: SectionType) => {
-    const meta = SECTION_TYPE_OPTIONS.find((t) => t.type === type) || SECTION_TYPE_OPTIONS[0];
-    const newSection: Section = {
-      type,
-      label: meta.label,
-      verseNum: null,
-      text: '',
-    };
-    onUpdate({ ...song, sections: [...song.sections, newSection] });
-    setNewSectionIdx(song.sections.length); // 추가된 카드 인덱스 → 자동 편집 모드
-    setShowAddMenu(false);
   };
 
   const saveTitle = () => {
@@ -230,6 +214,12 @@ function SongCard({
     onRemove();
   };
 
+  // 나누기 모드 편집창의 초기 텍스트 — 현재 묶음들을 빈 줄로 이어붙인 것.
+  const splitInitialText = song.sections
+    .map((s) => s.text)
+    .filter((t) => t && t.trim())
+    .join('\n\n');
+
   return (
     <article className="song-card">
       <header className="song-card-head">
@@ -240,8 +230,6 @@ function SongCard({
           aria-expanded={open}
           aria-label={`${song.title} 펼치기`}
         >
-          {/* SVG 셰브론 — 폰트 의존 glyph(▾)가 작아 보이는 문제 해결.
-              펼침: 아래로(0deg) / 접힘: 오른쪽으로(-90deg) */}
           <svg
             width="14"
             height="14"
@@ -295,7 +283,9 @@ function SongCard({
               {song.title || 'Untitled'}
             </h3>
           )}
-          <div className="song-card-meta mono">{song.sections.length}개 섹션</div>
+          <div className="song-card-meta mono">
+            {splitMode ? '나누는 중' : `${song.sections.length}개 묶음`}
+          </div>
         </div>
         <button
           type="button"
@@ -317,105 +307,166 @@ function SongCard({
         </button>
       </header>
 
-      {open && (
-        <>
-          <div className="song-sections">
-            {song.sections.map((sec, secIdx) => (
-              <SectionChipCard
-                key={secIdx}
-                section={sec}
-                forceEdit={newSectionIdx === secIdx}
-                suspects={sectionSuspects[secIdx] || []}
-                onAdd={() => {
-                  const includeTitle = !docHasSongTitle(docText, song.title);
-                  dispatchAppend(sectionToText(song, sec, includeTitle));
-                }}
-                onUpdate={(patch) => {
-                  updateSection(secIdx, patch);
-                  if (newSectionIdx === secIdx) setNewSectionIdx(null);
-                }}
-                onDelete={() => deleteSection(secIdx)}
-                onCancelNew={() => setNewSectionIdx(null)}
-              />
-            ))}
-          </div>
-
-          {/* + 새 섹션 추가 — AI가 놓친 섹션을 사용자가 직접 추가 */}
-          <div className="song-add-section">
-            {showAddMenu ? (
-              <div className="sec-add-menu">
-                <div className="sec-add-menu-head label">새 섹션 종류 선택</div>
-                <div className="sec-add-menu-grid">
-                  {SECTION_TYPE_OPTIONS.map((t) => (
-                    <button
-                      key={t.type}
-                      type="button"
-                      className={`sec-add-opt sec-${t.type}`}
-                      onClick={() => addSection(t.type)}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+      {open &&
+        (splitMode ? (
+          <SplitMode
+            key={splitInitialText}
+            initialText={splitInitialText}
+            onConfirm={(sections) => onUpdate({ ...song, sections, confirmed: true })}
+          />
+        ) : (
+          <>
+            <div className="song-sections">
+              {song.sections.length === 0 ? (
+                <div className="sec-line sec-line-empty" style={{ padding: '6px 2px' }}>
+                  아직 묶음이 없어요. 아래 “다시 나누기”로 가사를 나눠보세요.
                 </div>
-                <button
-                  type="button"
-                  className="sec-add-cancel"
-                  onClick={() => setShowAddMenu(false)}
-                >
-                  취소
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn-add-section"
-                onClick={() => setShowAddMenu(true)}
-              >
-                + 새 섹션 추가
-              </button>
-            )}
-          </div>
-        </>
-      )}
+              ) : (
+                song.sections.map((sec, secIdx) => (
+                  <SectionChipCard
+                    key={secIdx}
+                    index={secIdx + 1}
+                    section={sec}
+                    suspects={sectionSuspects[secIdx] || []}
+                    onAdd={() => {
+                      const includeTitle = !docHasSongTitle(docText, song.title);
+                      dispatchAppend(sectionToText(song, sec, includeTitle));
+                    }}
+                    onUpdate={(patch) => updateSection(secIdx, patch)}
+                    onDelete={() => deleteSection(secIdx)}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* 다시 나누기 — 묶음을 추가/수정/재분할하고 싶을 때 나누기 모드로 복귀 */}
+            <button
+              type="button"
+              className="btn-resplit"
+              onClick={() => onUpdate({ ...song, confirmed: false })}
+            >
+              ✂ 다시 나누기
+            </button>
+          </>
+        ))}
     </article>
   );
 }
 
+// 나누기 모드 — 가사를 편집창에 보여주고 빈 줄로 묶음을 직접 나눈다.
+function SplitMode({
+  initialText,
+  onConfirm,
+}: {
+  initialText: string;
+  onConfirm: (sections: Section[]) => void;
+}) {
+  const [draft, setDraft] = useState(initialText);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // textarea 높이 자동 — 가사 양에 맞춰 늘어나게.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.max(160, ta.scrollHeight) + 'px';
+  }, [draft]);
+
+  // 미리보기용 — 빈 줄로 나뉜 묶음 개수/내용.
+  const blocks = splitIntoBlocks(draft);
+
+  const handleConfirm = () => {
+    // 각 묶음을 중립 Section으로 (type/label은 화면에 안 쓰는 기본값).
+    const sections: Section[] = blocks.map((text) => ({
+      type: 'verse',
+      label: '',
+      verseNum: null,
+      text,
+    }));
+    onConfirm(sections);
+  };
+
+  return (
+    <div className="song-split">
+      <div className="song-split-hint">
+        가사를 <b>빈 줄(엔터 두 번)</b>로 나눠요. 빈 줄 위가 한 묶음(=칩 하나)이 됩니다. (절·후렴 몰라도 됨)
+      </div>
+      <textarea
+        ref={taRef}
+        className="song-split-textarea"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        spellCheck={false}
+        placeholder={
+          '가사를 붙여넣고, 나눌 곳에서 엔터를 두 번 치세요.\n\n예)\n주 사랑이 내려와\n내 맘에 가득해\n\n할렐루야 주를 찬양해\n온 맘 다해 노래해'
+        }
+      />
+      {/* 라이브 미리보기 — 빈 줄로 나뉜 묶음이 실시간으로 똭똭 갈라져 보인다.
+          key={i}라 묶음 개수가 늘 때 새로 생긴 카드만 등장 애니메이션이 돌아 "똭" 느낌이 난다. */}
+      <div className="song-split-preview">
+        <div className="song-split-preview-head label">
+          이렇게 나뉘어요 · <b>{blocks.length}개 묶음</b>
+        </div>
+        {blocks.length === 0 ? (
+          <div className="song-split-empty">가사를 입력하면 여기에 묶음이 나타나요</div>
+        ) : (
+          <div className="song-split-blocks">
+            {blocks.map((b, i) => (
+              <div className="song-split-block" key={i}>
+                <span className="sec-num">{i + 1}</span>
+                <div className="song-split-block-lines">
+                  {b.split('\n').map((l, j) => (
+                    <div key={j} className="song-split-block-line">
+                      {l.trim() || ' '}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="song-split-foot">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleConfirm}
+          disabled={blocks.length === 0}
+          style={{ width: '100%' }}
+        >
+          ✓ 이대로 나누기 확정 ({blocks.length}묶음)
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SectionChipCard({
+  index,
   section,
-  forceEdit,
   suspects,
   onAdd,
   onUpdate,
   onDelete,
-  onCancelNew,
 }: {
+  // 칩 순서 번호 (1부터). 음악용어 대신 번호 + 가사 미리보기로 식별한다.
+  index: number;
   section: Section;
-  // 새로 추가된 카드면 자동으로 편집 모드 진입
-  forceEdit: boolean;
-  // 이 섹션의 오타 의심 substring 목록 (검토 안 했으면 빈 배열).
+  // 이 묶음의 오타 의심 substring 목록 (검토 안 했으면 빈 배열).
   suspects: string[];
   onAdd: () => void;
   onUpdate: (patch: Partial<Section>) => void;
   onDelete: () => void;
-  onCancelNew: () => void;
 }) {
-  const [editing, setEditing] = useState(forceEdit);
-  const [label, setLabel] = useState(section.label);
+  const [editing, setEditing] = useState(false);
   const [linesText, setLinesText] = useState(section.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
 
   // section 외부 변경 시 draft 동기화
   useEffect(() => {
-    setLabel(section.label);
     setLinesText(section.text);
-  }, [section.label, section.text]);
-
-  // forceEdit가 true가 되면 즉시 편집 모드
-  useEffect(() => {
-    if (forceEdit) setEditing(true);
-  }, [forceEdit]);
+  }, [section.text]);
 
   // textarea autosize — 가사 줄 수에 따라 높이 자동.
   // mirror div도 같은 높이로 맞춰 빨간 밑줄이 글자 위에 정확히 그어지게.
@@ -434,7 +485,6 @@ function SectionChipCard({
   // 현재 본문에 실제 남아있는 의심 substring만 필터링 — 사용자가 수정하면 자동으로 빠짐.
   const activeSuspects = suspects.filter((s) => linesText.includes(s));
   // 편집 모드 mirror 오버레이용 HTML — 의심 substring을 <mark>로 감싸 빨간 밑줄.
-  // textarea의 본문은 그대로 두고, 같은 자리에 mirror가 깔리며 mark만 표시.
   const overlayHtml = useMemo(() => {
     if (activeSuspects.length === 0) return '';
     const escape = (s: string) =>
@@ -442,7 +492,6 @@ function SectionChipCard({
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-    // 모든 의심 substring을 한 번에 매치 — 긴 것부터 우선 처리해 substring 충돌 방지.
     const sorted = [...activeSuspects].sort((a, b) => b.length - a.length);
     const escapedRe = sorted
       .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -452,32 +501,22 @@ function SectionChipCard({
   }, [linesText, activeSuspects]);
 
   const save = () => {
-    onUpdate({
-      label: label.trim() || section.label,
-      text: linesText,
-    });
+    onUpdate({ text: linesText });
     setEditing(false);
   };
   const cancel = () => {
-    setLabel(section.label);
     setLinesText(section.text);
     setEditing(false);
-    if (forceEdit) onCancelNew();
   };
 
   if (editing) {
     return (
       <div
-        className={`sec-chip sec-chip-editing sec-${section.type}`}
+        className="sec-chip sec-chip-editing"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sec-chip-head sec-chip-head-editing">
-          <input
-            className="sec-label-input"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="섹션 이름"
-          />
+          <span className="sec-edit-title">묶음 {index} 수정</span>
           <div className="sec-edit-actions">
             <button
               type="button"
@@ -501,16 +540,13 @@ function SectionChipCard({
               type="button"
               className="sec-act sec-act-danger"
               onClick={onDelete}
-              title="이 섹션 삭제"
+              title="이 묶음 삭제"
               aria-label="삭제"
             >
               🗑
             </button>
           </div>
         </div>
-        {/* textarea + 의심 substring 빨간 밑줄 오버레이.
-            mirror div가 textarea와 같은 폰트/패딩으로 깔리고, <mark>만 시각화 — 사용자 입력은
-            textarea가 받는다. mirror는 pointer-events: none 이라 클릭이 textarea로 통과. */}
         <div className="sec-edit-textarea-wrap">
           {overlayHtml && (
             <div
@@ -531,7 +567,7 @@ function SectionChipCard({
           />
         </div>
         <div className="sec-edit-hint mono">
-          한 줄에 한 가사 · 빈 줄 그대로 둠
+          한 줄에 한 가사
           {activeSuspects.length > 0 && (
             <span className="sec-edit-hint-suspect">
               {' · '}빨간 밑줄 = 오타 의심 (무시해도 PPT 생성엔 영향 X)
@@ -579,13 +615,13 @@ function SectionChipCard({
   return (
     <button
       type="button"
-      className={`sec-chip sec-${section.type}`}
+      className="sec-chip"
       onClick={onAdd}
-      aria-label={`${section.label} 콘티에 추가`}
+      aria-label={`${index}번 묶음 콘티에 추가`}
     >
       <div className="sec-chip-head">
-        <span className="sec-label">{section.label || section.type}</span>
-        {/* 오타 의심 빨간 점 — 사용자가 한눈에 "이 섹션에 검토 결과 있다" 인지 */}
+        <span className="sec-num">{index}</span>
+        {/* 오타 의심 빨간 점 */}
         {activeSuspects.length > 0 && (
           <span className="sec-suspect-dot" aria-label={`오타 의심 ${activeSuspects.length}건`} title={`오타 의심 ${activeSuspects.length}건`} />
         )}
@@ -594,7 +630,7 @@ function SectionChipCard({
             className="sec-edit-btn"
             role="button"
             tabIndex={0}
-            aria-label={`${section.label} 가사 편집`}
+            aria-label={`${index}번 묶음 가사 편집`}
             onClick={(e) => {
               e.stopPropagation();
               setEditing(true);

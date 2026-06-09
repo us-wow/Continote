@@ -125,7 +125,7 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
               </span>
               <span style={{ flex: 1 }}>{song.title || 'Untitled'}</span>
               <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-                {song.sections.length}개 섹션
+                {song.sections.length}개 묶음
               </span>
             </button>
 
@@ -173,18 +173,19 @@ export default function MobileSongPicker({ songs, contiText }: MobileSongPickerP
                         // 화면을 넘는 긴 가사는 ellipsis로 잘라서 한 줄로 유지.
                         width: '100%',
                       }}
-                      aria-label={`${sec.label || sec.type} 가사를 콘티에 추가: ${firstLine}`}
+                      aria-label={`${secIdx + 1}번 묶음을 콘티에 추가: ${firstLine}`}
                     >
                       <span
                         style={{
                           fontWeight: 600,
                           color: 'var(--ink)',
-                          minWidth: 64,
+                          minWidth: 22,
                           flexShrink: 0,
                           fontSize: 12.5,
+                          textAlign: 'center',
                         }}
                       >
-                        {sec.label || sec.type}
+                        {secIdx + 1}
                       </span>
                       <span
                         style={{

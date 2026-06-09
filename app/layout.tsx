@@ -33,7 +33,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" data-theme="wanted">
+    // 아래 html의 suppressHydrationWarning: 브라우저 확장프로그램(한글/HWP 뷰어 등)이
+    // data-hwp-extension 속성을 hydration 전에 주입해 생기는 무해한 불일치 경고를 막는다.
+    // 이 태그 자체 속성에만 적용되고 자식엔 전파되지 않아 실제 버그는 그대로 잡힌다.
+    <html lang="ko" data-theme="wanted" suppressHydrationWarning>
       <head>
         {/* 폰트 CDN preconnect — 로딩 속도 향상 */}
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="" />

@@ -166,16 +166,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 후처리: Gemini가 라벨링 규칙을 안 지킨 경우 보정
-    // - 1절만 있으면 verseNum=null + label="Verse"로 단순화
-    //   (사용자 요청: "verse가 1절밖에 없으면 그냥 verse야")
+    // 후처리: 묶음(block) 정규화.
+    // AI는 분류 없이 가사 묶음만 주므로, 클라이언트 Section 형태로 채운다.
+    // type/label은 화면에 표시하지 않는 중립값(사람이 칩을 직접 다룸).
+    // AI가 {text} 객체로 주든 문자열로 주든 안전하게 변환하고, 빈 묶음은 버린다.
     for (const song of parsed.songs) {
-      if (!Array.isArray(song.sections)) continue;
-      const verses = song.sections.filter((s: any) => s.type === 'verse');
-      if (verses.length === 1) {
-        verses[0].label = 'Verse';
-        verses[0].verseNum = null;
-      }
+      const raw = Array.isArray(song.sections) ? song.sections : [];
+      song.sections = raw
+        .map((s: any) => {
+          const text =
+            typeof s === 'string' ? s : typeof s?.text === 'string' ? s.text : '';
+          return { type: 'verse', label: '', verseNum: null, text: text.trim() };
+        })
+        .filter((s: any) => s.text.length > 0);
     }
 
     return NextResponse.json({ songs: parsed.songs });

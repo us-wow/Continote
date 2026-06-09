@@ -1139,6 +1139,155 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   border-color: var(--accent);
   background: var(--accent-tint);
 }
+
+/* ── 묶음 번호 배지 — 음악용어 라벨(Verse/Chorus) 대신 칩 순서를 보여준다 ── */
+.sec-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+/* 편집 모드 제목 ("묶음 N 수정") */
+.sec-edit-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+/* ── 다시 나누기 버튼 — 칩 모드에서 나누기 모드로 복귀 ── */
+.btn-resplit {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1.5px dashed var(--rule-2);
+  background: transparent;
+  color: var(--ink-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 160ms;
+}
+.btn-resplit:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* ── 나누기 모드 — 가사를 빈 줄로 직접 나누는 편집창 ── */
+.song-split {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.song-split-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+.song-split-hint b {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.song-split-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.song-split-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.song-split-textarea::placeholder {
+  color: var(--ink-3);
+  opacity: 0.7;
+}
+.song-split-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.song-split-count {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* ── 나누기 라이브 미리보기 — 빈 줄로 나뉜 묶음이 실시간으로 갈라져 보인다 ── */
+.song-split-preview {
+  border-top: 1px dashed var(--rule-2);
+  padding-top: 10px;
+}
+.song-split-preview-head {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.song-split-preview-head b {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.song-split-empty {
+  font-size: 12px;
+  color: var(--ink-3);
+  padding: 6px 0;
+}
+.song-split-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.song-split-block {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  /* 새 묶음이 생길 때만(key 신규 마운트) 등장 — 키 입력마다 재생되지 않아 깔끔. */
+  animation: splitBlockIn 170ms ease;
+}
+.song-split-block .sec-num {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.song-split-block-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.song-split-block-line {
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@keyframes splitBlockIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
 .sec-add-menu {
   border: 1.5px solid var(--accent);
   background: var(--surface);
