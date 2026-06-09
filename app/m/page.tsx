@@ -30,7 +30,7 @@ import { migrateTemplatesToCloud } from '@/lib/template-cloud';
 import BrandMark from '@/components/BrandMark';
 import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
-import MobileSongPicker from '@/components/MobileSongPicker';
+// MobileSongPicker 제거 — 단일 스크롤에선 위 ExtractedSection의 칩으로 콘티에 추가한다.
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
@@ -44,7 +44,7 @@ export default function MobilePage() {
   //   false = 인트로 표시 중
   //   true = 인트로 건너뛰고 wizard 표시
   const [introSeen, setIntroSeen] = useState<boolean | null>(null);
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  // 단계 위저드 제거 — 데스크톱처럼 4개 패널을 한 스크롤에 모두 보여준다.
   const [files, setFiles] = useState<File[]>([]);
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
@@ -339,7 +339,7 @@ export default function MobilePage() {
           void addToLibraryAsync(data.songs);
           setPasted('');
           showToast(`${data.songs.length}곡 추출됨`);
-          setStep(2); // 다음 단계로 자동 이동
+          document.getElementById('m-sec-2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
           showToast('가사를 찾을 수 없어요');
         }
@@ -372,7 +372,7 @@ export default function MobilePage() {
           extractedImagesRef.current = images;
           setSuspectMap({});
           showToast(`${data.songs.length}곡 추출됨`);
-          setStep(2);
+          document.getElementById('m-sec-2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
           showToast('가사를 찾을 수 없어요');
         }
@@ -625,19 +625,7 @@ export default function MobilePage() {
   const isEmpty = !text || !text.trim();
   const slideCount = buildSlidesFromText(text).length;
 
-  // 단계 이동 제약 — 비어있는데 다음 단계 진행 못 하게 안내
-  const canGoNext = () => {
-    if (step === 1) return hasResult; // 추출 결과 있어야 다음
-    if (step === 2) return hasResult;
-    if (step === 3) return !isEmpty;
-    return false;
-  };
-  const goNext = () => {
-    if (step < 4) setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : s));
-  };
-  const goBack = () => {
-    if (step > 1) setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : s));
-  };
+  // (단계 위저드 제거 — canGoNext/goNext/goBack 불필요)
 
   // 디자인 변경 — paper ↔ wanted
   const toggleTheme = () => {
@@ -724,27 +712,31 @@ export default function MobilePage() {
       {/* ===== 사용법 가이드 (메뉴 → 사용법 보기) ===== */}
       {showGuide && <OnboardingGuide onClose={() => setShowGuide(false)} />}
 
-      {/* ===== Step indicator — 1/2/3/4 ===== */}
+      {/* ===== 빠른 이동 칩 — 누르면 해당 패널로 스크롤 (sticky) ===== */}
       <div className="m-steps">
-        {[1, 2, 3, 4].map((n) => (
+        {[
+          { n: 1, id: 'm-sec-1', label: '업로드' },
+          { n: 2, id: 'm-sec-2', label: '곡 확인' },
+          { n: 3, id: 'm-sec-3', label: '콘티' },
+          { n: 4, id: 'm-sec-4', label: 'PPT' },
+        ].map((s) => (
           <button
-            key={n}
+            key={s.n}
             type="button"
-            className={`m-step-pill ${step === n ? 'is-active' : ''} ${step > n ? 'is-done' : ''}`}
-            onClick={() => setStep(n as 1 | 2 | 3 | 4)}
-            aria-current={step === n ? 'step' : undefined}
+            className="m-step-pill"
+            onClick={() =>
+              document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
           >
-            <span className="m-step-num">{n}</span>
-            <span className="m-step-label">
-              {n === 1 ? '업로드' : n === 2 ? '곡 확인' : n === 3 ? '콘티' : 'PPT'}
-            </span>
+            <span className="m-step-num">{s.n}</span>
+            <span className="m-step-label">{s.label}</span>
           </button>
         ))}
       </div>
 
       {/* ===== 현재 단계 본문 ===== */}
       <main className="m-main">
-        {step === 1 && (
+        <div id="m-sec-1" style={{ scrollMarginTop: 64 }}>
           <UploadSection
             dragging={dragging}
             onDragOver={(e) => {
@@ -769,8 +761,9 @@ export default function MobilePage() {
             hasResult={hasResult}
             onExtract={handleExtract}
           />
-        )}
-        {step === 2 && (
+        </div>
+
+        <div id="m-sec-2" style={{ scrollMarginTop: 64 }}>
           <ExtractedSection
             songs={songs}
             text={text}
@@ -782,13 +775,9 @@ export default function MobilePage() {
             onVerifyLyrics={handleVerifyLyrics}
             verifying={verifying}
           />
-        )}
-        {step === 3 && (
-          <>
-            {/* 추출된 곡 sticky picker — Step 3에서 가사를 콘티에 추가하기 위한 가벼운 UI.
-                편집/삭제/추가 기능은 빼고 chip 클릭만 가능. 화면 상단 sticky로 따라온다.
-                수정이 필요하면 사용자는 Step 2로 돌아가서 한다. */}
-            <MobileSongPicker songs={songs} contiText={text} />
+        </div>
+
+        <div id="m-sec-3" style={{ scrollMarginTop: 64 }}>
             {/* Undo/Redo 액션 바 — 모바일엔 단축키가 없어 버튼으로 노출.
                 EditorSection은 그대로 두고 위에 별도 바를 둬서 공용 컴포넌트는 영향 없음. */}
             <div
@@ -846,9 +835,9 @@ export default function MobilePage() {
               // (자체 스크롤 + transform 동기화는 모바일에서 거터 어긋남의 원인)
               autoResize
             />
-          </>
-        )}
-        {step === 4 && (
+        </div>
+
+        <div id="m-sec-4" style={{ scrollMarginTop: 64 }}>
           <PptSection
             slideCount={slideCount}
             pptFont={pptFont}
@@ -865,27 +854,8 @@ export default function MobilePage() {
             onDownloadOpenSong={handleSaveOpenSong}
             onDownloadPlainSlides={handleSavePlainSlides}
           />
-        )}
+        </div>
       </main>
-
-      {/* ===== 하단 단계 이동 바 ===== */}
-      <nav className="m-nav">
-        {step > 1 && (
-          <button type="button" className="btn btn-ghost m-nav-back" onClick={goBack}>
-            ← 이전
-          </button>
-        )}
-        {step < 4 && (
-          <button
-            type="button"
-            className="btn btn-primary m-nav-next"
-            onClick={goNext}
-            disabled={!canGoNext()}
-          >
-            다음 →
-          </button>
-        )}
-      </nav>
 
       {/* PPT 전체 미리보기 */}
       <PreviewModal

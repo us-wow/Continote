@@ -1881,6 +1881,25 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   color: var(--ink-3);
 }
 
+/* ── 단계별 패널 구분 — 번호 배지를 단계 색 '알약'으로 + 패널 상단 색 띠 ──
+   추출된 곡(02)·콘티 편집(03)·PPT 만들기(04)가 같은 패널 모양이라 헷갈렸던 걸
+   색으로 분리해 한눈에 어느 단계인지 알게 한다. */
+.section-head .step-num-inline {
+  background: var(--panel-accent, var(--ink-3));
+  color: #fff;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.ex-panel { --panel-accent: #c98a2b; }   /* 02 곡 확인 — 앰버 */
+.ed-panel { --panel-accent: #157a6e; }   /* 03 콘티 — 틸(로고색) */
+.ppt-panel { --panel-accent: #5b53c7; }  /* 04 PPT — 보라 */
+.ex-panel,
+.ed-panel,
+.ppt-panel {
+  border-top: 3px solid var(--panel-accent);
+}
+
 /* 마스코트 호흡 애니메이션 — 위아래로 살짝 떠다님 */
 @keyframes floatY {
   0%, 100% { transform: translateY(0); }
@@ -2455,6 +2474,10 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   padding: 10px 12px 14px;
   border-bottom: 1px solid var(--rule);
   background: var(--paper);
+  /* 긴 단일 스크롤에서 '빠른 이동 칩'이 위에 고정되게 */
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 .m-step-pill {
   flex: 1;
