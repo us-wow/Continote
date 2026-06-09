@@ -17,6 +17,7 @@
 //   (찬양팀 로테이션 앱의 단계별 온보딩 방식을 콘티노트에 맞춰 차용)
 
 import { useEffect, useState } from 'react';
+import DetailedManual from './DetailedManual';
 
 // 한 장(슬라이드) = 소개(intro) 또는 단계(step).
 // step일 때만 num이 있어 "STEP 2 / 4"처럼 보여준다.
@@ -34,6 +35,8 @@ const STEP_COUNT = 4;
 export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
   // 지금 보여줄 장 (0 = 소개). 점 인디케이터/다음 버튼으로 이동.
   const [step, setStep] = useState(0);
+  // "더 자세한 사용법" → 전체 설명서(DetailedManual) 모달 표시 여부
+  const [showManual, setShowManual] = useState(false);
   const isLast = step === SLIDES.length - 1;
   const current = SLIDES[step];
 
@@ -47,6 +50,7 @@ export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
+    <>
     <div
       onClick={onClose}
       role="dialog"
@@ -204,8 +208,31 @@ export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
             {isLast ? '시작하기' : '다음'}
           </button>
         </div>
+
+        {/* 더 자세한 사용법 → 전체 설명서 모달 열기 */}
+        <button
+          type="button"
+          onClick={() => setShowManual(true)}
+          style={{
+            display: 'block',
+            margin: '14px auto 0',
+            background: 'none',
+            border: 'none',
+            color: 'var(--ink-3)',
+            cursor: 'pointer',
+            fontSize: 13,
+            textDecoration: 'underline',
+            textUnderlineOffset: 3,
+          }}
+        >
+          더 자세한 사용법이 궁금해요 →
+        </button>
       </div>
     </div>
+
+    {/* 전체 설명서 — 가이드 위에 겹쳐 띄운다(z-index 더 높음) */}
+    {showManual && <DetailedManual onClose={() => setShowManual(false)} />}
+    </>
   );
 }
 
