@@ -32,7 +32,6 @@ import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
 import MobileSongPicker from '@/components/MobileSongPicker';
 import EditorSection from '@/components/EditorSection';
-import SlideReorder from '@/components/SlideReorder';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
 import IntroScreen from '@/components/IntroScreen';
@@ -864,8 +863,6 @@ export default function MobilePage() {
               // (자체 스크롤 + transform 동기화는 모바일에서 거터 어긋남의 원인)
               autoResize
             />
-            {/* 슬라이드 순서 바꾸기·삭제 — 모바일에서도 동일 (펼침형) */}
-            <SlideReorder text={text} setText={setText} />
           </>
         )}
         {step === 4 && (

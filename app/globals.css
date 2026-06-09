@@ -1707,7 +1707,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 /* 좌측 거터 — 각 paragraph(슬라이드) 시작 위치에 번호 표시. textarea 스크롤에 맞춰 transform으로 따라감. */
 .ed-gutter {
-  width: 36px;
+  width: 54px;
   flex-shrink: 0;
   background: color-mix(in oklab, var(--paper) 80%, white);
   border-right: 1px solid var(--rule);
@@ -1719,22 +1719,51 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   inset: 0;
   /* transform: translateY로 textarea scrollTop과 sync — onScroll 핸들러가 갱신 */
 }
-.ed-gutter-num {
+.ed-gutter-row {
   position: absolute;
-  left: 4px;
-  right: 4px;
+  left: 2px;
+  right: 2px;
   height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  /* 텍스트 baseline과 라인 첫 줄이 맞도록 살짝 조정 */
+  margin-top: 2px;
+}
+.ed-gutter-move {
+  width: 15px;
+  height: 20px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+.ed-gutter-move:hover:not(:disabled) {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.ed-gutter-move:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.ed-gutter-num {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
   color: var(--ink-3);
   border-radius: 4px;
   letter-spacing: 0.02em;
-  /* 텍스트 baseline과 라인 첫 줄의 baseline이 맞도록 살짝 조정 */
-  margin-top: 2px;
 }
 .ed-gutter-num.is-overflow {
   background: var(--danger);
@@ -1764,7 +1793,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .ed-mirror {
   position: absolute;
   top: 0;
-  left: 36px; /* .ed-gutter width 와 동일 */
+  left: 54px; /* .ed-gutter width 와 동일 */
   right: 0;
   bottom: 0;
   font-family: var(--font-display);

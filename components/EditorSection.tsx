@@ -18,6 +18,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { buildSlidesFromText } from '@/lib/text-doc';
 
+// 빈 줄(엔터 두 번)로 슬라이드 블록 분리 — buildSlidesFromText와 동일 규칙.
+// 거터 ↑↓ 순서이동에서 블록을 swap하려고 원문 그대로 보존한다.
+function splitBlocks(text: string): string[] {
+  return text
+    .split(/\n[ \t]*\n+/)
+    .map((b) => b.replace(/^\n+|\n+$/g, '').trimEnd())
+    .filter((b) => b.trim().length > 0);
+}
+
 type EditorSectionProps = {
   text: string;
   // 함수형 업데이트를 지원해야 conti:append가 stale closure 없이 누적 동작.
@@ -108,6 +117,18 @@ export default function EditorSection({
   // 슬라이드 카운트 — 푸터 좌측에 표시
   const slideCount = useMemo(() => buildSlidesFromText(text).length, [text]);
   const isEmpty = !text || !text.trim();
+
+  // 거터 ↑↓ — slideNum(1-based) 슬라이드를 위(-1)/아래(+1)로 한 칸 이동.
+  // 블록을 swap해서 text 재구성 → setText. undo는 page.tsx 자동 스냅샷이 잡는다.
+  const moveSlide = (slideNum: number, dir: -1 | 1) => {
+    const blocks = splitBlocks(text);
+    const i = slideNum - 1;
+    const j = i + dir;
+    if (i < 0 || j < 0 || i >= blocks.length || j >= blocks.length) return;
+    const next = [...blocks];
+    [next[i], next[j]] = [next[j], next[i]];
+    setText(next.join('\n\n'));
+  };
 
   // textarea 좌측 gutter에 표시할 슬라이드 번호 정보 계산.
   // text를 줄 단위로 훑으며 빈 줄을 paragraph 경계로 보고, 각 paragraph(=슬라이드)의
@@ -262,24 +283,47 @@ export default function EditorSection({
       <div className={`ed-textarea-wrap ${autoResize ? 'is-auto-resize' : ''}`}>
         {/* 좌측 거터 — paragraph(슬라이드) 시작 위치에 번호 표시. mirror div 측정값을 우선 사용.
             autoResize면 페이지 스크롤로 통일되어 transform 동기화 불필요(오히려 잘못 적용되면 어긋남). */}
-        <div className="ed-gutter" aria-hidden="true">
+        {/* 거터 — 슬라이드 번호 + 그 자리에서 ↑↓로 순서 이동 (숫자 왼쪽에 위/아래 키) */}
+        <div className="ed-gutter">
           <div
             className="ed-gutter-inner"
             style={{ transform: autoResize ? 'none' : `translateY(${-scrollTop}px)` }}
           >
-            {paragraphInfo.map((p) => {
+            {paragraphInfo.map((p, idx) => {
               const isOverflow = overflowSlideIndices.includes(p.slideNum - 1);
               // 측정값(paragraphTops)이 있으면 그걸, 없으면 newline 기반 폴백.
               const top =
                 paragraphTops[p.slideNum] ?? PADDING_TOP + p.startLine * LINE_HEIGHT;
+              const isFirst = idx === 0;
+              const isLast = idx === paragraphInfo.length - 1;
               return (
-                <div
-                  key={p.slideNum}
-                  className={`ed-gutter-num ${isOverflow ? 'is-overflow' : ''}`}
-                  style={{ top }}
-                  title={isOverflow ? `${p.slideNum}번 슬라이드 4줄 초과` : `${p.slideNum}번 슬라이드`}
-                >
-                  {p.slideNum}
+                <div key={p.slideNum} className="ed-gutter-row" style={{ top }}>
+                  <button
+                    type="button"
+                    className="ed-gutter-move"
+                    onClick={() => moveSlide(p.slideNum, -1)}
+                    disabled={isFirst}
+                    aria-label={`${p.slideNum}번 슬라이드 위로`}
+                    title="위로 이동"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="ed-gutter-move"
+                    onClick={() => moveSlide(p.slideNum, 1)}
+                    disabled={isLast}
+                    aria-label={`${p.slideNum}번 슬라이드 아래로`}
+                    title="아래로 이동"
+                  >
+                    ↓
+                  </button>
+                  <span
+                    className={`ed-gutter-num ${isOverflow ? 'is-overflow' : ''}`}
+                    title={isOverflow ? `${p.slideNum}번 슬라이드 4줄 초과` : `${p.slideNum}번 슬라이드`}
+                  >
+                    {p.slideNum}
+                  </span>
                 </div>
               );
             })}
