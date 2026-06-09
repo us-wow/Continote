@@ -179,6 +179,22 @@ export async function POST(req: NextRequest) {
           return { type: 'verse', label: '', verseNum: null, text: text.trim() };
         })
         .filter((s: any) => s.text.length > 0);
+
+      // 제목 폴백 — AI가 제목을 못 찾아 비었거나 "Untitled"면 첫 가사 줄로 채운다.
+      // (검색·식별이 쉬워짐. 'Untitled'끼리는 구분이 안 돼 최악이라.)
+      const title = (song.title || '').trim();
+      if (!title || title.toLowerCase() === 'untitled') {
+        const firstLine =
+          (song.sections[0]?.text || '')
+            .split('\n')
+            .map((l: string) => l.trim())
+            .find(Boolean) || '';
+        song.title = firstLine
+          ? firstLine.length > 20
+            ? firstLine.slice(0, 20) + '…'
+            : firstLine
+          : 'Untitled';
+      }
     }
 
     return NextResponse.json({ songs: parsed.songs });

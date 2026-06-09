@@ -537,6 +537,10 @@ export default function Home() {
         extractedImagesRef.current = images;
         // 새 추출 → 이전 검토 결과 비움.
         setSuspectMap({});
+        // 추출 성공 → 업로드 영역의 악보 이미지를 비운다.
+        // 안 비우면 다음 드롭이 기존 파일에 더해져(append) 같은 악보를 또 중복으로 읽음.
+        // (오타 검토용 원본은 extractedImagesRef에 따로 있어 영향 없음)
+        setFiles([]);
         showToast(`${data.songs.length}곡 추출됨`);
       }
     } catch (err: any) {
