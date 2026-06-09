@@ -203,33 +203,14 @@ export default function UploadSection({
         )}
       </div>
 
-      {/* 직접 가사 붙여넣기 토글 + 텍스트영역 */}
-      <div>
-        <div
-          className="toggle"
-          data-on={pasteMode}
-          onClick={() => setPasteMode(!pasteMode)}
-        >
-          <span className="track" />
-          <span>직접 가사 붙여넣기</span>
-        </div>
-        {pasteMode && (
-          <textarea
-            value={pasted}
-            onChange={(e) => setPasted(e.target.value)}
-            placeholder="여기에 가사를 붙여넣어 주세요"
-            rows={6}
-            style={{ marginTop: 10 }}
-          />
-        )}
-      </div>
+      {/* 직접 가사 붙여넣기 기능 제거됨 — 악보 사진 추출 하나로 흐름 단일화 (혼란 줄이려고) */}
 
       {/* 메인 추출 버튼 + 진행 단계 표시 */}
       <div>
         <button
           className="btn-primary"
           onClick={onExtract}
-          disabled={extracting || (files.length === 0 && !pasted.trim())}
+          disabled={extracting || files.length === 0}
           title="가사 추출하기 (⌘+Enter)"
           style={{ width: '100%' }}
         >
