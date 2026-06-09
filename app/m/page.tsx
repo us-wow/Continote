@@ -35,6 +35,7 @@ import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
 import IntroScreen from '@/components/IntroScreen';
+import OnboardingGuide from '@/components/OnboardingGuide';
 import type { DesignTheme } from '@/components/Header';
 
 export default function MobilePage() {
@@ -77,6 +78,8 @@ export default function MobilePage() {
   // 메뉴 시트 — ☰ 햄버거 눌렀을 때 바닥에서 슉 올라옴.
   // 안에 사용법 / 데스크탑으로 보기 / 로그아웃 등 잘 안 쓰는 액션 모음.
   const [menuOpen, setMenuOpen] = useState(false);
+  // 사용법 가이드(OnboardingGuide) 표시 여부 — 메뉴의 "사용법 보기"로 연다.
+  const [showGuide, setShowGuide] = useState(false);
 
   // 오타 검토 — page.tsx와 동일 구조
   const extractedImagesRef = useRef<{ data: string; mimeType: string }[]>([]);
@@ -726,6 +729,10 @@ export default function MobilePage() {
             setMenuOpen(false);
             setIntroSeen(false);
           }}
+          onOpenGuide={() => {
+            setMenuOpen(false);
+            setShowGuide(true);
+          }}
           onSwapToDesktop={swapToDesktop}
           authUser={authUser}
           authBusy={authBusy}
@@ -740,6 +747,9 @@ export default function MobilePage() {
           supabaseEnabled={isSupabaseConfigured()}
         />
       )}
+
+      {/* ===== 사용법 가이드 (메뉴 → 사용법 보기) ===== */}
+      {showGuide && <OnboardingGuide onClose={() => setShowGuide(false)} />}
 
       {/* ===== Step indicator — 1/2/3/4 ===== */}
       <div className="m-steps">
@@ -933,6 +943,7 @@ export default function MobilePage() {
 function MobileMenuSheet({
   onClose,
   onBackToIntro,
+  onOpenGuide,
   onSwapToDesktop,
   authUser,
   authBusy,
@@ -942,6 +953,7 @@ function MobileMenuSheet({
 }: {
   onClose: () => void;
   onBackToIntro: () => void;
+  onOpenGuide: () => void;
   onSwapToDesktop: () => void;
   authUser: User | null;
   authBusy: boolean;
@@ -985,16 +997,10 @@ function MobileMenuSheet({
             <span className="m-sheet-item-label">데스크탑으로 보기</span>
             <span className="m-sheet-item-sub">큰 화면(2단 레이아웃)으로 전환</span>
           </button>
-          <a
-            href="https://contionote.vercel.app/?view=desktop#help"
-            target="_blank"
-            rel="noreferrer"
-            className="m-sheet-item"
-            onClick={onClose}
-          >
+          <button type="button" className="m-sheet-item" onClick={onOpenGuide}>
             <span className="m-sheet-item-label">사용법 보기</span>
-            <span className="m-sheet-item-sub">데스크탑 화면에서 자세한 가이드</span>
-          </a>
+            <span className="m-sheet-item-sub">4단계로 보는 그림 가이드</span>
+          </button>
 
           {supabaseEnabled && (
             <div className="m-sheet-auth">
