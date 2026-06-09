@@ -64,6 +64,8 @@ export default function MobilePage() {
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본 가운데. 데스크탑과 동일하게 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
+  // 글꼴 포함(임베드) — 기본 ON. 본명조 선택 시 글꼴을 PPT에 심어 어디서나 똑같이.
+  const [embedFont, setEmbedFont] = useState(true);
   // 저작권(CCLI) 상태 제거됨 — 한국 교회 미사용
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -589,7 +591,7 @@ export default function MobilePage() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign);
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -855,6 +857,8 @@ export default function MobilePage() {
             setPptTheme={setPptTheme}
             pptVAlign={pptVAlign}
             setPptVAlign={setPptVAlign}
+            embedFont={embedFont}
+            setEmbedFont={setEmbedFont}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
             onCopyShareLink={handleCopyShareLink}

@@ -176,12 +176,37 @@ export async function exportToPptx(
   theme: PptTheme = 'black',
   copyright?: PptCopyrightInfo,
   // 세로 정렬 — 기본값 'middle'로 두어 기존 호출/동작과 호환. 제목·메모·가사 슬라이드에 적용한다.
-  verticalAlign: PptVAlign = 'middle'
+  verticalAlign: PptVAlign = 'middle',
+  // 글꼴 포함(임베드) — 켜고 본명조를 고르면 서브셋 글꼴을 PPT에 심어 글꼴 없는 PC에서도 그대로 보임.
+  embedFont: boolean = false
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
   const pptxgen = (await import('pptxgenjs')).default;
-  const pres = new pptxgen();
+
+  // 글꼴 임베드 — 본명조(noto-serif-kr)일 때만 지원(서브셋 글꼴을 public/fonts/에 번들).
+  // pptx-embed-fonts로 감싼 클래스를 쓰면 writeFile 때 글꼴이 PPT에 자동으로 심긴다.
+  // 실패하면(라이브러리/네트워크) 조용히 일반 PPT로 폴백 → 다운로드 자체는 항상 된다.
+  const canEmbed = embedFont && font === 'noto-serif-kr';
+  let pres: InstanceType<typeof pptxgen>;
+  if (canEmbed) {
+    try {
+      // @ts-ignore — 서브패스('./pptxgenjs')에 타입 선언이 없어 무시
+      const { withPPTXEmbedFonts } = await import('pptx-embed-fonts/pptxgenjs');
+      const Enhanced = withPPTXEmbedFonts(pptxgen);
+      const embedPres = new Enhanced();
+      const res = await fetch('/fonts/noto-serif-kr-kr.otf');
+      if (!res.ok) throw new Error(`글꼴 파일 로드 실패 (${res.status})`);
+      const fontBuf = await res.arrayBuffer();
+      await embedPres.addFont({ fontFace: FONT_FACE_MAP[font], fontFile: fontBuf, fontType: 'otf' });
+      pres = embedPres as unknown as InstanceType<typeof pptxgen>;
+    } catch (err) {
+      console.warn('글꼴 임베드 실패 → 일반 PPT로 대체:', err);
+      pres = new pptxgen();
+    }
+  } else {
+    pres = new pptxgen();
+  }
   pres.layout = 'LAYOUT_WIDE';
 
   // 테마에 맞는 배경/글자색 선택. 이미지는 한 번만 만들어 모든 슬라이드 재사용.

@@ -160,6 +160,8 @@ export default function Home() {
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본은 가운데(기존 동작). 상단/하단 선택 시 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
+  // 글꼴 포함(임베드) — 기본 ON. 본명조 선택 시 글꼴을 PPT에 심어 어디서나 똑같이 보이게.
+  const [embedFont, setEmbedFont] = useState(true);
   // 외부 도구 export(Plain Slides / OpenSong)는 일반 사용자에겐 과해서 숨겨둠.
   // ProPresenter / EasyWorship / OpenLP 사용자가 필요할 때만 펼침.
   const [showExternalExports, setShowExternalExports] = useState(false);
@@ -800,7 +802,7 @@ export default function Home() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign);
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -1174,6 +1176,8 @@ export default function Home() {
           setPptTheme={setPptTheme}
           pptVAlign={pptVAlign}
           setPptVAlign={setPptVAlign}
+          embedFont={embedFont}
+          setEmbedFont={setEmbedFont}
           onOpenPreview={() => setPreviewOpen(true)}
           onDownloadPptx={handleSavePptx}
           onCopyShareLink={handleCopyShareLink}

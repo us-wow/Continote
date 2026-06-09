@@ -19,6 +19,7 @@
     "docx": "^9.0.3",
     "next": "^16.2.7",
     "pdfjs-dist": "^4.7.76",
+    "pptx-embed-fonts": "^0.0.6",
     "pptxgenjs": "^3.12.0",
     "react": "^18",
     "react-dom": "^18"

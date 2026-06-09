@@ -24,6 +24,9 @@ type PptSectionProps = {
   // 세로 정렬 — 상단/가운데/하단. 선택 즉시 미리보기와 PPT 출력에 함께 반영된다.
   pptVAlign: PptVAlign;
   setPptVAlign: (v: PptVAlign) => void;
+  // 글꼴 포함(임베드) 토글 — 켜면 본명조를 PPT에 심는다.
+  embedFont: boolean;
+  setEmbedFont: (v: boolean) => void;
   onOpenPreview: () => void;
   onDownloadPptx: () => void;
   // "다른 형식으로 내보내기" — 토글 펼치면 보임
@@ -89,6 +92,8 @@ export default function PptSection({
   setPptTheme,
   pptVAlign,
   setPptVAlign,
+  embedFont,
+  setEmbedFont,
   onOpenPreview,
   onDownloadPptx,
   onCopyShareLink,
@@ -201,7 +206,26 @@ export default function PptSection({
           </div>
         </div>
 
-        {/* 저작권 슬라이드 토글·CCLI 입력 제거됨 (한국 교회는 거의 안 써서) */}
+        {/* 글꼴 포함 — 켜면 본명조를 PPT에 심어, 글꼴 안 깔린 PC에서도 그대로 보인다.
+            (서브셋이라 파일 ~1MB만 커짐 · 현재 본명조 1종 지원) */}
+        <div className="ppt-ctrl-block">
+          <div className="ppt-ctrl-label label">글꼴 포함</div>
+          <div
+            className="toggle"
+            data-on={embedFont}
+            onClick={() => setEmbedFont(!embedFont)}
+            role="switch"
+            aria-checked={embedFont}
+          >
+            <span className="track" />
+            <span>PPT에 글꼴 포함 {embedFont ? '(켜짐)' : '(꺼짐)'}</span>
+          </div>
+          <div className="caption" style={{ color: 'var(--ink-3)', marginTop: 6, fontSize: 12 }}>
+            {pptFont === 'noto-serif-kr'
+              ? '글꼴 안 깔린 PC에서도 그대로 보여요 · 파일 약 1MB 커짐'
+              : '본명조(추천)를 고르면 적용돼요 — 지금 글꼴은 포함 안 됨'}
+          </div>
+        </div>
       </div>
 
       {/* 미리보기 / PPT 다운로드 */}
