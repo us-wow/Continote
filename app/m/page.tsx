@@ -227,7 +227,7 @@ export default function MobilePage() {
           .then(([conti, songsR, templates]) => {
             const total = conti.migrated + songsR.migrated + templates.migrated;
             if (total > 0) {
-              showToast(`이전 데이터 클라우드로 옮겼어요 (${total}개)`);
+              showToast(`이전에 쓰던 데이터를 클라우드에 저장했어요 (${total}개)`);
             }
           })
           .catch((err) => console.error('[migrate] 실패:', err));
@@ -415,7 +415,7 @@ export default function MobilePage() {
       return;
     }
     if (extractedImagesRef.current.length === 0) {
-      showToast('원본 이미지가 없어요. 가사를 다시 추출해주세요.');
+      showToast('원본 악보 이미지를 찾을 수 없어요. 다시 추출해 주세요.');
       return;
     }
     setVerifying(true);
@@ -455,7 +455,7 @@ export default function MobilePage() {
       if (totalCount === 0) {
         showToast('의심 부분 없음 — 추출 결과 깔끔합니다');
       } else {
-        showToast(`${totalCount}건 의심 — 빨간 점 섹션 확인`);
+        showToast(`${totalCount}건 확인 필요 — 빨간 점 있는 곡 확인`);
       }
     } catch (err: any) {
       showToast(`검토 실패: ${err.message}`);

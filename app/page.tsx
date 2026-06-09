@@ -247,7 +247,7 @@ export default function Home() {
             const total = conti.migrated + songs.migrated + templates.migrated;
             if (total > 0) {
               showToast(
-                `이전 데이터를 클라우드로 옮겼어요 — 콘티 ${conti.migrated} / 곡 ${songs.migrated} / 템플릿 ${templates.migrated}`
+                `이전에 쓰던 데이터를 클라우드에 저장했어요 — 콘티 ${conti.migrated}개, 곡 ${songs.migrated}개, 템플릿 ${templates.migrated}개`
               );
             }
           })
@@ -298,7 +298,7 @@ export default function Home() {
     if (!err) return;
     showToast(
       err === 'no_code'
-        ? '로그인 응답이 비어 있어요. 다시 시도해주세요.'
+        ? '로그인이 제대로 안 됐어요. 다시 시도해 주세요.'
         : '로그인에 실패했어요. 다시 시도해주세요.'
     );
     // URL에서 ?auth_error 파라미터를 제거 — 새로고침 시 토스트가 또 뜨는 걸 방지.
@@ -446,7 +446,7 @@ export default function Home() {
         try {
           data = await res.json();
         } catch {
-          throw new Error(`서버 응답이 JSON이 아님 (status ${res.status})`);
+          throw new Error(`서버에서 오류가 났어요 (코드 ${res.status})`);
         }
         if (!res.ok) throw new Error(data.error || '분석 실패');
         if (!data.songs?.length) {
@@ -495,7 +495,7 @@ export default function Home() {
           const img = await fileToBase64(f);
           images.push(img);
         } else {
-          showToast(`지원 안 함: ${f.name}`);
+          showToast(`지원하지 않는 파일: ${f.name}`);
         }
       }
       if (images.length === 0) {
@@ -515,7 +515,7 @@ export default function Home() {
       try {
         data = await res.json();
       } catch {
-        throw new Error(`서버 응답이 JSON이 아님 (status ${res.status})`);
+        throw new Error(`서버에서 오류가 났어요 (코드 ${res.status})`);
       }
       if (!res.ok) throw new Error(data.error || '분석 실패');
       if (!data.songs?.length) {
@@ -550,7 +550,7 @@ export default function Home() {
       return;
     }
     if (extractedImagesRef.current.length === 0) {
-      showToast('원본 이미지가 없어요. 가사를 다시 추출해주세요.');
+      showToast('원본 악보 이미지를 찾을 수 없어요. 다시 추출해 주세요.');
       return;
     }
     setVerifying(true);
@@ -592,7 +592,7 @@ export default function Home() {
       if (totalCount === 0) {
         showToast('의심 부분이 없어요 — 추출 결과 깔끔합니다');
       } else {
-        showToast(`${totalCount}건 의심 — 빨간 점이 있는 섹션 확인해주세요`);
+        showToast(`${totalCount}건 확인 필요 — 빨간 점이 있는 곡을 살펴보세요`);
       }
     } catch (err: any) {
       showToast(`검토 실패: ${err.message}`);
@@ -984,7 +984,7 @@ export default function Home() {
   };
 
   const deleteConfirmedSection = (songIdx: number, secIdx: number) => {
-    if (!confirm('이 섹션을 삭제할까요?')) return;
+    if (!confirm('이 묶음을 삭제할까요?')) return;
     setSongs((prev) =>
       prev.map((s, i) =>
         i !== songIdx ? s : { ...s, sections: s.sections.filter((_, si) => si !== secIdx) }
@@ -992,7 +992,7 @@ export default function Home() {
     );
     setEditingCardKey(null);
     setCardDraft(null);
-    showToast('섹션 삭제됨');
+    showToast('묶음 삭제됨');
   };
 
   // 곡 제목 인라인 수정
@@ -1101,9 +1101,9 @@ export default function Home() {
             wordBreak: 'keep-all',
           }}
         >
-          JPG·PDF 악보를 올리면 가사만 깔끔하게 추출해드립니다.
+          악보를 사진이나 PDF로 올리면, AI가 가사만 깔끔하게 뽑아줘요.
           <br />
-          결과에서 곡 제목과 섹션을 클릭해 콘티를 조립하세요.
+          곡 제목과 묶음(칩)을 누르면 콘티가 만들어집니다.
         </p>
         {/* 히어로 마스코트 — done 포즈로 차별화 (헤더에 미니 idle, 에디터 빈 상태에 큰 idle 있음) */}
         <div className="mascot-float hero-mascot">
@@ -1634,7 +1634,7 @@ function SongLibraryModal({
                       </div>
                     )}
                     <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-                      섹션 {song.sections.length}개 · {formatLibrarySavedAt(song.savedAt)}
+                      묶음 {song.sections.length}개 · {formatLibrarySavedAt(song.savedAt)}
                     </div>
                   </div>
                   <button
