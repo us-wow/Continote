@@ -66,7 +66,7 @@ export default function MobilePage() {
   // 내 교회 PPT(커스텀 배경) 이미지 — 세션 한정(저장 안 됨). 운영자 계정만 사용 가능(유료 예정).
   const [customBg, setCustomBg] = useState<string | null>(null);
   // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
-  const [customUnlocked, setCustomUnlocked] = useState(false);
+  const [premiumUnlocked, setPremiumUnlocked] = useState(false);
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본 가운데. 데스크탑과 동일하게 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
@@ -79,7 +79,7 @@ export default function MobilePage() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   // 내 교회 PPT 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
   useEffect(() => {
-    setCustomUnlocked(canUseCustomBg(authUser?.email));
+    setPremiumUnlocked(canUseCustomBg(authUser?.email));
   }, [authUser]);
   const [authBusy, setAuthBusy] = useState(false);
   const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
@@ -860,13 +860,13 @@ export default function MobilePage() {
             embedFont={embedFont}
             setEmbedFont={setEmbedFont}
             customBg={customBg}
-            customUnlocked={customUnlocked}
+            premiumUnlocked={premiumUnlocked}
             onCustomBgChange={(dataUrl) => {
               setCustomBg(dataUrl);
               setPptTheme('custom'); // 올리자마자 바로 적용
               showToast('교회 PPT 이미지가 배경으로 적용됐어요');
             }}
-            onLockedCustom={() => showToast('교회 PPT 배경은 유료 기능으로 준비 중이에요 🙏')}
+            onLockedPremium={() => showToast('유료 기능으로 준비 중이에요 🙏 조금만 기다려 주세요!')}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
             onCopyShareLink={handleCopyShareLink}

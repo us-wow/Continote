@@ -28,11 +28,13 @@ type PptSectionProps = {
   // 글꼴 포함(임베드) 토글 — 켜면 본명조를 PPT에 심는다.
   embedFont: boolean;
   setEmbedFont: (v: boolean) => void;
-  // 내 교회 PPT(커스텀 배경) — 유료 예정(왕관 표시). 현재는 운영자 계정만 사용 가능.
+  // 유료 기능(움직이는 배경 + 교회 PPT 등록) 잠금 — 운영자 계정만 해제.
+  // 잠긴 사용자에겐 보이되 어둡게 표시되고, 누르면 유료 안내만 나온다.
+  premiumUnlocked: boolean;
+  onLockedPremium: () => void;                   // 잠긴 상태에서 클릭 시 (유료 안내 토스트)
+  // 내 교회 PPT(커스텀 배경)
   customBg: string | null;                       // 업로드된 이미지 dataURL (없으면 null)
-  customUnlocked: boolean;                       // true=등록 가능(운영자), false=잠김(유료 안내)
   onCustomBgChange: (dataUrl: string) => void;   // 업로드 완료 시 (부모가 custom 테마로 전환)
-  onLockedCustom: () => void;                    // 잠긴 상태에서 클릭 시 (유료 안내 토스트)
   onOpenPreview: () => void;
   onDownloadPptx: () => void;
   // "다른 형식으로 내보내기" — 토글 펼치면 보임
@@ -156,10 +158,10 @@ export default function PptSection({
   setPptVAlign,
   embedFont,
   setEmbedFont,
+  premiumUnlocked,
+  onLockedPremium,
   customBg,
-  customUnlocked,
   onCustomBgChange,
-  onLockedCustom,
   onOpenPreview,
   onDownloadPptx,
   onCopyShareLink,
@@ -173,8 +175,8 @@ export default function PptSection({
   const customFileRef = useRef<HTMLInputElement>(null);
 
   const handleCustomTileClick = () => {
-    if (!customUnlocked) {
-      onLockedCustom(); // 잠김 — "유료 준비 중" 안내
+    if (!premiumUnlocked) {
+      onLockedPremium(); // 잠김 — "유료 준비 중" 안내
       return;
     }
     customFileRef.current?.click();
@@ -205,15 +207,19 @@ export default function PptSection({
         <div className="ppt-ctrl-block">
           <div className="ppt-ctrl-label label">테마</div>
           <div className="ppt-themes">
-            {THEME_ORDER.map((key) => (
+            {THEME_ORDER.map((key) => {
+              // 움직이는 배경은 유료 예정 — 잠긴 사용자에겐 보이되 어둡게, 선택 불가
+              const locked = PREMIUM_THEMES.includes(key) && !premiumUnlocked;
+              return (
               <button
                 key={key}
                 type="button"
-                className={`theme-sw ${pptTheme === key ? 'is-active' : ''}`}
-                onClick={() => setPptTheme(key)}
+                className={`theme-sw ${pptTheme === key ? 'is-active' : ''}${locked ? ' theme-sw-plocked' : ''}`}
+                onClick={() => (locked ? onLockedPremium() : setPptTheme(key))}
                 aria-pressed={pptTheme === key}
-                aria-label={`${PPT_THEME_LABELS[key]} 테마`}
-                title={PPT_THEME_LABELS[key]}
+                aria-disabled={locked}
+                aria-label={`${PPT_THEME_LABELS[key]} 테마${locked ? ' (유료 준비 중)' : ''}`}
+                title={locked ? `${PPT_THEME_LABELS[key]} — 유료 기능으로 준비 중이에요` : PPT_THEME_LABELS[key]}
               >
                 <div
                   className="theme-sw-preview"
@@ -243,7 +249,8 @@ export default function PptSection({
                   </div>
                 )}
               </button>
-            ))}
+              );
+            })}
             {/* 등록된 내 교회 PPT — 일반 테마처럼 선택 가능한 스와치로 표시 */}
             {customBg && (
               <button

@@ -1602,6 +1602,17 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .theme-sw-add:hover .theme-sw-add-plus {
   color: var(--accent-ink);
 }
+/* 잠긴 유료 테마 — 보이긴 보이지만 어둡게, 선택 불가 (운영자 계정만 해제) */
+.theme-sw-plocked {
+  cursor: not-allowed;
+}
+.theme-sw-plocked .theme-sw-preview {
+  filter: brightness(0.55) saturate(0.85);
+}
+.theme-sw-plocked .theme-sw-name {
+  opacity: 0.55;
+}
+
 /* 유료 예정 왕관 — 노란 선으로 그린 투명 왕관, 타일 오른쪽 위 (선택 중엔 ✓가 대신 보임) */
 .theme-sw-crown {
   position: absolute;

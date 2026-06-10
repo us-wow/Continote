@@ -161,7 +161,7 @@ export default function Home() {
   // 내 교회 PPT(커스텀 배경) 이미지 — 세션 한정(저장 안 됨). 운영자 계정만 사용 가능(유료 예정).
   const [customBg, setCustomBg] = useState<string | null>(null);
   // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
-  const [customUnlocked, setCustomUnlocked] = useState(false);
+  const [premiumUnlocked, setPremiumUnlocked] = useState(false);
   // PPT 배경 테마 — 어두운 예배실 기본은 검정.
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본은 가운데(기존 동작). 상단/하단 선택 시 미리보기·PPT 동시 적용.
@@ -181,7 +181,7 @@ export default function Home() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   // 내 교회 PPT 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
   useEffect(() => {
-    setCustomUnlocked(canUseCustomBg(authUser?.email));
+    setPremiumUnlocked(canUseCustomBg(authUser?.email));
   }, [authUser]);
   // 로그인/로그아웃 진행 중 표시 — 버튼 중복 클릭 방지.
   const [authBusy, setAuthBusy] = useState(false);
@@ -1192,13 +1192,13 @@ export default function Home() {
           embedFont={embedFont}
           setEmbedFont={setEmbedFont}
           customBg={customBg}
-          customUnlocked={customUnlocked}
+          premiumUnlocked={premiumUnlocked}
           onCustomBgChange={(dataUrl) => {
             setCustomBg(dataUrl);
             setPptTheme('custom'); // 올리자마자 바로 적용해서 미리보기로 확인
             showToast('교회 PPT 이미지가 배경으로 적용됐어요');
           }}
-          onLockedCustom={() => showToast('교회 PPT 배경은 유료 기능으로 준비 중이에요 🙏')}
+          onLockedPremium={() => showToast('유료 기능으로 준비 중이에요 🙏 조금만 기다려 주세요!')}
           onOpenPreview={() => setPreviewOpen(true)}
           onDownloadPptx={handleSavePptx}
           onCopyShareLink={handleCopyShareLink}
