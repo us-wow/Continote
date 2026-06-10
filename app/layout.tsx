@@ -38,6 +38,14 @@ export default function RootLayout({
     // 이 태그 자체 속성에만 적용되고 자식엔 전파되지 않아 실제 버그는 그대로 잡힌다.
     <html lang="ko" data-theme="wanted" suppressHydrationWarning>
       <head>
+        {/* 디자인 테마 FOUC 방지 — React가 뜨기 전(첫 페인트 전)에 저장된 테마를 동기로 적용한다.
+            이게 없으면 기본(wanted)으로 한 번 그려진 뒤 저장된 테마로 바뀌며 화면이 번쩍인다. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('conti-design-theme');if(t==='paper'||t==='wanted'){document.documentElement.dataset.theme=t}}catch(e){}",
+          }}
+        />
         {/* 폰트 CDN preconnect — 로딩 속도 향상 */}
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
