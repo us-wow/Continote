@@ -17,6 +17,7 @@ export const PPT_FONT_LABELS: Record<PptFont, string> = {
 // 'custom' = 사용자가 직접 올린 교회 PPT 이미지 (유료 예정이지만 현재 전체 공개)
 export type PptTheme =
   | 'black' | 'white' | 'paper' | 'meadow' | 'cross' | 'bible'
+  | 'sunrise' | 'milkyway' | 'godrays' | 'wheat' | 'sea' | 'flowers'
   | 'light' | 'dawn' | 'serene' | 'green' | 'gold' | 'pink' | 'violet'
   | 'wave' | 'mist' | 'candle' | 'grace' | 'aurora' | 'crosslight'
   | 'custom';
@@ -42,6 +43,13 @@ export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'meadow': '초원 (실사 이미지)',
   'cross': '십자가 (실사 이미지)',
   'bible': '성경책 (실사 이미지)',
+  // 무료 실사 6종 — Pexels 무료 스톡 (상업 무료·출처표기 불요)
+  'sunrise': '일출 (산 위 운해)',
+  'milkyway': '은하수 (밤하늘)',
+  'godrays': '숲빛 (사이로 드는 해)',
+  'wheat': '들녘 (황금 밀밭)',
+  'sea': '바다 (새벽 수평선)',
+  'flowers': '들꽃 (가을 역광)',
   'custom': '내 교회 PPT (직접 등록)',
 };
 
@@ -78,6 +86,13 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   'meadow': { kind: 'image', path: '/pptx-bg-meadow.jpg', text: '1F1B16' },
   'cross': { kind: 'image', path: '/pptx-bg-cross.jpg', text: '1F1B16' },
   'bible': { kind: 'image', path: '/pptx-bg-bible.jpg', text: '1F1B16' },
+  // 무료 실사 6종(Pexels) — 밝은 사진은 흰 오버레이+검정 글자, 은하수만 어두워서 흰 글자
+  'sunrise': { kind: 'image', path: '/pptx-bg-sunrise.jpg', text: '1F1B16' },
+  'milkyway': { kind: 'image', path: '/pptx-bg-milkyway.jpg', text: 'FFFFFF', overlay: false, fallback: '060A14' },
+  'godrays': { kind: 'image', path: '/pptx-bg-godrays.jpg', text: '1F1B16' },
+  'wheat': { kind: 'image', path: '/pptx-bg-wheat.jpg', text: '1F1B16' },
+  'sea': { kind: 'image', path: '/pptx-bg-sea.jpg', text: '1F1B16' },
+  'flowers': { kind: 'image', path: '/pptx-bg-flowers.jpg', text: '1F1B16' },
   // 움직이는 홀리 배경 7종 — GIF(scripts/gen-holy-bg.mjs v4, 4초 무한 루프).
   // 슬라이드쇼(발표) 모드에서만 움직이고 편집 화면에선 정지로 보인다(PowerPoint 동작).
   // 전부 어두운 배경이라 글자는 흰색, overlay 끔. fallback = 각 배경의 주조색.

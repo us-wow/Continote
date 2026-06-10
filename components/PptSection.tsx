@@ -69,6 +69,12 @@ const THEME_SWATCH_BG: Record<PptTheme, string> = {
   meadow: "url('/pptx-bg-meadow.jpg') center/cover",
   cross: "url('/pptx-bg-cross.jpg') center/cover",
   bible: "url('/pptx-bg-bible.jpg') center/cover",
+  sunrise: "url('/pptx-bg-sunrise.jpg') center/cover",
+  milkyway: "url('/pptx-bg-milkyway.jpg') center/cover",
+  godrays: "url('/pptx-bg-godrays.jpg') center/cover",
+  wheat: "url('/pptx-bg-wheat.jpg') center/cover",
+  sea: "url('/pptx-bg-sea.jpg') center/cover",
+  flowers: "url('/pptx-bg-flowers.jpg') center/cover",
 };
 // 글자색 — lib/pptx.ts의 text 컬러와 동일. 이미지 테마는 흰 반투명 오버레이 위에 검정 잉크.
 const THEME_SWATCH_FG: Record<PptTheme, string> = {
@@ -93,14 +99,21 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
   meadow: '#1F1B16',
   cross: '#1F1B16',
   bible: '#1F1B16',
+  sunrise: '#1F1B16',
+  milkyway: '#FFFFFF',
+  godrays: '#1F1B16',
+  wheat: '#1F1B16',
+  sea: '#1F1B16',
+  flowers: '#1F1B16',
 };
-// 이미지 테마 여부 — 흰 반투명 오버레이 깔지 결정.
-const isImageTheme = (theme: PptTheme): boolean =>
-  theme === 'meadow' || theme === 'cross' || theme === 'bible';
+// 흰 반투명 오버레이를 까는 실사 테마 — lib/pptx.ts와 동일 규칙 (은하수는 어두워서 제외)
+const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers'];
+const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme);
 
 // 순서(사용자 지정): 단색·실사 6종 → 움직이는 홀리 13종 → (별도) 교회 PPT 등록 타일.
 const THEME_ORDER: PptTheme[] = [
   'black', 'white', 'paper', 'bible', 'meadow', 'cross',
+  'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers',
   'light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet',
   'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight',
 ];

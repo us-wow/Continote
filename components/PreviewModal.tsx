@@ -48,6 +48,12 @@ const THEME_BG: Record<PptTheme, string> = {
   meadow: "url('/pptx-bg-meadow.jpg') center/cover, #B8D27A",
   cross: "url('/pptx-bg-cross.jpg') center/cover, #1a140e",
   bible: "url('/pptx-bg-bible.jpg') center/cover, #c19b6e",
+  sunrise: "url('/pptx-bg-sunrise.jpg') center/cover, #E8C8A0",
+  milkyway: "url('/pptx-bg-milkyway.jpg') center/cover, #060A14",
+  godrays: "url('/pptx-bg-godrays.jpg') center/cover, #2A2418",
+  wheat: "url('/pptx-bg-wheat.jpg') center/cover, #C89A50",
+  sea: "url('/pptx-bg-sea.jpg') center/cover, #A8C4D8",
+  flowers: "url('/pptx-bg-flowers.jpg') center/cover, #B89060",
 };
 const THEME_FG: Record<PptTheme, string> = {
   custom: '#1F1B16',
@@ -71,12 +77,23 @@ const THEME_FG: Record<PptTheme, string> = {
   meadow: '#1F1B16',
   cross: '#F4E8D2',
   bible: '#1F1B16',
+  sunrise: '#1F1B16',
+  milkyway: '#FFFFFF',
+  godrays: '#1F1B16',
+  wheat: '#1F1B16',
+  sea: '#1F1B16',
+  flowers: '#1F1B16',
 };
 // 실사 이미지 테마는 흰 반투명 오버레이 위에 검정 글자 (lib/pptx.ts 와 동일 규칙)
 const THEME_OVERLAY: Partial<Record<PptTheme, string>> = {
   meadow: 'rgba(255,255,255,0.65)',
   cross: 'rgba(0,0,0,0.40)',
   bible: 'rgba(255,255,255,0.55)',
+  sunrise: 'rgba(255,255,255,0.65)',
+  godrays: 'rgba(255,255,255,0.65)',
+  wheat: 'rgba(255,255,255,0.65)',
+  sea: 'rgba(255,255,255,0.65)',
+  flowers: 'rgba(255,255,255,0.65)',
   // 내 교회 PPT — 실제 출력(lib/pptx.ts overlay:true, 흰 65%)과 동일 톤
   custom: 'rgba(255,255,255,0.65)',
 };
