@@ -1,10 +1,11 @@
 import type { Slide } from './text-doc';
 
-// 폰트 옵션 4종
-export type PptFont = 'nanum-myeongjo' | 'noto-serif-kr' | 'nanum-square' | 'noto-sans-kr';
+// 폰트 옵션 5종 — 나눔고딕이 기본(첫 외부 사용자 피드백: 가장 보기 좋다고 함)
+export type PptFont = 'nanum-gothic' | 'nanum-myeongjo' | 'noto-serif-kr' | 'nanum-square' | 'noto-sans-kr';
 
 // 폰트 표시 라벨 (UI에서 사용)
 export const PPT_FONT_LABELS: Record<PptFont, string> = {
+  'nanum-gothic': '나눔고딕',
   'nanum-myeongjo': '나눔명조',
   'noto-serif-kr': '본명조',
   'nanum-square': '나눔스퀘어',
@@ -12,19 +13,36 @@ export const PPT_FONT_LABELS: Record<PptFont, string> = {
 };
 
 // 슬라이드 배경 템플릿 — 예배 분위기에 따라 선택
-export type PptTheme = 'black' | 'white' | 'paper' | 'light' | 'dawn' | 'serene' | 'meadow' | 'cross' | 'bible';
+// light~violet 7종 = 움직이는 홀리 배경(빛내림 + 글로우·빛망울 색 계열 6종)
+// 'custom' = 사용자가 직접 올린 교회 PPT 이미지 (유료 예정이지만 현재 전체 공개)
+export type PptTheme =
+  | 'black' | 'white' | 'paper' | 'meadow' | 'cross' | 'bible'
+  | 'light' | 'dawn' | 'serene' | 'green' | 'gold' | 'pink' | 'violet'
+  | 'wave' | 'mist' | 'candle' | 'grace' | 'aurora' | 'crosslight'
+  | 'custom';
 
 export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'black': '검정 (어두운 예배실)',
   'white': '흰색 (밝은 예배실)',
   'paper': '종이 톤 (따뜻한 분위기)',
-  // 홀리 그라데이션 3종 — scripts/gen-holy-bg.mjs로 생성한 빛/글로우 배경.
-  'light': '빛내림 (어두운 예배실)',
-  'dawn': '새벽 (따뜻한 톤)',
-  'serene': '고요한빛 (밝은 예배실)',
+  // 움직이는 홀리 배경 — scripts/gen-holy-bg.mjs로 생성(발표 모드에서 재생).
+  'light': '빛내림 (광선 다발)',
+  'dawn': '새벽 (따뜻한 빛망울)',
+  'serene': '푸른빛 (고요한 밤)',
+  'green': '초록빛 (깊은 숲)',
+  'gold': '금빛 (감사와 영광)',
+  'pink': '분홍빛 (따뜻한 사랑)',
+  'violet': '보랏빛 (경건한 묵상)',
+  'wave': '물결 (달빛 수면)',
+  'mist': '안개 (새벽 묵상)',
+  'candle': '촛불 (따뜻한 기도)',
+  'grace': '빛가루 (내리는 은혜)',
+  'aurora': '오로라 (밤하늘 물결)',
+  'crosslight': '십자가빛 (역광)',
   'meadow': '초원 (실사 이미지)',
   'cross': '십자가 (실사 이미지)',
   'bible': '성경책 (실사 이미지)',
+  'custom': '내 교회 PPT (직접 등록)',
 };
 
 // 슬라이드 세로 정렬 — 가사/제목을 화면의 위/가운데/아래 어디에 둘지 선택.
@@ -42,7 +60,10 @@ type ThemeConfig =
   | { kind: 'solid'; bg: string; text: string }
   // overlay: 글자 가독성용 흰 반투명 레이어 사용 여부. 실사 사진은 true(기본),
   // 자체 대비가 충분한 그라데이션 배경은 false로 둬서 색이 흐려지지 않게 한다.
-  | { kind: 'image'; path: string; text: string; overlay?: boolean };
+  // animated: 움직이는 GIF 배경. PowerPoint는 '배경 채우기'에 넣은 GIF를 첫 프레임
+  // 정지화면으로만 보여주므로, 슬라이드 맨 뒤 전면 이미지(addImage)로 깔아야 움직인다.
+  // fallback: 이미지 로드 실패 시(또는 GIF 뒤 안전망) 깔리는 단색 배경.
+  | { kind: 'image'; path: string; text: string; overlay?: boolean; animated?: boolean; fallback?: string };
 
 const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   // 검정은 어두운 예배실 투사 환경에서 가장 높은 대비를 주기 위해 선택했다.
@@ -57,11 +78,25 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   'meadow': { kind: 'image', path: '/pptx-bg-meadow.jpg', text: '1F1B16' },
   'cross': { kind: 'image', path: '/pptx-bg-cross.jpg', text: '1F1B16' },
   'bible': { kind: 'image', path: '/pptx-bg-bible.jpg', text: '1F1B16' },
-  // 홀리 그라데이션 3종 — 자체 대비가 충분하므로 overlay를 끈다(흰 반투명 레이어 생략).
-  // light/dawn는 어두운 배경이라 흰 글자, serene는 밝은 배경이라 검정 글자.
-  'light': { kind: 'image', path: '/pptx-bg-light.jpg', text: 'FFFFFF', overlay: false },
-  'dawn': { kind: 'image', path: '/pptx-bg-dawn.jpg', text: 'FFFFFF', overlay: false },
-  'serene': { kind: 'image', path: '/pptx-bg-serene.jpg', text: '1F1B16', overlay: false },
+  // 움직이는 홀리 배경 7종 — GIF(scripts/gen-holy-bg.mjs v4, 4초 무한 루프).
+  // 슬라이드쇼(발표) 모드에서만 움직이고 편집 화면에선 정지로 보인다(PowerPoint 동작).
+  // 전부 어두운 배경이라 글자는 흰색, overlay 끔. fallback = 각 배경의 주조색.
+  'light': { kind: 'image', path: '/pptx-bg-light.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '04060D' },
+  'dawn': { kind: 'image', path: '/pptx-bg-dawn.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '1F0F20' },
+  'serene': { kind: 'image', path: '/pptx-bg-serene.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A142B' },
+  'green': { kind: 'image', path: '/pptx-bg-green.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A1F14' },
+  'gold': { kind: 'image', path: '/pptx-bg-gold.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '241804' },
+  'pink': { kind: 'image', path: '/pptx-bg-pink.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '260D1B' },
+  'violet': { kind: 'image', path: '/pptx-bg-violet.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '150E2E' },
+  'wave': { kind: 'image', path: '/pptx-bg-wave.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '060D1C' },
+  'mist': { kind: 'image', path: '/pptx-bg-mist.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '141B28' },
+  'candle': { kind: 'image', path: '/pptx-bg-candle.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '170E06' },
+  'grace': { kind: 'image', path: '/pptx-bg-grace.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0E0A1E' },
+  'aurora': { kind: 'image', path: '/pptx-bg-aurora.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '050A18' },
+  'crosslight': { kind: 'image', path: '/pptx-bg-crosslight.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0C0908' },
+  // 내 교회 PPT — 이미지 데이터는 exportToPptx의 customBgData 파라미터로 받는다(path 미사용).
+  // 실사 테마처럼 흰 반투명 오버레이를 깔아 "투명도를 낮추고 가사를 얹는" 효과를 낸다.
+  'custom': { kind: 'image', path: '', text: '1F1B16', overlay: true },
 };
 
 // 한 슬라이드의 입력 — text-doc.ts의 Slide와 동일 구조를 그대로 재사용.
@@ -82,11 +117,23 @@ export type PptCopyrightInfo = {
 export type PptValidation = { ok: true; fontSize: number; lineCount: number };
 
 const FONT_FACE_MAP: Record<PptFont, string> = {
+  // 'NanumGothic'(붙여쓰기)이 글꼴 파일의 실제 내부 family명 — 임베드 글꼴과 정확히 일치해야 연결됨.
+  'nanum-gothic': 'NanumGothic',
   'nanum-myeongjo': 'Nanum Myeongjo',
   'noto-serif-kr': 'Noto Serif KR',
   'nanum-square': 'NanumSquare',
   'noto-sans-kr': 'Noto Sans KR',
 };
+
+// 임베드(글꼴 포함) 지원 글꼴 — public/fonts/의 서브셋 파일(scripts/gen-subset-font.py로 생성).
+// 여기 없는 글꼴은 "글꼴 포함" 토글을 켜도 일반 PPT로 나간다.
+const EMBED_FONT_FILES: Partial<Record<PptFont, { path: string; type: 'otf' | 'ttf' }>> = {
+  'noto-serif-kr': { path: '/fonts/noto-serif-kr-kr.otf', type: 'otf' },
+  'nanum-gothic': { path: '/fonts/nanum-gothic-kr.ttf', type: 'ttf' },
+};
+
+// UI에서 "이 글꼴은 포함돼요" 안내에 쓰는 헬퍼
+export const isEmbeddableFont = (font: PptFont): boolean => Boolean(EMBED_FONT_FILES[font]);
 
 // ── 가사 슬라이드 글씨 크기 자동 결정 ──────────────────────────────────
 // 2026-05-31 변경: 예전에는 "한 슬라이드 4줄 + 줄당 글자수" 한도를 넘으면
@@ -178,27 +225,30 @@ export async function exportToPptx(
   // 세로 정렬 — 기본값 'middle'로 두어 기존 호출/동작과 호환. 제목·메모·가사 슬라이드에 적용한다.
   verticalAlign: PptVAlign = 'middle',
   // 글꼴 포함(임베드) — 켜고 본명조를 고르면 서브셋 글꼴을 PPT에 심어 글꼴 없는 PC에서도 그대로 보임.
-  embedFont: boolean = false
+  embedFont: boolean = false,
+  // 내 교회 PPT(custom 테마) 배경 이미지 — FileReader dataURL 그대로 받는다.
+  customBgData?: string
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
   const pptxgen = (await import('pptxgenjs')).default;
 
-  // 글꼴 임베드 — 본명조(noto-serif-kr)일 때만 지원(서브셋 글꼴을 public/fonts/에 번들).
+  // 글꼴 임베드 — EMBED_FONT_FILES에 서브셋 파일이 있는 글꼴(본명조·나눔고딕)만 지원.
   // pptx-embed-fonts로 감싼 클래스를 쓰면 writeFile 때 글꼴이 PPT에 자동으로 심긴다.
   // 실패하면(라이브러리/네트워크) 조용히 일반 PPT로 폴백 → 다운로드 자체는 항상 된다.
-  const canEmbed = embedFont && font === 'noto-serif-kr';
+  const embedFile = EMBED_FONT_FILES[font];
+  const canEmbed = embedFont && Boolean(embedFile);
   let pres: InstanceType<typeof pptxgen>;
-  if (canEmbed) {
+  if (canEmbed && embedFile) {
     try {
       // @ts-ignore — 서브패스('./pptxgenjs')에 타입 선언이 없어 무시
       const { withPPTXEmbedFonts } = await import('pptx-embed-fonts/pptxgenjs');
       const Enhanced = withPPTXEmbedFonts(pptxgen);
       const embedPres = new Enhanced();
-      const res = await fetch('/fonts/noto-serif-kr-kr.otf');
+      const res = await fetch(embedFile.path);
       if (!res.ok) throw new Error(`글꼴 파일 로드 실패 (${res.status})`);
       const fontBuf = await res.arrayBuffer();
-      await embedPres.addFont({ fontFace: FONT_FACE_MAP[font], fontFile: fontBuf, fontType: 'otf' });
+      await embedPres.addFont({ fontFace: FONT_FACE_MAP[font], fontFile: fontBuf, fontType: embedFile.type });
       pres = embedPres as unknown as InstanceType<typeof pptxgen>;
     } catch (err) {
       console.warn('글꼴 임베드 실패 → 일반 PPT로 대체:', err);
@@ -218,7 +268,12 @@ export async function exportToPptx(
   let bgData: string | undefined;
   if (config.kind === 'image') {
     try {
-      bgData = await loadPublicImageAsBase64(config.path);
+      if (theme === 'custom') {
+        // 사용자가 올린 이미지 — pptxgenjs는 'data:' 접두사 없는 형식을 받는다.
+        bgData = customBgData ? customBgData.replace(/^data:/, '') : undefined;
+      } else {
+        bgData = await loadPublicImageAsBase64(config.path);
+      }
     } catch (err) {
       console.warn('이미지 배경 로드 실패 → 단색으로 대체:', err);
     }
@@ -227,6 +282,13 @@ export async function exportToPptx(
   const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>) => {
     if (config.kind === 'solid') {
       slide.background = { color: config.bg };
+    } else if (bgData && config.animated) {
+      // 움직이는 GIF 배경 — '배경 채우기'에 넣으면 PowerPoint가 첫 프레임 정지화면만
+      // 보여주므로, 슬라이드 맨 처음(=맨 뒤 레이어)에 전면 이미지로 깐다.
+      // 뒤에 단색을 깔아 GIF 로드가 늦거나 실패해도 글자가 읽히게 한다.
+      // 재생은 슬라이드쇼(발표) 모드에서만 된다 — 편집 화면에선 정지로 보이는 게 정상.
+      slide.background = { color: config.fallback ?? '000000' };
+      slide.addImage({ data: bgData, x: 0, y: 0, w: 13.333, h: 7.5 });
     } else if (bgData) {
       slide.background = { data: bgData };
       // 실사 이미지는 글자 가독성을 위해 흰 반투명 레이어를 깐다.
@@ -316,6 +378,80 @@ export async function exportToPptx(
 
   // 저작권(CCLI) 슬라이드 제거됨 — 한국 교회는 거의 안 써서. copyright 파라미터는 호환 위해 남겨두고 미사용.
 
+  if (config.kind === 'image' && config.animated && bgData) {
+    // 움직이는 배경은 pptxgenjs가 슬라이드마다 같은 GIF를 통째로 중복 저장한다
+    // (10장이면 30MB+). zip을 열어 같은 내용의 GIF를 하나만 남기고 참조를 통일한 뒤 내려준다.
+    // 후처리에 실패하면 중복 제거 없이(파일만 클 뿐 정상인) 원본을 그대로 내려준다.
+    const blob: Blob = await (pres as any).write({ outputType: 'blob' });
+    let finalBlob = blob;
+    try {
+      finalBlob = await dedupeGifMedia(blob);
+    } catch (err) {
+      console.warn('GIF 중복 제거 실패 → 원본 그대로 다운로드(파일이 클 수 있음):', err);
+    }
+    downloadBlob(finalBlob, fileName);
+    return;
+  }
+
   // 브라우저 환경에서는 pptxgenjs의 writeFile이 다운로드 처리를 맡는다.
   await pres.writeFile({ fileName });
+}
+
+// 생성된 pptx(zip) 안에서 내용이 똑같은 GIF를 하나만 남기고,
+// 각 슬라이드의 참조(rels)를 남긴 파일로 바꿔치기한다.
+// jszip은 pptxgenjs가 이미 쓰는 의존성이라 새로 설치할 게 없다.
+async function dedupeGifMedia(blob: Blob): Promise<Blob> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(blob);
+  const gifNames = Object.keys(zip.files)
+    .filter((n) => /^ppt\/media\/.+\.gif$/.test(n))
+    .sort();
+  if (gifNames.length < 2) return blob;
+
+  // 같은 내용 찾기 — 바이트 단위로 비교 (배경 GIF는 전부 같은 원본이라 한 그룹으로 묶인다)
+  const keepers: { name: string; bytes: Uint8Array }[] = [];
+  const rename = new Map<string, string>(); // 지울 파일명 → 남길 파일명
+  for (const name of gifNames) {
+    const bytes = await zip.files[name].async('uint8array');
+    const same = keepers.find(
+      (k) => k.bytes.length === bytes.length && k.bytes.every((b, i) => b === bytes[i])
+    );
+    if (same) {
+      rename.set(name, same.name);
+      zip.remove(name);
+    } else {
+      keepers.push({ name, bytes });
+    }
+  }
+  if (rename.size === 0) return blob;
+
+  // 슬라이드 rels에서 지운 GIF를 가리키던 참조를 남긴 GIF로 교체
+  const relsNames = Object.keys(zip.files).filter((n) => /^ppt\/slides\/_rels\/.+\.rels$/.test(n));
+  for (const relName of relsNames) {
+    let xml = await zip.files[relName].async('string');
+    let changed = false;
+    for (const [oldName, keptName] of rename) {
+      const oldRef = oldName.replace('ppt/', '../');   // 예: '../media/image3.gif'
+      const keptRef = keptName.replace('ppt/', '../');
+      if (xml.includes(oldRef)) {
+        xml = xml.split(oldRef).join(keptRef);
+        changed = true;
+      }
+    }
+    if (changed) zip.file(relName, xml);
+  }
+  return zip.generateAsync({ type: 'blob' });
+}
+
+// 브라우저에서 Blob을 파일로 내려받게 한다 (pptxgenjs writeFile과 같은 동작).
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // 다운로드가 시작될 시간을 준 뒤 메모리 해제
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

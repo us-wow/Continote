@@ -6,3 +6,6 @@ node_modules
 *.log
 .vercel
 tsconfig.tsbuildinfo
+
+# Supabase CLI 링크 임시 파일 (배포와 무관)
+supabase/

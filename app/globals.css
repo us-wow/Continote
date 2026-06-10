@@ -677,6 +677,8 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   font-size: 14px;
   color: var(--ink-2);
   line-height: 1.55;
+  /* 한글이 단어 중간에서 잘리지 않게 ("누르면" → "누/르면" 방지) */
+  word-break: keep-all;
 }
 .ex-empty-text strong {
   color: var(--accent-ink);
@@ -1227,10 +1229,62 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  /* 확정 버튼 아래 고지 문구(.refcheck-notice)가 다음 줄로 내려가게 */
+  flex-wrap: wrap;
 }
 .song-split-count {
   font-size: 12px;
   color: var(--ink-3);
+}
+
+/* ── 가사 대조 검토 — 확정본과의 일치율 배너 + 교정 제안 ── */
+.refcheck {
+  margin: 10px 14px 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+.refcheck-ok {
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 25%, transparent);
+  color: var(--accent-ink);
+}
+.refcheck-warn {
+  background: color-mix(in oklab, #c98a2b 9%, transparent);
+  border: 1px solid color-mix(in oklab, #c98a2b 32%, transparent);
+  color: var(--ink);
+}
+.refcheck-head { margin-bottom: 2px; }
+.refcheck-diff {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+/* 내 추출(의심) 줄은 취소선 느낌 없이 옅게, 확정본 제안은 진하게 — "고치라"가 아니라 "확인하라" 톤 */
+.refcheck-mine {
+  color: var(--ink-3);
+  background: color-mix(in oklab, #c98a2b 14%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.refcheck-arrow { color: var(--ink-3); }
+.refcheck-sugg {
+  font-weight: 600;
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.refcheck-notice {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-align: center;
+  word-break: keep-all;
 }
 
 /* ── 나누기 라이브 미리보기 — 빈 줄로 나뉜 묶음이 실시간으로 갈라져 보인다 ── */
@@ -1528,6 +1582,36 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   color: var(--ink-2);
   text-align: center;
 }
+/* 교회 PPT 등록 타일 — 점선 + 큰 + 모양. 잠긴 계정은 클릭 시 유료 안내만. */
+.theme-sw-add .theme-sw-add-preview {
+  border-style: dashed;
+  border-color: var(--rule-2);
+  background: var(--surface);
+}
+.theme-sw-add:hover .theme-sw-add-preview {
+  border-color: var(--accent);
+}
+.theme-sw-add-plus {
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--ink-3);
+  position: relative;
+  z-index: 1;
+}
+.theme-sw-add:hover .theme-sw-add-plus {
+  color: var(--accent-ink);
+}
+/* 유료 예정 왕관 — 노란 선으로 그린 투명 왕관, 타일 오른쪽 위 (선택 중엔 ✓가 대신 보임) */
+.theme-sw-crown {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  display: inline-flex;
+  /* 어두운 배경(홀리)과 밝은 배경(+타일) 양쪽에서 다 보이게 살짝 그림자 */
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
 .theme-sw.is-active .theme-sw-name {
   color: var(--accent-ink);
   font-weight: 600;
@@ -1547,7 +1631,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   font-size: 10px;
 }
 
-/* 폰트 카드 4개 */
+/* 폰트 카드 5개 (나눔고딕 추가) */
 .ppt-fonts {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1555,8 +1639,12 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 @media (min-width: 760px) {
   .ppt-fonts {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
   }
+}
+/* 세로 정렬은 버튼이 3개 — 폰트 그리드를 재사용하되 항상 3칸으로 (모바일 2+1 고아 줄 방지) */
+.ppt-fonts.ppt-valign {
+  grid-template-columns: repeat(3, 1fr);
 }
 .ppt-font {
   position: relative;
@@ -1909,6 +1997,19 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   50% { transform: translateY(-3px); }
 }
 .mascot-float { animation: floatY 4s ease-in-out infinite; }
+
+/* 병아리 인사 — 마우스를 올리면 몸을 까딱까딱 흔들며 인사한다.
+ * 발 근처(50% 88%)를 회전축으로 잡아 제자리에 서서 흔드는 느낌을 낸다.
+ * 호버에서 벗어났다 다시 올리면 다시 인사한다(애니메이션 재시작). */
+@keyframes mascotWave {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(-12deg); }
+  35% { transform: rotate(9deg); }
+  55% { transform: rotate(-7deg); }
+  75% { transform: rotate(4deg); }
+}
+.mascot-wave-hover { transform-origin: 50% 88%; }
+.mascot-wave-hover:hover { animation: mascotWave 1s ease-in-out; }
 
 /* 히어로 마스코트만 절대 배치해 데스크톱 헤드라인 옆 장식으로 쓰고, 다른 마스코트 사용처와 분리한다. */
 .hero-section .h-display {

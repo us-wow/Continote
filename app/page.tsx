@@ -41,6 +41,8 @@ import { buildPlainSlidesTxt, buildOpenSongXml, downloadText } from '@/lib/expor
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Song, Section, SectionType } from '@/lib/types';
+import { attachRefChecks } from '@/lib/reference-lyrics';
+import { canUseCustomBg } from '@/lib/custom-bg';
 import Mascot from '@/components/Mascot';
 // SectionChip은 Phase 3에서 ExtractedSection 컴포넌트 내부로 이관됨 — page.tsx에선 import 안 함.
 import Header, { type DesignTheme } from '@/components/Header';
@@ -155,7 +157,11 @@ export default function Home() {
   const [accuracyMode, setAccuracyMode] = useState(false);
   // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
   // 기본 폰트는 '본명조'(Noto Serif KR) — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
-  const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
+  const [pptFont, setPptFont] = useState<PptFont>('nanum-gothic');
+  // 내 교회 PPT(커스텀 배경) 이미지 — 세션 한정(저장 안 됨). 운영자 계정만 사용 가능(유료 예정).
+  const [customBg, setCustomBg] = useState<string | null>(null);
+  // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
+  const [customUnlocked, setCustomUnlocked] = useState(false);
   // PPT 배경 테마 — 어두운 예배실 기본은 검정.
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본은 가운데(기존 동작). 상단/하단 선택 시 미리보기·PPT 동시 적용.
@@ -173,6 +179,10 @@ export default function Home() {
   const [showLibrary, setShowLibrary] = useState(false);
   // Supabase 로그인 상태 — null이면 비로그인. supabase 미설정 환경에서도 null 유지.
   const [authUser, setAuthUser] = useState<User | null>(null);
+  // 내 교회 PPT 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
+  useEffect(() => {
+    setCustomUnlocked(canUseCustomBg(authUser?.email));
+  }, [authUser]);
   // 로그인/로그아웃 진행 중 표시 — 버튼 중복 클릭 방지.
   const [authBusy, setAuthBusy] = useState(false);
   // 디자인 시스템 — wanted(기본) ↔ paper. localStorage에 저장해 새로고침해도 유지.
@@ -455,7 +465,10 @@ export default function Home() {
           showToast('가사를 찾을 수 없어요');
         } else {
           // confirmed:false → "나누기 모드"로 시작. 사용자가 빈 줄로 묶음을 직접 나눈 뒤 확정한다.
-          setSongs((prev) => [...prev, ...data.songs.map((s: Song) => ({ ...s, confirmed: false }))]);
+          const newSongs: Song[] = data.songs.map((s: Song) => ({ ...s, confirmed: false }));
+          setSongs((prev) => [...prev, ...newSongs]);
+          // 가사 대조 검토 — 같은 제목의 확정본이 있으면 배너로 일치율·교정 제안 표시 (비동기)
+          attachRefChecks(newSongs, setSongs);
           // 라이브러리 누적은 fire-and-forget — 사용자가 결과를 보는 흐름은 막지 않는다.
           // 실패 시 console에 남고 토스트는 별도로 안 띄움(부수 효과라 덜 중요).
           void addToLibraryAsync(data.songs);
@@ -802,7 +815,7 @@ export default function Home() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont);
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg ?? undefined);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -1080,7 +1093,7 @@ export default function Home() {
       >
         {/* 히어로 헤드라인 — 한글 강제 이탤릭 어색해서 굵기+색으로만 강조 */}
         <h1 className="h-display" style={{ margin: 0, maxWidth: 920 }}>
-          악보를 콘티 가사로,
+          찬양 악보 한 장이면,
           <br />
           <span
             style={{
@@ -1088,7 +1101,7 @@ export default function Home() {
               fontWeight: 700,
             }}
           >
-            클릭 한 번에.
+            콘티부터 PPT까지.
           </span>
         </h1>
         <p
@@ -1103,9 +1116,9 @@ export default function Home() {
             wordBreak: 'keep-all',
           }}
         >
-          악보를 사진이나 PDF로 올리면, AI가 가사만 깔끔하게 뽑아줘요.
+          악보를 사진이나 PDF로 올리면 AI가 가사를 깔끔하게 뽑아줘요.
           <br />
-          곡 제목과 묶음(칩)을 누르면 콘티가 만들어집니다.
+          묶음을 눌러 콘티를 짜고, 움직이는 배경을 입힌 예배 PPT까지 바로 받아요.
         </p>
         {/* 히어로 마스코트 — done 포즈로 차별화 (헤더에 미니 idle, 에디터 빈 상태에 큰 idle 있음) */}
         <div className="mascot-float hero-mascot">
@@ -1178,6 +1191,14 @@ export default function Home() {
           setPptVAlign={setPptVAlign}
           embedFont={embedFont}
           setEmbedFont={setEmbedFont}
+          customBg={customBg}
+          customUnlocked={customUnlocked}
+          onCustomBgChange={(dataUrl) => {
+            setCustomBg(dataUrl);
+            setPptTheme('custom'); // 올리자마자 바로 적용해서 미리보기로 확인
+            showToast('교회 PPT 이미지가 배경으로 적용됐어요');
+          }}
+          onLockedCustom={() => showToast('교회 PPT 배경은 유료 기능으로 준비 중이에요 🙏')}
           onOpenPreview={() => setPreviewOpen(true)}
           onDownloadPptx={handleSavePptx}
           onCopyShareLink={handleCopyShareLink}
@@ -1195,6 +1216,7 @@ export default function Home() {
         pptFont={pptFont}
         pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}
+        customBgUrl={customBg}
       />
 
 

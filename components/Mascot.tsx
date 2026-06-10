@@ -34,7 +34,8 @@ export default function Mascot({ pose = 'idle', size = 140, className }: MascotP
       alt=""
       width={size}
       height={size}
-      className={className}
+      // mascot-wave-hover: 마우스를 올리면 까딱까딱 인사하는 애니메이션 (globals.css)
+      className={className ? `mascot-wave-hover ${className}` : 'mascot-wave-hover'}
       style={{ display: 'block' }}
     />
   );
@@ -51,6 +52,8 @@ export function MascotMini({ size = 28 }: { size?: number }) {
       alt=""
       width={size}
       height={size}
+      // 작은 자리(헤더·footer)에서도 호버하면 인사
+      className="mascot-wave-hover"
       style={{ display: 'inline-block', verticalAlign: 'middle' }}
     />
   );

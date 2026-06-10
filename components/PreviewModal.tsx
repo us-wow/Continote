@@ -21,28 +21,53 @@ type PreviewModalProps = {
   // 4줄 한도를 넘는 슬라이드 인덱스 — 빨간 테두리 + "4줄 초과" 배지로 강조.
   // 사용자가 해당 슬라이드를 줄이면 부모가 새 indices를 넘기면서 빨간색 자동 풀림.
   overflowSlideIndices?: number[];
+  // 내 교회 PPT(custom 테마) 이미지 dataURL — custom 테마일 때 카드 배경으로 사용.
+  customBgUrl?: string | null;
 };
 
 const THEME_BG: Record<PptTheme, string> = {
+  // custom(내 교회 PPT)은 사용자가 올린 이미지로 런타임에 결정 — 여기 값은 이미지 없을 때 폴백.
+  custom: '#FFFFFF',
   black: '#000000',
   white: '#FFFFFF',
   paper: '#FAF5EC',
-  // 홀리 그라데이션 3종 — 실제 .jpg + 로드 전 폴백색(그라데이션의 주조색).
-  light: "url('/pptx-bg-light.jpg') center/cover, #070B1E",
-  dawn: "url('/pptx-bg-dawn.jpg') center/cover, #20102C",
-  serene: "url('/pptx-bg-serene.jpg') center/cover, #E9E3D2",
+  // 움직이는 홀리 7종 — GIF + 로드 전 폴백색(배경의 주조색). 미리보기 카드도 움직인다.
+  light: "url('/pptx-bg-light.gif') center/cover, #04060D",
+  dawn: "url('/pptx-bg-dawn.gif') center/cover, #1F0F20",
+  serene: "url('/pptx-bg-serene.gif') center/cover, #0A142B",
+  green: "url('/pptx-bg-green.gif') center/cover, #0A1F14",
+  gold: "url('/pptx-bg-gold.gif') center/cover, #241804",
+  pink: "url('/pptx-bg-pink.gif') center/cover, #260D1B",
+  violet: "url('/pptx-bg-violet.gif') center/cover, #150E2E",
+  wave: "url('/pptx-bg-wave.gif') center/cover, #060D1C",
+  mist: "url('/pptx-bg-mist.gif') center/cover, #141B28",
+  candle: "url('/pptx-bg-candle.gif') center/cover, #170E06",
+  grace: "url('/pptx-bg-grace.gif') center/cover, #0E0A1E",
+  aurora: "url('/pptx-bg-aurora.gif') center/cover, #050A18",
+  crosslight: "url('/pptx-bg-crosslight.gif') center/cover, #0C0908",
   meadow: "url('/pptx-bg-meadow.jpg') center/cover, #B8D27A",
   cross: "url('/pptx-bg-cross.jpg') center/cover, #1a140e",
   bible: "url('/pptx-bg-bible.jpg') center/cover, #c19b6e",
 };
 const THEME_FG: Record<PptTheme, string> = {
+  custom: '#1F1B16',
   black: '#FFFFFF',
   white: '#1F1B16',
   paper: '#1F1B16',
-  // 빛내림/새벽은 흰 글자, 고요한빛은 검정 글자 (lib/pptx.ts와 동일).
+  // 움직이는 홀리 13종은 전부 어두운 배경 → 흰 글자 (lib/pptx.ts와 동일).
   light: '#FFFFFF',
   dawn: '#FFFFFF',
-  serene: '#1F1B16',
+  serene: '#FFFFFF',
+  green: '#FFFFFF',
+  gold: '#FFFFFF',
+  pink: '#FFFFFF',
+  violet: '#FFFFFF',
+  wave: '#FFFFFF',
+  mist: '#FFFFFF',
+  candle: '#FFFFFF',
+  grace: '#FFFFFF',
+  aurora: '#FFFFFF',
+  crosslight: '#FFFFFF',
   meadow: '#1F1B16',
   cross: '#F4E8D2',
   bible: '#1F1B16',
@@ -52,6 +77,8 @@ const THEME_OVERLAY: Partial<Record<PptTheme, string>> = {
   meadow: 'rgba(255,255,255,0.65)',
   cross: 'rgba(0,0,0,0.40)',
   bible: 'rgba(255,255,255,0.55)',
+  // 내 교회 PPT — 실제 출력(lib/pptx.ts overlay:true, 흰 65%)과 동일 톤
+  custom: 'rgba(255,255,255,0.65)',
 };
 
 // 미리보기 글씨체를 실제 PPT 출력 폰트와 일치시킨다.
@@ -60,6 +87,7 @@ const THEME_OVERLAY: Partial<Record<PptTheme, string>> = {
 // 각 옵션을 같은 이름의 웹폰트로 매핑하고, fallback도 같은 계열로 둔다.
 // (앞단에서 layout.tsx가 해당 웹폰트들을 로드해야 시각적으로 일치)
 const FONT_FAMILY_PREVIEW: Record<PptFont, string> = {
+  'nanum-gothic': "'Nanum Gothic', 'Noto Sans KR', 'Pretendard Variable', sans-serif",
   'nanum-myeongjo': "'Nanum Myeongjo', 'Noto Serif KR', serif",
   'noto-serif-kr': "'Noto Serif KR', serif",
   'nanum-square': "'NanumSquare', 'Noto Sans KR', 'Pretendard Variable', sans-serif",
@@ -74,6 +102,7 @@ export default function PreviewModal({
   pptFont,
   pptVAlign,
   overflowSlideIndices = [],
+  customBgUrl = null,
 }: PreviewModalProps) {
   // ESC로 닫기
   useEffect(() => {
@@ -89,6 +118,11 @@ export default function PreviewModal({
 
   const slides = buildSlidesFromText(text);
   const overlay = THEME_OVERLAY[pptTheme];
+  // custom 테마면 사용자가 올린 이미지를 카드 배경으로 (실제 PPT 출력과 동일한 그림)
+  const themeBg =
+    pptTheme === 'custom' && customBgUrl
+      ? `url('${customBgUrl}') center/cover, #FFFFFF`
+      : THEME_BG[pptTheme];
   // 세로 정렬값(top/middle/bottom)을 flexbox의 alignItems로 변환.
   // 카드 안 텍스트 박스는 flex(row)라 cross축(세로)을 alignItems가 제어한다 → top=위, bottom=아래.
   const vAlignItems =
@@ -202,7 +236,7 @@ export default function PreviewModal({
                 slide={slide}
                 index={i + 1}
                 isOverflow={overflowSlideIndices.includes(i)}
-                themeBg={THEME_BG[pptTheme]}
+                themeBg={themeBg}
                 themeFg={THEME_FG[pptTheme]}
                 overlay={overlay}
                 fontFamily={FONT_FAMILY_PREVIEW[pptFont]}

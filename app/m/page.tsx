@@ -16,6 +16,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Song } from '@/lib/types';
+import { attachRefChecks } from '@/lib/reference-lyrics';
+import { canUseCustomBg } from '@/lib/custom-bg';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
 import { encodeStateToHash } from '@/lib/url-sync';
@@ -60,7 +62,11 @@ export default function MobilePage() {
   const [dragging, setDragging] = useState(false);
 
   // PPT 옵션
-  const [pptFont, setPptFont] = useState<PptFont>('noto-serif-kr');
+  const [pptFont, setPptFont] = useState<PptFont>('nanum-gothic');
+  // 내 교회 PPT(커스텀 배경) 이미지 — 세션 한정(저장 안 됨). 운영자 계정만 사용 가능(유료 예정).
+  const [customBg, setCustomBg] = useState<string | null>(null);
+  // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
+  const [customUnlocked, setCustomUnlocked] = useState(false);
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // PPT 세로 정렬 — 기본 가운데. 데스크탑과 동일하게 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
@@ -71,6 +77,10 @@ export default function MobilePage() {
 
   // Auth + 디자인
   const [authUser, setAuthUser] = useState<User | null>(null);
+  // 내 교회 PPT 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
+  useEffect(() => {
+    setCustomUnlocked(canUseCustomBg(authUser?.email));
+  }, [authUser]);
   const [authBusy, setAuthBusy] = useState(false);
   const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
 
@@ -335,7 +345,10 @@ export default function MobilePage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '분석 실패');
         if (data.songs?.length) {
-          setSongs((prev) => [...prev, ...data.songs]);
+          const newSongs: Song[] = data.songs;
+          setSongs((prev) => [...prev, ...newSongs]);
+          // 가사 대조 검토 — 같은 제목의 확정본이 있으면 배너로 일치율·교정 제안 표시 (비동기)
+          attachRefChecks(newSongs, setSongs);
           void addToLibraryAsync(data.songs);
           setPasted('');
           showToast(`${data.songs.length}곡 추출됨`);
@@ -366,7 +379,10 @@ export default function MobilePage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '분석 실패');
         if (data.songs?.length) {
-          setSongs((prev) => [...prev, ...data.songs]);
+          const newSongs: Song[] = data.songs;
+          setSongs((prev) => [...prev, ...newSongs]);
+          // 가사 대조 검토 — 같은 제목의 확정본이 있으면 배너로 일치율·교정 제안 표시 (비동기)
+          attachRefChecks(newSongs, setSongs);
           void addToLibraryAsync(data.songs);
           // 오타 검토용 이미지 캐싱 + 이전 검토 결과 초기화
           extractedImagesRef.current = images;
@@ -591,7 +607,7 @@ export default function MobilePage() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont);
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg ?? undefined);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -843,6 +859,14 @@ export default function MobilePage() {
             setPptVAlign={setPptVAlign}
             embedFont={embedFont}
             setEmbedFont={setEmbedFont}
+            customBg={customBg}
+            customUnlocked={customUnlocked}
+            onCustomBgChange={(dataUrl) => {
+              setCustomBg(dataUrl);
+              setPptTheme('custom'); // 올리자마자 바로 적용
+              showToast('교회 PPT 이미지가 배경으로 적용됐어요');
+            }}
+            onLockedCustom={() => showToast('교회 PPT 배경은 유료 기능으로 준비 중이에요 🙏')}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
             onCopyShareLink={handleCopyShareLink}
@@ -861,6 +885,7 @@ export default function MobilePage() {
         pptFont={pptFont}
         pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}
+        customBgUrl={customBg}
       />
 
       {/* 토스트 */}

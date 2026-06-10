@@ -16,8 +16,9 @@
 // "사람이 엔터로 직접 나누기"로 단순화했다. AI는 가사 OCR + 줄 정리만 한다.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Section, Song } from '@/lib/types';
+import type { RefCheck, Section, Song } from '@/lib/types';
 import { sectionToText, docHasSongTitle } from '@/lib/text-doc';
+import { submitReferenceLyrics } from '@/lib/reference-lyrics';
 import Mascot from '@/components/Mascot';
 
 type ExtractedSectionProps = {
@@ -154,7 +155,8 @@ function EmptyExtracted() {
     <div className="ex-empty">
       <Mascot pose="idle" size={108} />
       <div className="ex-empty-text">
-        왼쪽에 악보를 올리고 <strong>가사 추출하기</strong>를 누르면
+        {/* 데스크톱·모바일 모두 업로드가 "위"에 있다 — 옛 좌우 레이아웃 시절 "왼쪽에"가 남아있던 것 수정 */}
+        위에서 악보를 올리고 <strong>가사 추출하기</strong>를 누르면
         <br />여기에 곡 카드가 나타납니다.
       </div>
     </div>
@@ -287,15 +289,7 @@ function SongCard({
             {splitMode ? '나누는 중' : `${song.sections.length}개 묶음`}
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-icon btn-sm song-title-edit"
-          onClick={() => setEditingTitle(!editingTitle)}
-          aria-label="제목 편집"
-          title={editingTitle ? '저장' : '제목 편집'}
-        >
-          {editingTitle ? '✓' : '✎'}
-        </button>
+        {/* 제목 옆 ✎ 버튼은 제거 — 제목 글자를 바로 클릭하면 수정돼서 중복이었음 (사용자 피드백) */}
         <button
           type="button"
           className="btn btn-icon btn-sm song-remove"
@@ -307,12 +301,20 @@ function SongCard({
         </button>
       </header>
 
+      {/* 가사 대조 검토 — 같은 제목의 확정본이 있으면 일치율 + 교정 제안 표시 */}
+      {open && song.refCheck && <RefCheckNote check={song.refCheck} />}
+
       {open &&
         (splitMode ? (
           <SplitMode
             key={splitInitialText}
             initialText={splitInitialText}
-            onConfirm={(sections) => onUpdate({ ...song, sections, confirmed: true })}
+            onConfirm={(sections) => {
+              const next = { ...song, sections, confirmed: true };
+              onUpdate(next);
+              // 확정한 가사를 대조용으로 쌓는다 — fire-and-forget (로그인 시에만 저장됨)
+              void submitReferenceLyrics(next);
+            }}
           />
         ) : (
           <>
@@ -350,6 +352,34 @@ function SongCard({
           </>
         ))}
     </article>
+  );
+}
+
+// 가사 대조 검토 배너 — "이전에 확정한 같은 제목 가사"와 얼마나 일치하는지 + 교정 제안.
+// 추출 직후(나누기 모드)에 보여서, 사용자가 편집창에서 바로 고칠 수 있게 한다.
+function RefCheckNote({ check }: { check: RefCheck }) {
+  // 거의 완전 일치 → 한 줄 안심 메시지만
+  if (check.diffs.length === 0 && check.matchPct >= 95) {
+    return (
+      <div className="refcheck refcheck-ok">
+        ✓ 이전에 확정한 같은 제목의 가사와 일치해요 ({check.matchPct}%)
+      </div>
+    );
+  }
+  return (
+    <div className="refcheck refcheck-warn">
+      <div className="refcheck-head">
+        이전에 확정한 같은 제목의 가사와 <b>{check.matchPct}% 일치</b>해요.
+        {check.diffs.length > 0 && <> 이 줄들을 확인해 보세요:</>}
+      </div>
+      {check.diffs.map((d, i) => (
+        <div key={i} className="refcheck-diff">
+          <span className="refcheck-mine">{d.mine}</span>
+          <span className="refcheck-arrow" aria-hidden="true">→</span>
+          <span className="refcheck-sugg">{d.suggestion}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -436,6 +466,10 @@ function SplitMode({
         >
           ✓ 이대로 나누기 확정 ({blocks.length}묶음)
         </button>
+        {/* 대조 검토 데이터 사용 고지 — 확정 가사가 어디에 쓰이는지 투명하게 */}
+        <div className="refcheck-notice">
+          확정한 가사는 같은 곡을 올린 분들의 오탈자 검토(가사 대조)에만 쓰여요.
+        </div>
       </div>
     </div>
   );
