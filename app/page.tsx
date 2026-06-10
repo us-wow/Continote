@@ -1118,7 +1118,7 @@ export default function Home() {
         >
           악보를 사진이나 PDF로 올리면 AI가 가사를 깔끔하게 뽑아줘요.
           <br />
-          묶음을 눌러 콘티를 짜고, 움직이는 배경을 입힌 예배 PPT까지 바로 받아요.
+          묶음을 눌러 콘티를 짜고, 배경을 입힌 예배 PPT까지 바로 받아요.
         </p>
         {/* 히어로 마스코트 — done 포즈로 차별화 (헤더에 미니 idle, 에디터 빈 상태에 큰 idle 있음) */}
         <div className="mascot-float hero-mascot">
