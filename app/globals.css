@@ -1607,10 +1607,10 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   cursor: not-allowed;
 }
 .theme-sw-plocked .theme-sw-preview {
-  filter: brightness(0.55) saturate(0.85);
+  filter: brightness(0.32) saturate(0.7);
 }
 .theme-sw-plocked .theme-sw-name {
-  opacity: 0.55;
+  opacity: 0.45;
 }
 
 /* 유료 예정 왕관 — 노란 선으로 그린 투명 왕관, 타일 오른쪽 위 (선택 중엔 ✓가 대신 보임) */
