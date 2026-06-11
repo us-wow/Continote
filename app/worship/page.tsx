@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import { canUseCustomBg, checkPremiumAccess } from '@/lib/custom-bg';
+import { CUSTOM_BG_ADMIN_EMAILS, checkPremiumAccess } from '@/lib/custom-bg';
 import {
   BLOCK_PRESETS,
   createBlock,
@@ -24,6 +24,7 @@ import {
   removeWorshipOrder,
   type SavedWorshipOrder,
 } from '@/lib/worship-order-cloud';
+import { listSetsAsync } from '@/lib/conti-cloud';
 import { buildSlidesFromText } from '@/lib/text-doc';
 import { exportToPptx, type PptFont, type PptTheme } from '@/lib/pptx';
 
@@ -57,6 +58,11 @@ export default function WorshipBuilderPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
 
+  // 콘티 가져오기 — 어느 블록의 picker가 열렸는지 + 불러온 콘티 목록 + 메인 작업 중 콘티
+  const [contiPickerId, setContiPickerId] = useState<string | null>(null);
+  const [contiSets, setContiSets] = useState<{ id: string; name: string; doc: string }[]>([]);
+  const [draftText, setDraftText] = useState<string | null>(null);
+
   // PPT 옵션
   const [theme, setTheme] = useState<PptTheme>('black');
   const [font, setFont] = useState<PptFont>('nanum-gothic');
@@ -72,7 +78,9 @@ export default function WorshipBuilderPage() {
     sb.auth.getUser().then(async ({ data }) => {
       const email = data.user?.email ?? null;
       setAuthEmail(email);
-      if (canUseCustomBg(email)) {
+      // canUseCustomBg의 localStorage 테스트 스위치는 여기선 안 받는다 —
+      // 이 페이지는 유료 미리보기라 운영자 이메일 또는 premium_access 명단만 통과.
+      if (email && CUSTOM_BG_ADMIN_EMAILS.includes(email.toLowerCase())) {
         setGate('open');
         return;
       }
@@ -97,6 +105,38 @@ export default function WorshipBuilderPage() {
       }
     });
   }, [gate]);
+
+  // 열린 뒤: 콘티 연동 소스 로드 — 클라우드 저장 콘티 + 메인에서 작업 중이던 콘티(임시 저장)
+  useEffect(() => {
+    if (gate !== 'open') return;
+    listSetsAsync().then((sets) =>
+      setContiSets(sets.map((s) => ({ id: s.id, name: s.name, doc: s.doc })))
+    );
+    try {
+      const raw = window.localStorage.getItem('contino-working-draft');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // 48시간 이내 것만 "방금 작업하던 콘티"로 제안 — 토요일 작업 → 주일 사용까지 커버
+        const fresh = typeof parsed?.at === 'number' && Date.now() - parsed.at < 48 * 60 * 60 * 1000;
+        if (typeof parsed?.text === 'string' && parsed.text.trim() && fresh) setDraftText(parsed.text);
+      }
+    } catch {
+      // 임시 저장이 없거나 깨짐 → 저장된 콘티 목록만 사용
+    }
+  }, [gate]);
+
+  // 콘티를 블록 본문에 통째로 삽입 — 콘티 텍스트는 이미 "# 곡제목 + 가사" 형식이라
+  // 그대로 body에 넣으면 PPT에서 곡 제목·가사 슬라이드로 풀린다.
+  // asSubtitle: 저장된 콘티는 이름을 부제로 깔아주지만, "작업 중인 콘티"는 라벨일 뿐이라 PPT에 안 찍는다
+  const insertConti = (blockId: string, name: string, doc: string, asSubtitle: boolean) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    if (block.body.trim() && !confirm(`이 블록의 기존 내용을 "${name}" 콘티로 바꿀까요?`)) return;
+    patchBlock(blockId, { body: doc.trim(), subtitle: block.subtitle || (asSubtitle ? name : '') });
+    setContiPickerId(null);
+    setOpenBodyId(blockId);
+    flash(`"${name}" 콘티를 가져왔어요`);
+  };
 
   // ── 블록 조작 ──
   const patchBlock = (id: string, patch: Partial<WorshipBlock>) =>
@@ -158,9 +198,13 @@ export default function WorshipBuilderPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('이 템플릿을 삭제할까요?')) return;
-    await removeWorshipOrder(id);
-    if (currentId === id) setCurrentId(null);
-    setSaved(await listWorshipOrders());
+    try {
+      await removeWorshipOrder(id);
+      if (currentId === id) setCurrentId(null);
+      setSaved(await listWorshipOrders());
+    } catch (e: any) {
+      flash(e?.message ?? '삭제 실패');
+    }
   };
 
   // ── PPT ──
@@ -309,13 +353,45 @@ export default function WorshipBuilderPage() {
                   aria-label="부제"
                 />
                 {open && (
-                  <textarea
-                    value={b.body}
-                    onChange={(e) => patchBlock(b.id, { body: e.target.value })}
-                    placeholder={preset?.bodyPlaceholder ?? '본문 (빈 줄 = 슬라이드 구분, 비우면 제목 슬라이드만)'}
-                    rows={Math.min(14, Math.max(5, b.body.split('\n').length + 1))}
-                    style={{ ...inputStyle, marginTop: 8, marginLeft: 30, width: 'calc(100% - 30px)', fontSize: 13, lineHeight: 1.6, resize: 'vertical' }}
-                  />
+                  <div style={{ marginLeft: 30, marginTop: 8, position: 'relative' }}>
+                    {/* 콘티 가져오기 — 메인에서 만든 찬양 묶음을 이 블록에 통째로 삽입 */}
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => setContiPickerId(contiPickerId === b.id ? null : b.id)}
+                        style={{ ...btnGhost, padding: '5px 10px', fontSize: 12 }}
+                      >
+                        📥 콘티 가져오기
+                      </button>
+                      {contiPickerId === b.id && (
+                        <div style={{ ...pickerStyle, position: 'absolute', top: 32, bottom: 'auto', gridTemplateColumns: '1fr' }}>
+                          {draftText && (
+                            <button onClick={() => insertConti(b.id, '작업 중인 콘티', draftText, false)} style={pickerItem}>
+                              <span style={{ fontWeight: 600, color: 'var(--accent, #0f766e)' }}>✏️ 방금 작업하던 콘티</span>
+                              <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>콘티노트 메인에서 만들던 내용 그대로</span>
+                            </button>
+                          )}
+                          {contiSets.map((s) => (
+                            <button key={s.id} onClick={() => insertConti(b.id, s.name, s.doc, true)} style={pickerItem}>
+                              <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{s.name}</span>
+                              <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>저장된 콘티</span>
+                            </button>
+                          ))}
+                          {!draftText && contiSets.length === 0 && (
+                            <p style={{ fontSize: 12, color: 'var(--ink-2)', padding: 10 }}>
+                              가져올 콘티가 없어요 — 콘티노트 메인에서 먼저 콘티를 만들거나 저장해 주세요.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <textarea
+                      value={b.body}
+                      onChange={(e) => patchBlock(b.id, { body: e.target.value })}
+                      placeholder={preset?.bodyPlaceholder ?? '본문 (빈 줄 = 슬라이드 구분, 비우면 제목 슬라이드만)'}
+                      rows={Math.min(14, Math.max(5, b.body.split('\n').length + 1))}
+                      style={{ ...inputStyle, width: '100%', fontSize: 13, lineHeight: 1.6, resize: 'vertical' }}
+                    />
+                  </div>
                 )}
               </div>
             );

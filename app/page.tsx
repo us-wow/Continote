@@ -940,6 +940,27 @@ export default function Home() {
     }
   }, []);
 
+  // 작업 중인 콘티를 localStorage에 임시 저장 — 예배 순서 빌더(/worship)가
+  // "방금 작업하던 콘티 가져오기"로 읽어간다. 타이핑마다 쓰면 낭비라 0.5초 디바운스.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (text.trim()) {
+          window.localStorage.setItem(
+            'contino-working-draft',
+            JSON.stringify({ text, at: Date.now() })
+          );
+        } else {
+          // 콘티를 비우면 임시 저장도 지움 — 빌더에 옛날 콘티가 "방금 작업하던"으로 남지 않게
+          window.localStorage.removeItem('contino-working-draft');
+        }
+      } catch {
+        // 시크릿 모드 등 localStorage 불가 → 임시 저장만 생략 (기능엔 영향 없음)
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [text]);
+
   // 파일 추가/제거 시 실제 썸네일 생성
   // 이미지는 base64 data URL(FileReader)로, PDF는 PDF.js로 첫 페이지 렌더링.
   // blob URL을 쓰지 않는 이유: Strict Mode dev에서 effect가 두 번 실행될 때 revoke 타이밍이 꼬여

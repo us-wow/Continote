@@ -80,6 +80,9 @@ export const BLOCK_PRESETS: BlockPreset[] = [
   { key: 'fellowship', name: '성도의 교제', hint: '인사·환영 — 위치는 교회마다 앞/뒤 자유' },
   { key: 'scripture', name: '성경봉독', hint: '본문은 성경 앱에서 복사해 붙여넣기 (빈 줄 = 슬라이드 구분)', subtitlePlaceholder: '예: 로마서 12:1-2', bodyPlaceholder: '성경 본문을 붙여넣으세요.\n\n빈 줄을 넣으면 그 자리에서 슬라이드가 나뉩니다.' },
   { key: 'choir', name: '찬양', hint: '찬양대(성가대) 찬양', subtitlePlaceholder: '예: 할렐루야 찬양대' },
+  // 콘티노트 본체와의 연결 고리 — 메인에서 만든 콘티(찬양 묶음)를 통째로 이 자리에 끼운다.
+  // 콘티 텍스트는 이미 "# 곡제목 + 가사" 형식이라 body에 그대로 넣으면 슬라이드로 풀린다.
+  { key: 'conti', name: '찬양(콘티)', hint: '콘티노트에서 만든 찬양 묶음을 통째로 가져와 끼우기', bodyPlaceholder: '아래 "콘티 가져오기"로 저장된 콘티나 방금 작업하던 콘티를 불러오세요' },
   { key: 'sermon', name: '설교', hint: '말씀·말씀선포·말씀증거 등으로 표기 바꿔 쓰세요', subtitlePlaceholder: '예: "다시 일어서는 믿음" · ○○○ 목사' },
   { key: 'offering', name: '봉헌', hint: '헌금 — 장로교·감리교 모두 봉헌/헌금 혼용', subtitlePlaceholder: '예: 다 같이' },
   { key: 'offeringPrayer', name: '봉헌기도', hint: '봉헌 뒤 기도' },
@@ -121,7 +124,9 @@ export function createDefaultOrder(): WorshipBlock[] {
 // 순서 요약 — "# 예배 순서" 제목 슬라이드 + 번호 목록 슬라이드 2장.
 // (제목 paragraph에 목록을 같이 넣으면 부제 규칙(" · " join) 때문에 한 줄로 뭉개져서 분리)
 export function summaryToText(blocks: WorshipBlock[]): string {
-  const lines = blocks.map((b, i) => `${i + 1}. ${b.name}${b.subtitle ? ` — ${b.subtitle}` : ''}`);
+  // 이름 없는 블록은 본문 변환에서도 건너뛰므로 요약에서도 빼서 번호를 맞춘다
+  const named = blocks.filter((b) => b.name.trim());
+  const lines = named.map((b, i) => `${i + 1}. ${b.name}${b.subtitle ? ` — ${b.subtitle}` : ''}`);
   return `# 예배 순서\n\n${lines.join('\n')}`;
 }
 
