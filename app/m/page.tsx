@@ -54,6 +54,24 @@ export default function MobilePage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [text, setText] = useState<string>('');
 
+  // 작업 중인 콘티 임시 저장 — 예배 순서 빌더(/worship)의 "방금 작업하던 콘티"가 읽어간다.
+  // 데스크톱(app/page.tsx)과 같은 키·같은 규칙(0.5초 디바운스, 빈 텍스트는 건드리지 않음).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (text.trim()) {
+          window.localStorage.setItem(
+            'contino-working-draft',
+            JSON.stringify({ text, at: Date.now() })
+          );
+        }
+      } catch {
+        // localStorage 불가 환경 → 임시 저장만 생략
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [text]);
+
   // 업로드 옵션
   const [accuracyMode, setAccuracyMode] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
@@ -900,7 +918,11 @@ export default function MobilePage() {
               text={text}
               setText={setText}
               onClear={() => {
-                if (confirm('콘티를 모두 비울까요?')) setText('');
+                if (confirm('콘티를 모두 비울까요?')) {
+                  setText('');
+                  // 명시적으로 비울 때만 임시 저장도 삭제
+                  try { window.localStorage.removeItem('contino-working-draft'); } catch {}
+                }
               }}
               onCopy={handleCopy}
               onDownloadTxt={handleSaveTxt}

@@ -53,6 +53,28 @@ const FONT_OPTIONS: { value: PptFont; label: string }[] = [
 
 type Gate = 'loading' | 'locked' | 'open';
 
+// 왕관 — 메인 PPT 테마 카드(PptSection)와 같은 노란 선 각진 왕관 (이모지 X, 프리미엄 스타일 통일)
+function Crown({ size = 17 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={Math.round(size * (21 / 24))}
+      viewBox="0 0 24 21"
+      fill="none"
+      aria-label="유료 예정"
+      style={{ display: 'inline-block', verticalAlign: '-2px' }}
+    >
+      <path
+        d="M3 18 L3 6 L8.5 10.5 L12 3 L15.5 10.5 L21 6 L21 18 Z"
+        stroke="#F2C14E"
+        strokeWidth="2.2"
+        strokeLinejoin="miter"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
 export default function WorshipBuilderPage() {
   const [gate, setGate] = useState<Gate>('loading');
   const [authEmail, setAuthEmail] = useState<string | null>(null);
@@ -272,7 +294,7 @@ export default function WorshipBuilderPage() {
       <main style={pageWrap}>
         <TopBar />
         <div style={{ maxWidth: 520, margin: '80px auto', textAlign: 'center', padding: '0 20px' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>👑</div>
+          <div style={{ marginBottom: 12 }}><Crown size={44} /></div>
           <h1 style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--ink)', marginBottom: 10 }}>
             예배 순서 빌더는 준비 중이에요
           </h1>
@@ -304,7 +326,10 @@ export default function WorshipBuilderPage() {
         {/* 제목 + 템플릿 이름 */}
         <header style={{ marginBottom: 18 }}>
           <h1 style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--ink)', marginBottom: 4 }}>
-            예배 순서 빌더 <span style={{ fontSize: 12, color: '#b45309', verticalAlign: 'middle' }}>👑 미리보기</span>
+            예배 순서 빌더{' '}
+            <span style={{ fontSize: 12, color: '#b45309', verticalAlign: 'middle', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Crown size={14} /> 미리보기
+            </span>
           </h1>
           <p style={{ fontSize: 13, color: 'var(--ink-2)' }}>
             블록을 조립해 예배 전체 PPT를 한 번에 만들어요. 블록 이름은 우리 교회 표기대로 고쳐 쓰세요.

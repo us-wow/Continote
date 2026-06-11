@@ -917,7 +917,11 @@ export default function Home() {
   };
 
   const onClear = () => {
-    if (confirm('콘티를 모두 비울까요?')) setText('');
+    if (confirm('콘티를 모두 비울까요?')) {
+      setText('');
+      // 명시적으로 비웠을 때만 임시 저장도 같이 삭제
+      try { window.localStorage.removeItem('contino-working-draft'); } catch {}
+    }
   };
 
   // 공유 링크로 진입한 경우 URL hash에서 콘티 상태 자동 복원.
@@ -950,10 +954,10 @@ export default function Home() {
             'contino-working-draft',
             JSON.stringify({ text, at: Date.now() })
           );
-        } else {
-          // 콘티를 비우면 임시 저장도 지움 — 빌더에 옛날 콘티가 "방금 작업하던"으로 남지 않게
-          window.localStorage.removeItem('contino-working-draft');
         }
+        // 빈 텍스트일 땐 아무것도 안 함 — 첫 로드 때 text가 ''라서
+        // 여기서 지우면 직전에 만들어둔 콘티 임시 저장이 날아간다(실제 버그였음).
+        // 지우기는 사용자가 "콘티 비우기"를 눌렀을 때만(handleClear).
       } catch {
         // 시크릿 모드 등 localStorage 불가 → 임시 저장만 생략 (기능엔 영향 없음)
       }
@@ -1169,7 +1173,7 @@ export default function Home() {
           {/* 예배 순서 빌더 — 유료 예정. 운영자/프리미엄에게만 메뉴 노출 (/worship 자체도 게이트 있음) */}
           {premiumUnlocked && (
             <MenuItem
-              label="예배 순서 빌더 👑"
+              label="예배 순서 빌더"
               sub="예배 전체 PPT 한 번에 (미리보기)"
               onClick={() => { window.location.href = '/worship'; }}
             />
