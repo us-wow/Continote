@@ -241,8 +241,10 @@ export async function exportToPptx(
   verticalAlign: PptVAlign = 'middle',
   // 글꼴 포함(임베드) — 켜고 본명조를 고르면 서브셋 글꼴을 PPT에 심어 글꼴 없는 PC에서도 그대로 보임.
   embedFont: boolean = false,
-  // 내 교회 PPT(custom 테마) 배경 이미지 — FileReader dataURL 그대로 받는다.
-  customBgData?: string
+  // 내 교회 PPT(custom 테마) 배경 — dataURL 또는 클라우드 https URL.
+  customBgData?: string,
+  // 커스텀 배경이 GIF(움직임)인지 — true면 홀리 배경처럼 전면 이미지+흰 글자로 출력.
+  customBgIsGif?: boolean
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
@@ -280,12 +282,21 @@ export async function exportToPptx(
   const useOverlay = config.kind === 'image' ? config.overlay !== false : false;
   // 흰 글자 테마(빛내림/새벽)인지 — 이미지 로드 실패 시 폴백 배경색을 정하는 데 쓴다.
   const isLightText = config.kind === 'image' && config.text.toUpperCase() === 'FFFFFF';
+  // 움직이는 배경인지 — 홀리 GIF 테마이거나, 사용자가 올린 커스텀 GIF.
+  const animatedBg = config.kind === 'image' && (config.animated === true || (theme === 'custom' && customBgIsGif === true));
+  // 커스텀 GIF는 어두운 배경 가정 → 흰 글자 + 오버레이 없음 (홀리 테마와 동일 규칙)
+  const textColor = theme === 'custom' && customBgIsGif ? 'FFFFFF' : config.text;
+
   let bgData: string | undefined;
   if (config.kind === 'image') {
     try {
       if (theme === 'custom') {
-        // 사용자가 올린 이미지 — pptxgenjs는 'data:' 접두사 없는 형식을 받는다.
-        bgData = customBgData ? customBgData.replace(/^data:/, '') : undefined;
+        // dataURL이면 'data:' 접두사만 떼고, 클라우드 https URL이면 받아와서 base64로.
+        bgData = customBgData
+          ? customBgData.startsWith('data:')
+            ? customBgData.replace(/^data:/, '')
+            : await loadPublicImageAsBase64(customBgData)
+          : undefined;
       } else {
         bgData = await loadPublicImageAsBase64(config.path);
       }
@@ -297,12 +308,12 @@ export async function exportToPptx(
   const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>) => {
     if (config.kind === 'solid') {
       slide.background = { color: config.bg };
-    } else if (bgData && config.animated) {
+    } else if (bgData && animatedBg) {
       // 움직이는 GIF 배경 — '배경 채우기'에 넣으면 PowerPoint가 첫 프레임 정지화면만
       // 보여주므로, 슬라이드 맨 처음(=맨 뒤 레이어)에 전면 이미지로 깐다.
       // 뒤에 단색을 깔아 GIF 로드가 늦거나 실패해도 글자가 읽히게 한다.
       // 재생은 슬라이드쇼(발표) 모드에서만 된다 — 편집 화면에선 정지로 보이는 게 정상.
-      slide.background = { color: config.fallback ?? '000000' };
+      slide.background = { color: ('fallback' in config ? config.fallback : undefined) ?? '000000' };
       slide.addImage({ data: bgData, x: 0, y: 0, w: 13.333, h: 7.5 });
     } else if (bgData) {
       slide.background = { data: bgData };
@@ -349,7 +360,7 @@ export async function exportToPptx(
         ...boxFrame,
         align: 'center',
         valign: verticalAlign,
-        color: config.text,
+        color: textColor,
         fontFace: FONT_FACE_MAP[font],
         paraSpaceAfter: 12,
         fit: 'shrink',
@@ -363,7 +374,7 @@ export async function exportToPptx(
         ...boxFrame,
         align: 'center',
         valign: verticalAlign,
-        color: config.text,
+        color: textColor,
         fontFace: FONT_FACE_MAP[font],
         fontSize: 36,
         paraSpaceAfter: 8,
@@ -380,7 +391,7 @@ export async function exportToPptx(
       ...boxFrame,
       align: 'center',
       valign: verticalAlign,
-      color: config.text,
+      color: textColor,
       fontFace: FONT_FACE_MAP[font],
       fontSize,
       paraSpaceAfter: 8,
@@ -393,7 +404,7 @@ export async function exportToPptx(
 
   // 저작권(CCLI) 슬라이드 제거됨 — 한국 교회는 거의 안 써서. copyright 파라미터는 호환 위해 남겨두고 미사용.
 
-  if (config.kind === 'image' && config.animated && bgData) {
+  if (animatedBg && bgData) {
     // 움직이는 배경은 pptxgenjs가 슬라이드마다 같은 GIF를 통째로 중복 저장한다
     // (10장이면 30MB+). zip을 열어 같은 내용의 GIF를 하나만 남기고 참조를 통일한 뒤 내려준다.
     // 후처리에 실패하면 중복 제거 없이(파일만 클 뿐 정상인) 원본을 그대로 내려준다.

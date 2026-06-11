@@ -17,7 +17,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Song } from '@/lib/types';
 import { attachRefChecks } from '@/lib/reference-lyrics';
-import { canUseCustomBg } from '@/lib/custom-bg';
+import { canUseCustomBg, type CustomBg } from '@/lib/custom-bg';
+import { listMyBackgrounds, saveBackground, deleteBackground, type SavedBg } from '@/lib/custom-bg-cloud';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
 import { encodeStateToHash } from '@/lib/url-sync';
@@ -64,7 +65,9 @@ export default function MobilePage() {
   // PPT 옵션
   const [pptFont, setPptFont] = useState<PptFont>('nanum-gothic');
   // 내 교회 PPT(커스텀 배경) 이미지 — 세션 한정(저장 안 됨). 운영자 계정만 사용 가능(유료 예정).
-  const [customBg, setCustomBg] = useState<string | null>(null);
+  const [customBg, setCustomBg] = useState<CustomBg | null>(null);
+  // 클라우드에 저장된 "내 배경" 목록 (유료 기능 — 현재 운영자만)
+  const [savedBgs, setSavedBgs] = useState<SavedBg[]>([]);
   // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
   const [premiumUnlocked, setPremiumUnlocked] = useState(false);
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
@@ -77,10 +80,48 @@ export default function MobilePage() {
 
   // Auth + 디자인
   const [authUser, setAuthUser] = useState<User | null>(null);
-  // 내 교회 PPT 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
+  // 유료 기능 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
   useEffect(() => {
     setPremiumUnlocked(canUseCustomBg(authUser?.email));
   }, [authUser]);
+  // 해제된 계정이면 클라우드의 "내 배경" 목록을 불러온다
+  useEffect(() => {
+    if (premiumUnlocked && authUser) {
+      void listMyBackgrounds().then(setSavedBgs);
+    } else {
+      setSavedBgs([]);
+    }
+  }, [premiumUnlocked, authUser]);
+
+  // 업로드/변환 성공 → 바로 적용하고, 로그인 상태면 이름 받아 클라우드에 저장
+  const handleCustomBgChange = (bg: CustomBg, note?: string) => {
+    setCustomBg(bg);
+    setPptTheme('custom');
+    showToast(note ?? '교회 PPT 배경이 적용됐어요');
+    if (premiumUnlocked && authUser && bg.src.startsWith('data:')) {
+      const name = window.prompt('이 배경의 이름을 지어주세요 (저장 안 하려면 취소)', '우리 교회 배경');
+      if (name !== null) {
+        void saveBackground(name, bg.src, bg.kind)
+          .then((saved) => {
+            setSavedBgs((prev) => [saved, ...prev]);
+            setCustomBg({ src: saved.url, kind: saved.kind });
+            showToast('저장했어요 — 다음에도 바로 쓸 수 있어요');
+          })
+          .catch((err: Error) => showToast(err.message));
+      }
+    }
+  };
+
+  const handleDeleteSavedBg = (bg: SavedBg) => {
+    if (!confirm(`"${bg.name}" 배경을 지울까요?`)) return;
+    void deleteBackground(bg).then(() => {
+      setSavedBgs((prev) => prev.filter((b) => b.id !== bg.id));
+      if (customBg?.src === bg.url) {
+        setCustomBg(null);
+        setPptTheme('black');
+      }
+    });
+  };
   const [authBusy, setAuthBusy] = useState(false);
   const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
 
@@ -607,7 +648,7 @@ export default function MobilePage() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg ?? undefined);
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif');
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -861,11 +902,14 @@ export default function MobilePage() {
             setEmbedFont={setEmbedFont}
             customBg={customBg}
             premiumUnlocked={premiumUnlocked}
-            onCustomBgChange={(dataUrl) => {
-              setCustomBg(dataUrl);
-              setPptTheme('custom'); // 올리자마자 바로 적용
-              showToast('교회 PPT 이미지가 배경으로 적용됐어요');
+            onCustomBgChange={handleCustomBgChange}
+            onCustomNotice={showToast}
+            savedBgs={savedBgs}
+            onSelectSaved={(bg) => {
+              setCustomBg({ src: bg.url, kind: bg.kind });
+              setPptTheme('custom');
             }}
+            onDeleteSaved={handleDeleteSavedBg}
             onLockedPremium={() => showToast('유료 기능으로 준비 중이에요 🙏 조금만 기다려 주세요!')}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
@@ -885,7 +929,8 @@ export default function MobilePage() {
         pptFont={pptFont}
         pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}
-        customBgUrl={customBg}
+        customBgUrl={customBg?.src ?? null}
+        customBgIsGif={customBg?.kind === 'gif'}
       />
 
       {/* 토스트 */}

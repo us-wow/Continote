@@ -21,8 +21,10 @@ type PreviewModalProps = {
   // 4줄 한도를 넘는 슬라이드 인덱스 — 빨간 테두리 + "4줄 초과" 배지로 강조.
   // 사용자가 해당 슬라이드를 줄이면 부모가 새 indices를 넘기면서 빨간색 자동 풀림.
   overflowSlideIndices?: number[];
-  // 내 교회 PPT(custom 테마) 이미지 dataURL — custom 테마일 때 카드 배경으로 사용.
+  // 내 교회 PPT(custom 테마) 이미지 — custom 테마일 때 카드 배경으로 사용.
   customBgUrl?: string | null;
+  // 커스텀 배경이 GIF(움직임)면 흰 글자·오버레이 없음 (실제 출력과 동일 규칙)
+  customBgIsGif?: boolean;
 };
 
 const THEME_BG: Record<PptTheme, string> = {
@@ -120,6 +122,7 @@ export default function PreviewModal({
   pptVAlign,
   overflowSlideIndices = [],
   customBgUrl = null,
+  customBgIsGif = false,
 }: PreviewModalProps) {
   // ESC로 닫기
   useEffect(() => {
@@ -134,11 +137,14 @@ export default function PreviewModal({
   if (!open) return null;
 
   const slides = buildSlidesFromText(text);
-  const overlay = THEME_OVERLAY[pptTheme];
+  const isCustomGif = pptTheme === 'custom' && customBgIsGif;
+  // 커스텀 GIF는 어두운 배경 가정 → 오버레이 없이 흰 글자 (lib/pptx.ts와 동일 규칙)
+  const overlay = isCustomGif ? undefined : THEME_OVERLAY[pptTheme];
+  const themeFg = isCustomGif ? '#FFFFFF' : THEME_FG[pptTheme];
   // custom 테마면 사용자가 올린 이미지를 카드 배경으로 (실제 PPT 출력과 동일한 그림)
   const themeBg =
     pptTheme === 'custom' && customBgUrl
-      ? `url('${customBgUrl}') center/cover, #FFFFFF`
+      ? `url('${customBgUrl}') center/cover, ${isCustomGif ? '#000000' : '#FFFFFF'}`
       : THEME_BG[pptTheme];
   // 세로 정렬값(top/middle/bottom)을 flexbox의 alignItems로 변환.
   // 카드 안 텍스트 박스는 flex(row)라 cross축(세로)을 alignItems가 제어한다 → top=위, bottom=아래.
@@ -254,7 +260,7 @@ export default function PreviewModal({
                 index={i + 1}
                 isOverflow={overflowSlideIndices.includes(i)}
                 themeBg={themeBg}
-                themeFg={THEME_FG[pptTheme]}
+                themeFg={themeFg}
                 overlay={overlay}
                 fontFamily={FONT_FAMILY_PREVIEW[pptFont]}
                 vAlignItems={vAlignItems}

@@ -10,6 +10,14 @@
 
 export const CUSTOM_BG_ADMIN_EMAILS = ['sdj07044@gmail.com'];
 
+// 커스텀 배경 한 개 — src는 dataURL(방금 올린 것) 또는 https URL(클라우드에 저장된 것).
+// kind가 'gif'면 PPT에서 움직이는 배경 경로(전면 이미지+흰 글자)로 출력된다.
+export type CustomBgKind = 'image' | 'gif';
+export type CustomBg = { src: string; kind: CustomBgKind };
+
+// 업로드 파일 하드캡 — GIF·변환 결과 공통 (PPT에 통째로 들어가는 용량이라 제한 필수)
+export const CUSTOM_BG_MAX_BYTES = 10 * 1024 * 1024;
+
 export function canUseCustomBg(email: string | null | undefined): boolean {
   if (email && CUSTOM_BG_ADMIN_EMAILS.includes(email.toLowerCase())) return true;
   if (typeof window !== 'undefined' && window.localStorage.getItem('cn-custom-unlock') === '1') {

@@ -13,7 +13,9 @@
 //   - "다른 형식으로 내보내기" → 공유 링크 / OpenSong / Plain Slides 등 보조 출구
 
 import { PPT_FONT_LABELS, PPT_THEME_LABELS, PPT_VALIGN_LABELS, type PptFont, type PptTheme, type PptVAlign } from '@/lib/pptx';
-import { fileToDataUrl } from '@/lib/custom-bg';
+import { fileToDataUrl, CUSTOM_BG_MAX_BYTES, type CustomBg } from '@/lib/custom-bg';
+import { videoFileToGif } from '@/lib/video-to-gif';
+import type { SavedBg } from '@/lib/custom-bg-cloud';
 import { useRef, useState } from 'react';
 
 type PptSectionProps = {
@@ -32,9 +34,14 @@ type PptSectionProps = {
   // 잠긴 사용자에겐 보이되 어둡게 표시되고, 누르면 유료 안내만 나온다.
   premiumUnlocked: boolean;
   onLockedPremium: () => void;                   // 잠긴 상태에서 클릭 시 (유료 안내 토스트)
-  // 내 교회 PPT(커스텀 배경)
-  customBg: string | null;                       // 업로드된 이미지 dataURL (없으면 null)
-  onCustomBgChange: (dataUrl: string) => void;   // 업로드 완료 시 (부모가 custom 테마로 전환)
+  // 내 교회 PPT(커스텀 배경) — 이미지/GIF/짧은 영상(브라우저에서 GIF로 변환)
+  customBg: CustomBg | null;                     // 지금 적용 중인 배경 (없으면 null)
+  onCustomBgChange: (bg: CustomBg, note?: string) => void; // 업로드/변환 성공 (부모가 적용+저장 흐름)
+  onCustomNotice: (msg: string) => void;         // 안내/오류 토스트 (용량 초과, 형식 불가 등)
+  // 클라우드에 저장된 "내 배경" 목록 (유료 기능 — 지금은 운영자만 채워짐)
+  savedBgs: SavedBg[];
+  onSelectSaved: (bg: SavedBg) => void;
+  onDeleteSaved: (bg: SavedBg) => void;
   onOpenPreview: () => void;
   onDownloadPptx: () => void;
   // "다른 형식으로 내보내기" — 토글 펼치면 보임
@@ -175,6 +182,10 @@ export default function PptSection({
   onLockedPremium,
   customBg,
   onCustomBgChange,
+  onCustomNotice,
+  savedBgs,
+  onSelectSaved,
+  onDeleteSaved,
   onOpenPreview,
   onDownloadPptx,
   onCopyShareLink,
@@ -184,23 +195,66 @@ export default function PptSection({
 }: PptSectionProps) {
   const isEmpty = slideCount === 0;
   const [moreOpen, setMoreOpen] = useState(false);
-  // 교회 PPT 이미지 업로드용 숨김 input — 등록 타일 클릭 시 연다
+  // 교회 PPT 파일 업로드용 숨김 input — 등록 타일 클릭 시 연다
   const customFileRef = useRef<HTMLInputElement>(null);
+  // 영상→GIF 변환 진행 상태 — 변환 중엔 타일에 % 표시, 클릭 잠금
+  const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
 
   const handleCustomTileClick = () => {
     if (!premiumUnlocked) {
       onLockedPremium(); // 잠김 — "유료 준비 중" 안내
       return;
     }
+    if (converting) return;
     customFileRef.current?.click();
   };
 
-  const handleCustomFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 파일 종류별 처리: 이미지=그대로 / GIF=용량 검사 / 영상=브라우저에서 GIF 변환
+  const handleCustomFile = async (file: File) => {
+    try {
+      if (file.type.startsWith('video/')) {
+        setConverting({ pct: 0, label: '변환 준비' });
+        const res = await videoFileToGif(file, (pct, label) => setConverting({ pct, label }));
+        if (res.bytes > CUSTOM_BG_MAX_BYTES) {
+          onCustomNotice('변환해도 10MB가 넘어요 — 더 짧거나 단순한 영상으로 해주세요');
+          return;
+        }
+        onCustomBgChange({ src: res.dataUrl, kind: 'gif' }, res.trimmed ? '영상이 길어서 앞 10초만 사용했어요' : undefined);
+      } else if (file.type === 'image/gif') {
+        if (file.size > CUSTOM_BG_MAX_BYTES) {
+          onCustomNotice('GIF가 10MB를 넘어요 — 더 작은 파일로 해주세요');
+          return;
+        }
+        onCustomBgChange({ src: await fileToDataUrl(file), kind: 'gif' });
+      } else if (/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+        onCustomBgChange({ src: await fileToDataUrl(file), kind: 'image' });
+      } else {
+        onCustomNotice('이미지(JPG·PNG)·GIF·짧은 영상(MP4)만 올릴 수 있어요');
+      }
+    } catch (err) {
+      console.warn('[custom-bg] 처리 실패:', err);
+      onCustomNotice('파일을 처리하지 못했어요 — 다른 파일로 해보세요');
+    } finally {
+      setConverting(null);
+    }
+  };
+
+  const handleCustomInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // 같은 파일 재선택도 onChange가 다시 불리게 초기화
-    if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    onCustomBgChange(dataUrl); // 부모가 저장 + custom 테마로 전환
+    if (file) void handleCustomFile(file);
+  };
+
+  // 드래그앤드롭 — 등록 타일에 파일을 끌어다 놓으면 바로 처리
+  const handleCustomDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!premiumUnlocked) {
+      onLockedPremium();
+      return;
+    }
+    if (converting) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) void handleCustomFile(file);
   };
 
   return (
@@ -264,8 +318,51 @@ export default function PptSection({
               </button>
               );
             })}
-            {/* 등록된 내 교회 PPT — 일반 테마처럼 선택 가능한 스와치로 표시 */}
-            {customBg && (
+            {/* 클라우드에 저장된 "내 배경" 목록 — 선택·삭제 가능 (유료 기능, 지금은 운영자만) */}
+            {savedBgs.map((bg) => {
+              const active = pptTheme === 'custom' && customBg?.src === bg.url;
+              return (
+                <button
+                  key={bg.id}
+                  type="button"
+                  className={`theme-sw ${active ? 'is-active' : ''}`}
+                  onClick={() => onSelectSaved(bg)}
+                  aria-pressed={active}
+                  title={`${bg.name} (저장된 내 배경)`}
+                >
+                  <div
+                    className="theme-sw-preview"
+                    style={{ background: `url('${bg.url}') center/cover` }}
+                  >
+                    {/* 이미지는 실제 출력처럼 흰 오버레이+검정, GIF는 어두운 배경 가정이라 흰 글자 */}
+                    {bg.kind === 'image' && <div className="theme-sw-overlay" aria-hidden="true" />}
+                    <span
+                      className="theme-sw-letter"
+                      style={{ fontFamily: 'var(--font-display)', color: bg.kind === 'gif' ? '#FFFFFF' : '#1F1B16' }}
+                    >
+                      가
+                    </span>
+                  </div>
+                  <div className="theme-sw-name">{bg.name}</div>
+                  {/* 저장 배경 삭제 — 스와치 왼쪽 위 작은 ✕ */}
+                  <span
+                    className="theme-sw-del"
+                    role="button"
+                    aria-label={`${bg.name} 삭제`}
+                    title="삭제"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSaved(bg);
+                    }}
+                  >
+                    ✕
+                  </span>
+                  {active && <div className="theme-sw-check" aria-hidden="true">✓</div>}
+                </button>
+              );
+            })}
+            {/* 방금 올린(아직 저장 안 된) 배경 — 세션 한정 스와치 */}
+            {customBg && customBg.src.startsWith('data:') && (
               <button
                 type="button"
                 className={`theme-sw ${pptTheme === 'custom' ? 'is-active' : ''}`}
@@ -276,11 +373,13 @@ export default function PptSection({
               >
                 <div
                   className="theme-sw-preview"
-                  style={{ background: `url('${customBg}') center/cover`, color: '#1F1B16' }}
+                  style={{ background: `url('${customBg.src}') center/cover` }}
                 >
-                  {/* 실제 PPT와 동일하게 흰 반투명 오버레이("투명도 낮춤") 위에 검정 글자 */}
-                  <div className="theme-sw-overlay" aria-hidden="true" />
-                  <span className="theme-sw-letter" style={{ fontFamily: 'var(--font-display)', color: '#1F1B16' }}>
+                  {customBg.kind === 'image' && <div className="theme-sw-overlay" aria-hidden="true" />}
+                  <span
+                    className="theme-sw-letter"
+                    style={{ fontFamily: 'var(--font-display)', color: customBg.kind === 'gif' ? '#FFFFFF' : '#1F1B16' }}
+                  >
                     가
                   </span>
                 </div>
@@ -291,24 +390,30 @@ export default function PptSection({
                 )}
               </button>
             )}
-            {/* 교회 PPT 등록 타일 — 유료 예정(왕관)이지만 지금은 누구나 등록 가능 */}
+            {/* 교회 PPT 등록 타일 — 이미지·GIF·짧은 영상(자동 GIF 변환). 드래그앤드롭 지원 */}
             <button
               type="button"
               className="theme-sw theme-sw-add"
               onClick={handleCustomTileClick}
-              title="교회에서 쓰는 PPT 이미지를 올리면 배경이 돼요 (투명도는 자동으로 낮춰져요)"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleCustomDrop}
+              title="교회 PPT 이미지·GIF·짧은 영상(10초)을 올리면 배경이 돼요 — 끌어다 놔도 됩니다"
             >
               <div className="theme-sw-preview theme-sw-add-preview">
-                <span className="theme-sw-add-plus" aria-hidden="true">+</span>
+                {converting ? (
+                  <span className="theme-sw-add-progress">{converting.label} {converting.pct}%</span>
+                ) : (
+                  <span className="theme-sw-add-plus" aria-hidden="true">+</span>
+                )}
               </div>
-              <div className="theme-sw-name">{customBg ? '이미지 바꾸기' : '교회 PPT 등록'}</div>
+              <div className="theme-sw-name">{converting ? '영상 변환 중' : customBg ? '배경 바꾸기' : '교회 PPT 등록'}</div>
               <CrownBadge />
             </button>
             <input
               ref={customFileRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleCustomFile}
+              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+              onChange={handleCustomInput}
               style={{ display: 'none' }}
               aria-hidden="true"
               tabIndex={-1}
