@@ -1633,6 +1633,42 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .theme-sw:hover .theme-sw-del {
   display: inline-flex;
 }
+/* ── 테마 그룹 접이식 — 26개 타일을 기본/실사/움직이는 배경/내 배경으로 묶음 ── */
+.theme-group {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.theme-group > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.theme-group > summary::-webkit-details-marker { display: none; }
+.theme-group-arrow {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--ink-3);
+  transition: transform 160ms;
+}
+.theme-group[open] .theme-group-arrow { transform: rotate(90deg); }
+.theme-group-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.theme-group-crowninline { flex-shrink: 0; }
+.theme-group > .ppt-themes { padding: 4px 12px 12px; }
+
 /* 잠긴 유료 테마 — 보이긴 보이지만 어둡게, 선택 불가 (운영자 계정만 해제) */
 .theme-sw-plocked {
   cursor: not-allowed;

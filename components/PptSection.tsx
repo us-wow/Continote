@@ -16,7 +16,7 @@ import { PPT_FONT_LABELS, PPT_THEME_LABELS, PPT_VALIGN_LABELS, type PptFont, typ
 import { fileToDataUrl, CUSTOM_BG_MAX_BYTES, type CustomBg } from '@/lib/custom-bg';
 import { videoFileToGif } from '@/lib/video-to-gif';
 import type { SavedBg } from '@/lib/custom-bg-cloud';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type PptSectionProps = {
   slideCount: number;
@@ -117,18 +117,29 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
 const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers'];
 const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme);
 
-// 순서(사용자 지정): 단색·실사 6종 → 움직이는 홀리 13종 → (별도) 교회 PPT 등록 타일.
-const THEME_ORDER: PptTheme[] = [
-  'black', 'white', 'paper', 'bible', 'meadow', 'cross',
-  'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers',
-  'light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet',
-  'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight',
+// 테마가 26개라 한 번에 다 펼치면 부담 → 묶음별로 접었다 펼 수 있게 그룹핑.
+// 접힘 상태는 localStorage에 기억되고, 선택 중인 테마가 든 그룹은 처음에 자동으로 펼쳐진다.
+const THEME_GROUPS: { id: string; label: string; premium: boolean; themes: PptTheme[] }[] = [
+  { id: 'basic', label: '기본', premium: false, themes: ['black', 'white', 'paper', 'bible', 'meadow', 'cross'] },
+  { id: 'photo', label: '실사', premium: false, themes: ['sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'] },
+  {
+    id: 'motion', label: '움직이는 배경', premium: true,
+    themes: ['light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'],
+  },
 ];
-// 유료 예정 기능(움직이는 배경 전부) — 오른쪽 위에 왕관 표시 (지금은 모두 무료로 열려 있음)
-const PREMIUM_THEMES: PptTheme[] = [
-  'light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet',
-  'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight',
-];
+// 기본 접힘 상태 — 처음엔 '기본'과 '내 배경'만 펼쳐서 화면을 가볍게
+const GROUP_DEFAULT_OPEN: Record<string, boolean> = { basic: true, photo: false, motion: false, mine: true };
+// 유료 예정 기능(움직이는 배경 전부) — 오른쪽 위에 왕관 표시 (지금은 운영자만 사용 가능)
+const PREMIUM_THEMES: PptTheme[] = THEME_GROUPS.find((g) => g.id === 'motion')!.themes;
+
+// 그룹 제목용 인라인 왕관 — 배지(절대 배치)와 달리 글자 옆에 흐름대로 놓인다
+function CrownInline() {
+  return (
+    <svg className="theme-group-crowninline" width="13" height="11" viewBox="0 0 24 21" fill="none" aria-label="유료 예정">
+      <path d="M3 18 L3 6 L8.5 10.5 L12 3 L15.5 10.5 L21 6 L21 18 Z" stroke="#F2C14E" strokeWidth="2.4" strokeLinejoin="miter" fill="none" />
+    </svg>
+  );
+}
 
 // 왕관 배지 — 노란 선으로 그린 투명 왕관 (이모지 X, 사용자 지정 스타일)
 // 측면이 수직이고 모서리가 뾰족한 "각진" 왕관 — 둥글면 산맥처럼 보인다는 피드백 반영.
@@ -200,6 +211,32 @@ export default function PptSection({
   // 영상→GIF 변환 진행 상태 — 변환 중엔 타일에 % 표시, 클릭 잠금
   const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
 
+  // 테마 그룹 접힘 상태 — localStorage에 기억. 첫 화면은 SSR과 같게(기본값) 그리고,
+  // 마운트 후에 저장값 복원 + 지금 선택된 테마가 든 그룹은 펼쳐준다.
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(GROUP_DEFAULT_OPEN);
+  useEffect(() => {
+    const next = { ...GROUP_DEFAULT_OPEN };
+    for (const id of [...THEME_GROUPS.map((g) => g.id), 'mine']) {
+      const v = window.localStorage.getItem('cn-theme-group.' + id);
+      if (v === '1') next[id] = true;
+      else if (v === '0') next[id] = false;
+    }
+    const holder = THEME_GROUPS.find((g) => g.themes.includes(pptTheme));
+    if (holder) next[holder.id] = true;
+    if (pptTheme === 'custom') next.mine = true;
+    setGroupOpen(next);
+    // 마운트 1회만 — 이후 접고 펴는 건 사용자 조작이 진실
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const toggleGroup = (id: string, open: boolean) => {
+    setGroupOpen((prev) => (prev[id] === open ? prev : { ...prev, [id]: open }));
+    try {
+      window.localStorage.setItem('cn-theme-group.' + id, open ? '1' : '0');
+    } catch {
+      /* 사생활 보호 모드 등 저장 불가 환경 — 기억만 못 할 뿐 동작엔 지장 없음 */
+    }
+  };
+
   const handleCustomTileClick = () => {
     if (!premiumUnlocked) {
       onLockedPremium(); // 잠김 — "유료 준비 중" 안내
@@ -270,11 +307,24 @@ export default function PptSection({
       </div>
 
       <div className="ppt-controls">
-        {/* 테마 */}
+        {/* 테마 — 묶음별 접이식 (기본/실사/움직이는 배경/내 배경) */}
         <div className="ppt-ctrl-block">
           <div className="ppt-ctrl-label label">테마</div>
-          <div className="ppt-themes">
-            {THEME_ORDER.map((key) => {
+          {THEME_GROUPS.map((group) => (
+            <details
+              key={group.id}
+              className="theme-group"
+              open={!!groupOpen[group.id]}
+              onToggle={(e) => toggleGroup(group.id, (e.target as HTMLDetailsElement).open)}
+            >
+              <summary>
+                <span className="theme-group-arrow" aria-hidden="true">▸</span>
+                {group.label}
+                {group.premium && <CrownInline />}
+                <span className="theme-group-count mono">{group.themes.length}</span>
+              </summary>
+              <div className="ppt-themes">
+            {group.themes.map((key) => {
               // 움직이는 배경은 유료 예정 — 잠긴 사용자에겐 보이되 어둡게, 선택 불가
               const locked = PREMIUM_THEMES.includes(key) && !premiumUnlocked;
               return (
@@ -318,6 +368,23 @@ export default function PptSection({
               </button>
               );
             })}
+              </div>
+            </details>
+          ))}
+
+          {/* 내 배경 — 저장된 것 + 방금 올린 것 + 등록 타일 */}
+          <details
+            className="theme-group"
+            open={!!groupOpen.mine}
+            onToggle={(e) => toggleGroup('mine', (e.target as HTMLDetailsElement).open)}
+          >
+            <summary>
+              <span className="theme-group-arrow" aria-hidden="true">▸</span>
+              내 배경
+              <CrownInline />
+              <span className="theme-group-count mono">{savedBgs.length}</span>
+            </summary>
+            <div className="ppt-themes">
             {/* 클라우드에 저장된 "내 배경" 목록 — 선택·삭제 가능 (유료 기능, 지금은 운영자만) */}
             {savedBgs.map((bg) => {
               const active = pptTheme === 'custom' && customBg?.src === bg.url;
@@ -409,16 +476,17 @@ export default function PptSection({
               <div className="theme-sw-name">{converting ? '영상 변환 중' : customBg ? '배경 바꾸기' : '교회 PPT 등록'}</div>
               <CrownBadge />
             </button>
-            <input
-              ref={customFileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
-              onChange={handleCustomInput}
-              style={{ display: 'none' }}
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-          </div>
+            </div>
+          </details>
+          <input
+            ref={customFileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+            onChange={handleCustomInput}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
         </div>
 
         {/* 폰트 */}
