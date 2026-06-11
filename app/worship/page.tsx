@@ -25,19 +25,30 @@ import {
   type SavedWorshipOrder,
 } from '@/lib/worship-order-cloud';
 import { listSetsAsync } from '@/lib/conti-cloud';
-import { buildSlidesFromText } from '@/lib/text-doc';
-import { exportToPptx, type PptFont, type PptTheme } from '@/lib/pptx';
+import { listLibraryAsync } from '@/lib/song-library-cloud';
+import type { LibrarySong } from '@/lib/song-library';
+import { buildSlidesFromText, songToText, appendText, docHasSongTitle } from '@/lib/text-doc';
+import {
+  exportToPptx,
+  isEmbeddableFont,
+  PPT_THEME_LABELS,
+  type PptFont,
+  type PptTheme,
+} from '@/lib/pptx';
 
-// 빌더에서 고를 PPT 옵션 — 1단계는 단순하게 단색 테마 3종 + 폰트 2종만.
-// (실사·홀리·커스텀 배경은 콘티(찬양) 쪽 기능과 결제 도입 시 합류)
-const THEME_OPTIONS: { value: PptTheme; label: string }[] = [
-  { value: 'black', label: '검정' },
-  { value: 'white', label: '흰색' },
-  { value: 'paper', label: '종이' },
+// 테마 전체 개방 — 메인 PPT와 같은 24종을 그룹으로 묶어 select에 노출.
+// 'custom'(내 교회 배경)만 제외: 배경 데이터 연결이 별도라 다음 단계에서.
+const THEME_GROUPS: { label: string; themes: PptTheme[] }[] = [
+  { label: '단색', themes: ['black', 'white', 'paper'] },
+  { label: '움직이는 홀리 배경', themes: ['light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'] },
+  { label: '실사 사진', themes: ['meadow', 'cross', 'bible', 'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'] },
 ];
 const FONT_OPTIONS: { value: PptFont; label: string }[] = [
   { value: 'nanum-gothic', label: '나눔고딕' },
   { value: 'noto-serif-kr', label: '본명조' },
+  { value: 'nanum-myeongjo', label: '나눔명조' },
+  { value: 'nanum-square', label: '나눔스퀘어' },
+  { value: 'noto-sans-kr', label: '본고딕' },
 ];
 
 type Gate = 'loading' | 'locked' | 'open';
@@ -62,11 +73,13 @@ export default function WorshipBuilderPage() {
   const [contiPickerId, setContiPickerId] = useState<string | null>(null);
   const [contiSets, setContiSets] = useState<{ id: string; name: string; doc: string }[]>([]);
   const [draftText, setDraftText] = useState<string | null>(null);
+  const [librarySongs, setLibrarySongs] = useState<LibrarySong[]>([]);
 
   // PPT 옵션
   const [theme, setTheme] = useState<PptTheme>('black');
   const [font, setFont] = useState<PptFont>('nanum-gothic');
   const [includeSummary, setIncludeSummary] = useState(true);
+  const [embedFont, setEmbedFont] = useState(true); // 메인과 같은 기본값 ON — 임베드 가능 글꼴일 때만 적용
 
   // ── 게이트: 로그인 → 운영자 목록 또는 premium_access 테이블 확인 ──
   useEffect(() => {
@@ -112,6 +125,8 @@ export default function WorshipBuilderPage() {
     listSetsAsync().then((sets) =>
       setContiSets(sets.map((s) => ({ id: s.id, name: s.name, doc: s.doc })))
     );
+    // 곡 라이브러리 — 콘티 통째가 아니라 곡 하나씩 골라 끼울 때 사용
+    listLibraryAsync().then(setLibrarySongs);
     try {
       const raw = window.localStorage.getItem('contino-working-draft');
       if (raw) {
@@ -136,6 +151,17 @@ export default function WorshipBuilderPage() {
     setContiPickerId(null);
     setOpenBodyId(blockId);
     flash(`"${name}" 콘티를 가져왔어요`);
+  };
+
+  // 곡 하나를 블록 본문 끝에 이어붙이기 — 콘티(통째 교체)와 달리 여러 곡을 차곡차곡 쌓는다
+  const appendSong = (blockId: string, song: LibrarySong) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    // 같은 곡 두 번 클릭(실수) 방지 — 의도적으로 반복하고 싶으면 확인 후 진행
+    if (docHasSongTitle(block.body, song.title) && !confirm(`"${song.title}"은(는) 이미 들어 있어요. 한 번 더 추가할까요?`)) return;
+    patchBlock(blockId, { body: appendText(block.body, songToText(song)) });
+    setOpenBodyId(blockId);
+    flash(`"${song.title}" 곡을 추가했어요 — 계속 골라 쌓을 수 있어요`);
   };
 
   // ── 블록 조작 ──
@@ -218,7 +244,15 @@ export default function WorshipBuilderPage() {
     if (slides.length === 0) return;
     setBusy(true);
     try {
-      await exportToPptx(slides, font, `${templateName || '예배순서'}.pptx`, theme);
+      await exportToPptx(
+        slides,
+        font,
+        `${templateName || '예배순서'}.pptx`,
+        theme,
+        undefined,
+        'middle',
+        embedFont && isEmbeddableFont(font)
+      );
     } finally {
       setBusy(false);
     }
@@ -373,10 +407,22 @@ export default function WorshipBuilderPage() {
                           {contiSets.map((s) => (
                             <button key={s.id} onClick={() => insertConti(b.id, s.name, s.doc, true)} style={pickerItem}>
                               <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{s.name}</span>
-                              <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>저장된 콘티</span>
+                              <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>저장된 콘티 (통째로 교체)</span>
                             </button>
                           ))}
-                          {!draftText && contiSets.length === 0 && (
+                          {/* 곡 라이브러리 — 클릭할 때마다 본문 끝에 곡이 쌓인다 (picker 안 닫음) */}
+                          {librarySongs.length > 0 && (
+                            <p style={{ fontSize: 11, color: 'var(--ink-2)', padding: '8px 10px 2px', borderTop: '1px solid var(--rule)' }}>
+                              곡 라이브러리 — 누를 때마다 한 곡씩 이어붙어요
+                            </p>
+                          )}
+                          {librarySongs.map((s) => (
+                            <button key={s.id} onClick={() => appendSong(b.id, s)} style={pickerItem}>
+                              <span style={{ fontWeight: 600, color: 'var(--ink)' }}>🎵 {s.title}</span>
+                              <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>곡 추가</span>
+                            </button>
+                          ))}
+                          {!draftText && contiSets.length === 0 && librarySongs.length === 0 && (
                             <p style={{ fontSize: 12, color: 'var(--ink-2)', padding: 10 }}>
                               가져올 콘티가 없어요 — 콘티노트 메인에서 먼저 콘티를 만들거나 저장해 주세요.
                             </p>
@@ -421,7 +467,11 @@ export default function WorshipBuilderPage() {
             <label style={selLabel}>
               테마
               <select value={theme} onChange={(e) => setTheme(e.target.value as PptTheme)} style={selectStyle}>
-                {THEME_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {THEME_GROUPS.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.themes.map((t) => <option key={t} value={t}>{PPT_THEME_LABELS[t]}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </label>
             <label style={selLabel}>
@@ -434,6 +484,16 @@ export default function WorshipBuilderPage() {
               <input type="checkbox" checked={includeSummary} onChange={(e) => setIncludeSummary(e.target.checked)} />
               순서 요약 슬라이드
             </label>
+            {/* 글꼴 포함 — 서브셋 파일이 있는 글꼴(본명조·나눔고딕)만 실제 임베드됨 */}
+            <label style={{ ...selLabel, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: isEmbeddableFont(font) ? 1 : 0.45 }}>
+              <input
+                type="checkbox"
+                checked={embedFont && isEmbeddableFont(font)}
+                disabled={!isEmbeddableFont(font)}
+                onChange={(e) => setEmbedFont(e.target.checked)}
+              />
+              글꼴 포함{!isEmbeddableFont(font) && ' (본명조·나눔고딕만)'}
+            </label>
             <span style={{ fontSize: 12, color: 'var(--ink-2)', marginLeft: 'auto' }}>총 {slideCount}장</span>
           </div>
           <button
@@ -444,7 +504,7 @@ export default function WorshipBuilderPage() {
             {busy ? '만드는 중…' : '예배 PPT 다운로드'}
           </button>
           <p style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-2)' }}>
-            찬양(가사) 슬라이드는 콘티노트 메인에서 만든 PPT를 이어서 쓰세요 — 합치기는 다음 단계에서 들어갑니다.
+            움직이는 배경은 PPT 슬라이드쇼 모드에서만 재생돼요. 찬양은 블록의 "콘티 가져오기"로 끼우면 한 파일로 나옵니다.
           </p>
         </section>
       </div>
