@@ -23,9 +23,12 @@ async function getCurrentUserId(): Promise<string | null> {
 }
 
 // 같은 곡인지 비교할 때 쓰는 정규화 키 — song-library.makeId와 동일 규칙.
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   return (title || 'untitled').trim().toLowerCase().replace(/\s+/g, ' ');
 }
+
+// 무료 라이브러리 한도 — 한 주 콘티 분량. 프리미엄은 무제한.
+export const FREE_LIBRARY_LIMIT = 5;
 
 function rowToLibrarySong(row: any): LibrarySong {
   const ts = row.created_at ? new Date(row.created_at).getTime() : Date.now();
@@ -55,12 +58,17 @@ export async function listLibraryAsync(): Promise<LibrarySong[]> {
 }
 
 // 추출된 곡들을 라이브러리에 누적/갱신.
-// 이미 같은 제목 행이 있으면 sections를 update, 없으면 insert.
-export async function addToLibraryAsync(songs: Song[]): Promise<void> {
-  if (!songs || songs.length === 0) return;
+// 이미 같은 제목 행이 있으면 sections를 update(한도와 무관 — 갱신은 항상 허용),
+// 새 제목은 insert하되 maxSongs(무료 5곡) 한도를 넘는 만큼 건너뛴다.
+// 반환: { added: 새로 저장된 수, skipped: 한도에 막혀 못 들어간 수 }
+export async function addToLibraryAsync(
+  songs: Song[],
+  maxSongs?: number
+): Promise<{ added: number; skipped: number }> {
+  if (!songs || songs.length === 0) return { added: 0, skipped: 0 };
   const userId = await getCurrentUserId();
   // 컷: 비로그인은 누적 저장 안 함(로컬 X). 로그인해야 클라우드에 쌓임.
-  if (!userId) return;
+  if (!userId) return { added: 0, skipped: 0 };
 
   const sb = getSupabaseClient()!;
   // 사용자의 기존 곡 제목 목록을 한 번에 가져와 client-side에서 매칭.
@@ -70,7 +78,7 @@ export async function addToLibraryAsync(songs: Song[]): Promise<void> {
     .order('created_at', { ascending: false });
   if (fetchError) {
     console.error('[song-cloud] addToLibraryAsync 조회 실패:', fetchError.message);
-    return;
+    return { added: 0, skipped: 0 };
   }
   const titleToId = new Map<string, string>();
   for (const r of existing ?? []) {
@@ -78,6 +86,9 @@ export async function addToLibraryAsync(songs: Song[]): Promise<void> {
   }
 
   // 같은 제목은 update, 처음 보는 제목은 insert로 분리.
+  // insert는 한도(무료 5곡)를 넘는 만큼 건너뛴다 — 한도는 "새 곡 저장"에만 적용.
+  let room = maxSongs === undefined ? Infinity : Math.max(0, maxSongs - (existing?.length ?? 0));
+  let skipped = 0;
   const toUpdate: { id: string; sections: any[] }[] = [];
   const toInsert: { user_id: string; title: string; sections: any[] }[] = [];
   for (const song of songs) {
@@ -85,7 +96,8 @@ export async function addToLibraryAsync(songs: Song[]): Promise<void> {
     const existingId = titleToId.get(norm);
     if (existingId) {
       toUpdate.push({ id: existingId, sections: song.sections });
-    } else {
+    } else if (room > 0) {
+      room -= 1;
       toInsert.push({
         user_id: userId,
         title: song.title || 'Untitled',
@@ -93,6 +105,8 @@ export async function addToLibraryAsync(songs: Song[]): Promise<void> {
       });
       // 같은 배치 안에서 중복 입력 방지 — 이번에 insert될 제목도 map에 미리 등록.
       titleToId.set(norm, 'pending');
+    } else {
+      skipped += 1;
     }
   }
 
@@ -106,8 +120,44 @@ export async function addToLibraryAsync(songs: Song[]): Promise<void> {
   }
   if (toInsert.length > 0) {
     const { error } = await sb.from('songs').insert(toInsert);
-    if (error) console.error('[song-cloud] insert 실패:', error.message);
+    if (error) {
+      console.error('[song-cloud] insert 실패:', error.message);
+      return { added: 0, skipped: skipped + toInsert.length };
+    }
   }
+  return { added: toInsert.length, skipped };
+}
+
+// ── 곡 라이브러리 자동 재사용 ─────────────────────────────────────────────────
+// 추출된 곡의 제목이 라이브러리에 이미 있으면, 날것 AI 추출본 대신
+// "지난번에 다듬어 둔 확정본"을 칩 모드로 바로 투입한다 (나누기·오타 수정 생략 = 시간 절약).
+// 새 추출본은 freshSections에 보관해서, 배너의 "새 추출본 쓰기"로 되돌릴 수 있다.
+export async function reuseFromLibrary(
+  rawSongs: Song[],
+  // 데스크톱은 새 곡을 나누기 모드(confirmed:false)로 시작, 모바일은 칩 모드 그대로
+  markUnconfirmed: boolean
+): Promise<{ songs: Song[]; reusedCount: number; freshSongs: Song[] }> {
+  const library = await listLibraryAsync(); // 비로그인이면 [] → 전부 새 곡 취급
+  const byTitle = new Map(library.map((s) => [normalizeTitle(s.title), s]));
+
+  const freshSongs: Song[] = [];
+  let reusedCount = 0;
+  const songs = rawSongs.map((raw) => {
+    const hit = byTitle.get(normalizeTitle(raw.title));
+    if (hit && hit.sections.length > 0) {
+      reusedCount += 1;
+      return {
+        ...raw,
+        sections: hit.sections,
+        confirmed: true,        // 이미 다듬은 버전 → 바로 칩 모드
+        reused: true,
+        freshSections: raw.sections,
+      };
+    }
+    freshSongs.push(raw);
+    return markUnconfirmed ? { ...raw, confirmed: false } : raw;
+  });
+  return { songs, reusedCount, freshSongs };
 }
 
 export async function removeFromLibraryAsync(id: string): Promise<void> {

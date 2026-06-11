@@ -30,4 +30,8 @@ export interface Song {
   confirmed?: boolean;
   // 가사 대조 검토 결과 — 있으면 곡 카드 상단에 배너로 표시.
   refCheck?: RefCheck;
+  // 곡 라이브러리 자동 재사용 — true면 "지난번 다듬은 확정본"으로 대체된 곡.
+  // freshSections에 이번 AI 추출본을 보관해 "새 추출본 쓰기"로 되돌릴 수 있다. (세션 한정, 저장 안 됨)
+  reused?: boolean;
+  freshSections?: Section[];
 }

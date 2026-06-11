@@ -25,6 +25,8 @@ import {
   removeFromLibraryAsync,
   updateLibrarySongTitleAsync,
   migrateSongLibraryToCloud,
+  reuseFromLibrary,
+  FREE_LIBRARY_LIMIT,
 } from '@/lib/song-library-cloud';
 import {
   exportToPptx,
@@ -213,6 +215,21 @@ export default function Home() {
           .catch((err: Error) => showToast(err.message));
       }
     }
+  };
+
+  // 추출 결과를 화면에 투입 — ①라이브러리 재사용(다듬은 확정본 우선) ②새 곡만 대조 검토
+  // ③새 곡만 라이브러리 적립(무료 5곡 한도) ④결과를 토스트 하나로 요약.
+  const ingestExtractedSongs = async (raw: Song[], markUnconfirmed: boolean) => {
+    const { songs: merged, reusedCount, freshSongs } = await reuseFromLibrary(raw, markUnconfirmed);
+    setSongs((prev) => [...prev, ...merged]);
+    // 재사용 곡은 이미 확정본이라 대조 불필요 — 새 곡만 검토
+    attachRefChecks(merged.filter((s) => !s.reused), setSongs);
+    // 새 곡만 적립 — 재사용 곡을 날것 AI 추출본으로 덮어쓰지 않기 위해
+    const { skipped } = await addToLibraryAsync(freshSongs, premiumUnlocked ? undefined : FREE_LIBRARY_LIMIT);
+    const parts = [`${raw.length}곡 추출됨`];
+    if (reusedCount > 0) parts.push(`${reusedCount}곡은 지난번 다듬은 버전으로 가져왔어요 📚`);
+    if (skipped > 0) parts.push(`무료는 라이브러리 ${FREE_LIBRARY_LIMIT}곡까지라 ${skipped}곡은 저장 안 됐어요`);
+    showToast(parts.join(' · '));
   };
 
   const handleDeleteSavedBg = (bg: SavedBg) => {
@@ -509,16 +526,9 @@ export default function Home() {
         if (!data.songs?.length) {
           showToast('가사를 찾을 수 없어요');
         } else {
-          // confirmed:false → "나누기 모드"로 시작. 사용자가 빈 줄로 묶음을 직접 나눈 뒤 확정한다.
-          const newSongs: Song[] = data.songs.map((s: Song) => ({ ...s, confirmed: false }));
-          setSongs((prev) => [...prev, ...newSongs]);
-          // 가사 대조 검토 — 같은 제목의 확정본이 있으면 배너로 일치율·교정 제안 표시 (비동기)
-          attachRefChecks(newSongs, setSongs);
-          // 라이브러리 누적은 fire-and-forget — 사용자가 결과를 보는 흐름은 막지 않는다.
-          // 실패 시 console에 남고 토스트는 별도로 안 띄움(부수 효과라 덜 중요).
-          void addToLibraryAsync(data.songs);
+          // 라이브러리 재사용 → 대조 검토 → 적립 → 요약 토스트까지 한 번에
+          await ingestExtractedSongs(data.songs, true);
           setPasted('');
-          showToast(`${data.songs.length}곡 추출됨`);
         }
       } catch (err: any) {
         showToast(`오류: ${err.message}`);
@@ -581,10 +591,8 @@ export default function Home() {
       if (!data.songs?.length) {
         showToast('가사를 찾을 수 없어요');
       } else {
-        // confirmed:false → "나누기 모드"로 시작 (사용자가 직접 묶음을 나눈 뒤 확정).
-        setSongs((prev) => [...prev, ...data.songs.map((s: Song) => ({ ...s, confirmed: false }))]);
-        // 라이브러리 누적은 fire-and-forget — 결과 표시를 막지 않는다.
-        void addToLibraryAsync(data.songs);
+        // 라이브러리 재사용 → 대조 검토 → 적립 → 요약 토스트까지 한 번에
+        await ingestExtractedSongs(data.songs, true);
         // 오타 검토 시 다시 보내야 하므로 추출 시점 이미지를 메모리에 캐싱.
         extractedImagesRef.current = images;
         // 새 추출 → 이전 검토 결과 비움.
@@ -593,7 +601,6 @@ export default function Home() {
         // 안 비우면 다음 드롭이 기존 파일에 더해져(append) 같은 악보를 또 중복으로 읽음.
         // (오타 검토용 원본은 extractedImagesRef에 따로 있어 영향 없음)
         setFiles([]);
-        showToast(`${data.songs.length}곡 추출됨`);
       }
     } catch (err: any) {
       showToast(`오류: ${err.message}`);

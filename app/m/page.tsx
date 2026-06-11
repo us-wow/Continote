@@ -27,7 +27,7 @@ import { buildPlainSlidesTxt, buildOpenSongXml, downloadText } from '@/lib/expor
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { exportToPptx, validateSlide, type PptCopyrightInfo, type PptFont, type PptSlide, type PptTheme, type PptVAlign } from '@/lib/pptx';
 import { buildSlidesFromText } from '@/lib/text-doc';
-import { addToLibraryAsync, migrateSongLibraryToCloud } from '@/lib/song-library-cloud';
+import { addToLibraryAsync, migrateSongLibraryToCloud, reuseFromLibrary, FREE_LIBRARY_LIMIT } from '@/lib/song-library-cloud';
 import { migrateLocalToCloud } from '@/lib/conti-cloud';
 import { migrateTemplatesToCloud } from '@/lib/template-cloud';
 import BrandMark from '@/components/BrandMark';
@@ -124,6 +124,19 @@ export default function MobilePage() {
         setPptTheme('black');
       }
     });
+  };
+
+  // 추출 결과 투입 — ①라이브러리 재사용 ②새 곡만 대조 검토 ③새 곡만 적립(무료 5곡) ④요약 토스트.
+  // 모바일은 곡을 칩 모드 그대로 받으므로 markUnconfirmed=false.
+  const ingestExtractedSongs = async (raw: Song[]) => {
+    const { songs: merged, reusedCount, freshSongs } = await reuseFromLibrary(raw, false);
+    setSongs((prev) => [...prev, ...merged]);
+    attachRefChecks(merged.filter((s) => !s.reused), setSongs);
+    const { skipped } = await addToLibraryAsync(freshSongs, premiumUnlocked ? undefined : FREE_LIBRARY_LIMIT);
+    const parts = [`${raw.length}곡 추출됨`];
+    if (reusedCount > 0) parts.push(`${reusedCount}곡은 지난번 다듬은 버전으로 가져왔어요 📚`);
+    if (skipped > 0) parts.push(`무료는 라이브러리 ${FREE_LIBRARY_LIMIT}곡까지라 ${skipped}곡은 저장 안 됐어요`);
+    showToast(parts.join(' · '));
   };
   const [authBusy, setAuthBusy] = useState(false);
   const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
@@ -389,13 +402,9 @@ export default function MobilePage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '분석 실패');
         if (data.songs?.length) {
-          const newSongs: Song[] = data.songs;
-          setSongs((prev) => [...prev, ...newSongs]);
-          // 가사 대조 검토 — 같은 제목의 확정본이 있으면 배너로 일치율·교정 제안 표시 (비동기)
-          attachRefChecks(newSongs, setSongs);
-          void addToLibraryAsync(data.songs);
+          // 라이브러리 재사용 → 대조 검토 → 적립 → 요약 토스트까지 한 번에
+          await ingestExtractedSongs(data.songs);
           setPasted('');
-          showToast(`${data.songs.length}곡 추출됨`);
           document.getElementById('m-sec-2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
           showToast('가사를 찾을 수 없어요');
@@ -423,15 +432,11 @@ export default function MobilePage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '분석 실패');
         if (data.songs?.length) {
-          const newSongs: Song[] = data.songs;
-          setSongs((prev) => [...prev, ...newSongs]);
-          // 가사 대조 검토 — 같은 제목의 확정본이 있으면 배너로 일치율·교정 제안 표시 (비동기)
-          attachRefChecks(newSongs, setSongs);
-          void addToLibraryAsync(data.songs);
+          // 라이브러리 재사용 → 대조 검토 → 적립 → 요약 토스트까지 한 번에
+          await ingestExtractedSongs(data.songs);
           // 오타 검토용 이미지 캐싱 + 이전 검토 결과 초기화
           extractedImagesRef.current = images;
           setSuspectMap({});
-          showToast(`${data.songs.length}곡 추출됨`);
           document.getElementById('m-sec-2')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
           showToast('가사를 찾을 수 없어요');

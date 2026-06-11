@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefCheck, Section, Song } from '@/lib/types';
 import { sectionToText, docHasSongTitle } from '@/lib/text-doc';
 import { submitReferenceLyrics } from '@/lib/reference-lyrics';
+import { addToLibraryAsync } from '@/lib/song-library-cloud';
 import Mascot from '@/components/Mascot';
 
 type ExtractedSectionProps = {
@@ -301,6 +302,31 @@ function SongCard({
         </button>
       </header>
 
+      {/* 곡 라이브러리 자동 재사용 — 지난번 다듬은 확정본으로 대체됐음을 알림 */}
+      {open && song.reused && (
+        <div className="refcheck refcheck-ok">
+          📚 곡 라이브러리에서 가져왔어요 — 지난번에 다듬은 그대로예요.
+          {song.freshSections && song.freshSections.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-text btn-sm"
+              style={{ marginLeft: 8, fontSize: 12, padding: '2px 8px' }}
+              onClick={() =>
+                onUpdate({
+                  ...song,
+                  sections: song.freshSections!,
+                  confirmed: false, // 새 추출본은 다시 나누기 모드부터
+                  reused: false,
+                  freshSections: undefined,
+                })
+              }
+            >
+              새 추출본 쓰기
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 가사 대조 검토 — 같은 제목의 확정본이 있으면 일치율 + 교정 제안 표시 */}
       {open && song.refCheck && <RefCheckNote check={song.refCheck} />}
 
@@ -314,6 +340,9 @@ function SongCard({
               onUpdate(next);
               // 확정한 가사를 대조용으로 쌓는다 — fire-and-forget (로그인 시에만 저장됨)
               void submitReferenceLyrics(next);
+              // 곡 라이브러리도 다듬은 버전으로 갱신 — 다음에 같은 곡을 올리면
+              // 이 확정본이 자동 재사용된다 (날것 AI 추출본 대신).
+              void addToLibraryAsync([next]);
             }}
           />
         ) : (
