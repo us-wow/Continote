@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Song } from '@/lib/types';
 import { attachRefChecks } from '@/lib/reference-lyrics';
-import { canUseCustomBg, type CustomBg } from '@/lib/custom-bg';
+import { canUseCustomBg, checkPremiumAccess, type CustomBg } from '@/lib/custom-bg';
 import { listMyBackgrounds, saveBackground, deleteBackground, type SavedBg } from '@/lib/custom-bg-cloud';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
@@ -85,7 +85,22 @@ export default function MobilePage() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   // 유료 기능 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
   useEffect(() => {
-    setPremiumUnlocked(canUseCustomBg(authUser?.email));
+    // 1차: 운영자 이메일·테스트 스위치 (즉시) → 2차: 무료 체험 명단(premium_access) 조회 (비동기)
+    if (canUseCustomBg(authUser?.email)) {
+      setPremiumUnlocked(true);
+      return;
+    }
+    if (!authUser?.email) {
+      setPremiumUnlocked(false);
+      return;
+    }
+    let cancelled = false;
+    void checkPremiumAccess(authUser.email).then((ok) => {
+      if (!cancelled) setPremiumUnlocked(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [authUser]);
   // 해제된 계정이면 클라우드의 "내 배경" 목록을 불러온다
   useEffect(() => {

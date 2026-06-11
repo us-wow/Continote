@@ -26,6 +26,27 @@ export function canUseCustomBg(email: string | null | undefined): boolean {
   return false;
 }
 
+// 무료 체험/프리미엄 허용 명단(premium_access 테이블) 조회 —
+// 결제가 붙기 전까지는 이 표가 "구독자 명단"이다. 운영자가 대시보드에서 행을 추가하면
+// 그 이메일의 사용자는 로그인만 해도 유료 기능이 풀린다. expires_at이 지나면 자동 잠김.
+export async function checkPremiumAccess(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  try {
+    const { getSupabaseClient } = await import('./supabase');
+    const sb = getSupabaseClient();
+    if (!sb) return false;
+    const { data, error } = await sb
+      .from('premium_access')
+      .select('email, expires_at')
+      .limit(1);
+    if (error || !data || data.length === 0) return false;
+    const row = data[0];
+    return !row.expires_at || new Date(row.expires_at).getTime() > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 // 업로드된 이미지 파일을 dataURL로 — 미리보기(css url)와 PPT(customBgData) 양쪽에 그대로 쓴다.
 export function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
