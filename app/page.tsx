@@ -1145,6 +1145,14 @@ export default function Home() {
             sub="추출한 곡 재사용"
             onClick={() => { setShowMenu(false); setShowLibrary(true); }}
           />
+          {/* 예배 순서 빌더 — 유료 예정. 운영자/프리미엄에게만 메뉴 노출 (/worship 자체도 게이트 있음) */}
+          {premiumUnlocked && (
+            <MenuItem
+              label="예배 순서 빌더 👑"
+              sub="예배 전체 PPT 한 번에 (미리보기)"
+              onClick={() => { window.location.href = '/worship'; }}
+            />
+          )}
         </MenuDrawer>
       )}
 
