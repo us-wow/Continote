@@ -30,6 +30,8 @@ type PptSectionProps = {
   // 글꼴 포함(임베드) 토글 — 켜면 본명조를 PPT에 심는다.
   embedFont: boolean;
   setEmbedFont: (v: boolean) => void;
+  // 로그인 여부 — "자주 쓰는 배경" 줄은 로그인한 사용자에게만 보인다
+  isLoggedIn: boolean;
   // 유료 기능(움직이는 배경 + 교회 PPT 등록) 잠금 — 운영자 계정만 해제.
   // 잠긴 사용자에겐 보이되 어둡게 표시되고, 누르면 유료 안내만 나온다.
   premiumUnlocked: boolean;
@@ -117,18 +119,31 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
 const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers'];
 const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme);
 
-// 테마가 26개라 한 번에 다 펼치면 부담 → 묶음별로 접었다 펼 수 있게 그룹핑.
-// 접힘 상태는 localStorage에 기억되고, 선택 중인 테마가 든 그룹은 처음에 자동으로 펼쳐진다.
+// 테마 26개를 묶음별로 접었다 펼 수 있게 그룹핑.
+// 기본 세팅은 "전부 펼침" — 접는 건 사용자의 선택이고, 접힘 상태는 localStorage에 기억된다.
 const THEME_GROUPS: { id: string; label: string; premium: boolean; themes: PptTheme[] }[] = [
-  { id: 'basic', label: '기본', premium: false, themes: ['black', 'white', 'paper', 'bible', 'meadow', 'cross'] },
-  { id: 'photo', label: '실사', premium: false, themes: ['sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'] },
+  {
+    id: 'free', label: '기본 배경', premium: false,
+    themes: ['black', 'white', 'paper', 'bible', 'meadow', 'cross', 'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'],
+  },
   {
     id: 'motion', label: '움직이는 배경', premium: true,
     themes: ['light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'],
   },
 ];
-// 기본 접힘 상태 — 처음엔 '기본'과 '내 배경'만 펼쳐서 화면을 가볍게
-const GROUP_DEFAULT_OPEN: Record<string, boolean> = { basic: true, photo: false, motion: false, mine: true };
+// 기본 접힘 상태 — 전부 펼침 (사용자 요청: "기본 세팅이 다 보이는 게 세팅")
+const GROUP_DEFAULT_OPEN: Record<string, boolean> = { freq: true, free: true, motion: true, mine: true };
+
+// 자주 쓰는 배경 — PPT 다운로드할 때마다 그 테마를 세서 localStorage에 기억.
+// 로그인한 사용자에게만 맨 위 줄로 보여준다 (로그인할 이유 하나 추가).
+const USAGE_KEY = 'cn-theme-usage';
+function readUsage(): Record<string, number> {
+  try {
+    return JSON.parse(window.localStorage.getItem(USAGE_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
 // 유료 예정 기능(움직이는 배경 전부) — 오른쪽 위에 왕관 표시 (지금은 운영자만 사용 가능)
 const PREMIUM_THEMES: PptTheme[] = THEME_GROUPS.find((g) => g.id === 'motion')!.themes;
 
@@ -189,6 +204,7 @@ export default function PptSection({
   setPptVAlign,
   embedFont,
   setEmbedFont,
+  isLoggedIn,
   premiumUnlocked,
   onLockedPremium,
   customBg,
@@ -206,6 +222,49 @@ export default function PptSection({
 }: PptSectionProps) {
   const isEmpty = slideCount === 0;
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // 테마 스와치 한 칸 — 그룹 목록과 "자주 쓰는" 줄에서 같이 쓴다
+  const renderThemeTile = (key: PptTheme) => {
+    // 움직이는 배경은 유료 예정 — 잠긴 사용자에겐 보이되 어둡게, 선택 불가
+    const locked = PREMIUM_THEMES.includes(key) && !premiumUnlocked;
+    return (
+      <button
+        key={key}
+        type="button"
+        className={`theme-sw ${pptTheme === key ? 'is-active' : ''}${locked ? ' theme-sw-plocked' : ''}`}
+        onClick={() => (locked ? onLockedPremium() : setPptTheme(key))}
+        aria-pressed={pptTheme === key}
+        aria-disabled={locked}
+        aria-label={`${PPT_THEME_LABELS[key]} 테마${locked ? ' (유료 준비 중)' : ''}`}
+        title={locked ? `${PPT_THEME_LABELS[key]} — 유료 기능으로 준비 중이에요` : PPT_THEME_LABELS[key]}
+      >
+        <div
+          className="theme-sw-preview"
+          style={{
+            background: THEME_SWATCH_BG[key],
+            color: THEME_SWATCH_FG[key],
+          }}
+        >
+          {/* 이미지 테마는 lib/pptx.ts와 동일하게 흰 반투명 레이어 위에 검정 글자 (65% 불투명) */}
+          {isImageTheme(key) && <div className="theme-sw-overlay" aria-hidden="true" />}
+          <span
+            className="theme-sw-letter"
+            style={{ fontFamily: 'var(--font-display)', color: THEME_SWATCH_FG[key] }}
+          >
+            가
+          </span>
+        </div>
+        <div className="theme-sw-name">{PPT_THEME_LABELS[key].split(' ')[0]}</div>
+        {/* 왕관은 오른쪽 위 — 선택 체크(✓)와 같은 자리라, 선택 중엔 ✓만 보여준다 */}
+        {PREMIUM_THEMES.includes(key) && pptTheme !== key && <CrownBadge />}
+        {pptTheme === key && (
+          <div className="theme-sw-check" aria-hidden="true">
+            ✓
+          </div>
+        )}
+      </button>
+    );
+  };
   // 교회 PPT 파일 업로드용 숨김 input — 등록 타일 클릭 시 연다
   const customFileRef = useRef<HTMLInputElement>(null);
   // 영상→GIF 변환 진행 상태 — 변환 중엔 타일에 % 표시, 클릭 잠금
@@ -236,6 +295,28 @@ export default function PptSection({
       /* 사생활 보호 모드 등 저장 불가 환경 — 기억만 못 할 뿐 동작엔 지장 없음 */
     }
   };
+
+  // 자주 쓰는 배경 — 다운로드 횟수 기준. 마운트 후 localStorage에서 읽는다(hydration 안전).
+  const [usage, setUsage] = useState<Record<string, number>>({});
+  useEffect(() => {
+    setUsage(readUsage());
+  }, []);
+  const recordThemeUsage = () => {
+    const next = { ...readUsage(), [pptTheme]: (readUsage()[pptTheme] ?? 0) + 1 };
+    setUsage(next);
+    try {
+      window.localStorage.setItem(USAGE_KEY, JSON.stringify(next));
+    } catch { /* 저장 불가 환경 무시 */ }
+  };
+  // 2회 이상 쓴 테마 중 상위 4개 (custom은 저장 배경과 헷갈려서 제외)
+  const allThemeKeys = THEME_GROUPS.flatMap((g) => g.themes);
+  const frequentThemes = isLoggedIn
+    ? (Object.entries(usage)
+        .filter(([key, count]) => count >= 2 && allThemeKeys.includes(key as PptTheme))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([key]) => key) as PptTheme[])
+    : [];
 
   const handleCustomTileClick = () => {
     if (!premiumUnlocked) {
@@ -310,6 +391,21 @@ export default function PptSection({
         {/* 테마 — 묶음별 접이식 (기본/실사/움직이는 배경/내 배경) */}
         <div className="ppt-ctrl-block">
           <div className="ppt-ctrl-label label">테마</div>
+          {/* 자주 쓰는 배경 — 다운로드 2회 이상 한 테마 상위 4개 (로그인 시에만) */}
+          {frequentThemes.length > 0 && (
+            <details
+              className="theme-group"
+              open={!!groupOpen.freq}
+              onToggle={(e) => toggleGroup('freq', (e.target as HTMLDetailsElement).open)}
+            >
+              <summary>
+                <span className="theme-group-arrow" aria-hidden="true">▸</span>
+                자주 쓰는
+                <span className="theme-group-count mono">{frequentThemes.length}</span>
+              </summary>
+              <div className="ppt-themes">{frequentThemes.map(renderThemeTile)}</div>
+            </details>
+          )}
           {THEME_GROUPS.map((group) => (
             <details
               key={group.id}
@@ -324,50 +420,7 @@ export default function PptSection({
                 <span className="theme-group-count mono">{group.themes.length}</span>
               </summary>
               <div className="ppt-themes">
-            {group.themes.map((key) => {
-              // 움직이는 배경은 유료 예정 — 잠긴 사용자에겐 보이되 어둡게, 선택 불가
-              const locked = PREMIUM_THEMES.includes(key) && !premiumUnlocked;
-              return (
-              <button
-                key={key}
-                type="button"
-                className={`theme-sw ${pptTheme === key ? 'is-active' : ''}${locked ? ' theme-sw-plocked' : ''}`}
-                onClick={() => (locked ? onLockedPremium() : setPptTheme(key))}
-                aria-pressed={pptTheme === key}
-                aria-disabled={locked}
-                aria-label={`${PPT_THEME_LABELS[key]} 테마${locked ? ' (유료 준비 중)' : ''}`}
-                title={locked ? `${PPT_THEME_LABELS[key]} — 유료 기능으로 준비 중이에요` : PPT_THEME_LABELS[key]}
-              >
-                <div
-                  className="theme-sw-preview"
-                  style={{
-                    background: THEME_SWATCH_BG[key],
-                    color: THEME_SWATCH_FG[key],
-                  }}
-                >
-                  {/* 이미지 테마는 lib/pptx.ts와 동일하게 흰 반투명 레이어 위에 검정 글자.
-                      transparency 35 = 65% 불투명. */}
-                  {isImageTheme(key) && (
-                    <div className="theme-sw-overlay" aria-hidden="true" />
-                  )}
-                  <span
-                    className="theme-sw-letter"
-                    style={{ fontFamily: 'var(--font-display)', color: THEME_SWATCH_FG[key] }}
-                  >
-                    가
-                  </span>
-                </div>
-                <div className="theme-sw-name">{PPT_THEME_LABELS[key].split(' ')[0]}</div>
-                {/* 왕관은 오른쪽 위 — 선택 체크(✓)와 같은 자리라, 선택 중엔 ✓만 보여준다 */}
-                {PREMIUM_THEMES.includes(key) && pptTheme !== key && <CrownBadge />}
-                {pptTheme === key && (
-                  <div className="theme-sw-check" aria-hidden="true">
-                    ✓
-                  </div>
-                )}
-              </button>
-              );
-            })}
+            {group.themes.map(renderThemeTile)}
               </div>
             </details>
           ))}
@@ -569,7 +622,10 @@ export default function PptSection({
         <button
           type="button"
           className="btn btn-primary btn-lg ppt-download"
-          onClick={onDownloadPptx}
+          onClick={() => {
+            recordThemeUsage(); // "자주 쓰는 배경" 집계 — 다운로드가 가장 확실한 사용 신호
+            onDownloadPptx();
+          }}
           disabled={isEmpty || busy}
         >
           ⬇ PPT 다운로드 (.pptx)

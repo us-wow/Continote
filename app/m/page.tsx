@@ -37,6 +37,7 @@ import ExtractedSection from '@/components/ExtractedSection';
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
+import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
 import type { DesignTheme } from '@/components/Header';
 
@@ -77,6 +78,8 @@ export default function MobilePage() {
   const [embedFont, setEmbedFont] = useState(true);
   // 저작권(CCLI) 상태 제거됨 — 한국 교회 미사용
   const [previewOpen, setPreviewOpen] = useState(false);
+  // 요금제 안내 모달 — 잠긴 유료 기능(왕관) 클릭 시 열림
+  const [pricingOpen, setPricingOpen] = useState(false);
 
   // Auth + 디자인
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -910,7 +913,8 @@ export default function MobilePage() {
               setPptTheme('custom');
             }}
             onDeleteSaved={handleDeleteSavedBg}
-            onLockedPremium={() => showToast('유료 기능으로 준비 중이에요 🙏 조금만 기다려 주세요!')}
+            onLockedPremium={() => setPricingOpen(true)}
+            isLoggedIn={!!authUser}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
             onCopyShareLink={handleCopyShareLink}
@@ -932,6 +936,8 @@ export default function MobilePage() {
         customBgUrl={customBg?.src ?? null}
         customBgIsGif={customBg?.kind === 'gif'}
       />
+
+      <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
 
       {/* 토스트 */}
       {toast && <div className="toast">{toast}</div>}

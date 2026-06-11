@@ -52,6 +52,7 @@ import ExtractedSection from '@/components/ExtractedSection';
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
 import PreviewModal from '@/components/PreviewModal';
+import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
 import {
   buildSlidesFromText,
@@ -232,6 +233,8 @@ export default function Home() {
   const [designTheme, setDesignTheme] = useState<DesignTheme>('wanted');
   // 04 PPT 만들기의 "전체 미리보기" 모달 상태
   const [previewOpen, setPreviewOpen] = useState(false);
+  // 요금제 안내 모달 — 잠긴 유료 기능(왕관) 클릭 시 열림
+  const [pricingOpen, setPricingOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const editorBodyRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1243,7 +1246,8 @@ export default function Home() {
             setPptTheme('custom');
           }}
           onDeleteSaved={handleDeleteSavedBg}
-          onLockedPremium={() => showToast('유료 기능으로 준비 중이에요 🙏 조금만 기다려 주세요!')}
+          onLockedPremium={() => setPricingOpen(true)}
+            isLoggedIn={!!authUser}
           onOpenPreview={() => setPreviewOpen(true)}
           onDownloadPptx={handleSavePptx}
           onCopyShareLink={handleCopyShareLink}
@@ -1264,6 +1268,8 @@ export default function Home() {
         customBgUrl={customBg?.src ?? null}
         customBgIsGif={customBg?.kind === 'gif'}
       />
+
+      <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
 
 
       {/* ----- 푸터 ----- */}
