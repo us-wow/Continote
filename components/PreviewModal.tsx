@@ -15,6 +15,8 @@ type PreviewModalProps = {
   onClose: () => void;
   text: string;
   pptTheme: PptTheme;
+  // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 없으면 해당 곡은 pptTheme를 따른다.
+  songThemes?: (PptTheme | undefined)[];
   pptFont: PptFont;
   // 세로 정렬 — 실제 PPT 출력과 동일하게 미리보기 카드 안 텍스트 위치를 위/가운데/아래로 맞춘다.
   pptVAlign: PptVAlign;
@@ -118,6 +120,7 @@ export default function PreviewModal({
   onClose,
   text,
   pptTheme,
+  songThemes = [],
   pptFont,
   pptVAlign,
   overflowSlideIndices = [],
@@ -137,15 +140,21 @@ export default function PreviewModal({
   if (!open) return null;
 
   const slides = buildSlidesFromText(text);
-  const isCustomGif = pptTheme === 'custom' && customBgIsGif;
-  // 커스텀 GIF는 어두운 배경 가정 → 오버레이 없이 흰 글자 (lib/pptx.ts와 동일 규칙)
-  const overlay = isCustomGif ? undefined : THEME_OVERLAY[pptTheme];
-  const themeFg = isCustomGif ? '#FFFFFF' : THEME_FG[pptTheme];
-  // custom 테마면 사용자가 올린 이미지를 카드 배경으로 (실제 PPT 출력과 동일한 그림)
-  const themeBg =
-    pptTheme === 'custom' && customBgUrl
-      ? `url('${customBgUrl}') center/cover, ${isCustomGif ? '#000000' : '#FFFFFF'}`
-      : THEME_BG[pptTheme];
+
+  // 한 테마의 카드 배경/글자색/오버레이를 계산한다(곡별 배경에서 슬라이드마다 다른 테마를 쓰므로 함수로).
+  const themeVisual = (t: PptTheme) => {
+    const isCG = t === 'custom' && customBgIsGif;
+    // 커스텀 GIF는 어두운 배경 가정 → 오버레이 없이 흰 글자 (lib/pptx.ts와 동일 규칙)
+    const ov = isCG ? undefined : THEME_OVERLAY[t];
+    const fg = isCG ? '#FFFFFF' : THEME_FG[t];
+    // custom 테마면 사용자가 올린 이미지를 카드 배경으로 (실제 PPT 출력과 동일한 그림)
+    const bg =
+      t === 'custom' && customBgUrl
+        ? `url('${customBgUrl}') center/cover, ${isCG ? '#000000' : '#FFFFFF'}`
+        : THEME_BG[t];
+    return { bg, fg, overlay: ov };
+  };
+
   // 세로 정렬값(top/middle/bottom)을 flexbox의 alignItems로 변환.
   // 카드 안 텍스트 박스는 flex(row)라 cross축(세로)을 alignItems가 제어한다 → top=위, bottom=아래.
   const vAlignItems =
@@ -253,19 +262,29 @@ export default function PreviewModal({
               gap: 14,
             }}
           >
-            {slides.map((slide, i) => (
-              <SlidePreview
-                key={i}
-                slide={slide}
-                index={i + 1}
-                isOverflow={overflowSlideIndices.includes(i)}
-                themeBg={themeBg}
-                themeFg={themeFg}
-                overlay={overlay}
-                fontFamily={FONT_FAMILY_PREVIEW[pptFont]}
-                vAlignItems={vAlignItems}
-              />
-            ))}
+            {(() => {
+              // 곡 순번 추적 — title 슬라이드를 만날 때마다 +1 (lib/pptx.ts의 곡 순번과 동일).
+              let songIndex = -1;
+              return slides.map((slide, i) => {
+                if (slide.kind === 'title') songIndex++;
+                // 이 슬라이드가 속한 곡의 테마(곡별 지정 없으면 기본 pptTheme).
+                const slideTheme = (songIndex >= 0 && songThemes[songIndex]) || pptTheme;
+                const v = themeVisual(slideTheme);
+                return (
+                  <SlidePreview
+                    key={i}
+                    slide={slide}
+                    index={i + 1}
+                    isOverflow={overflowSlideIndices.includes(i)}
+                    themeBg={v.bg}
+                    themeFg={v.fg}
+                    overlay={v.overlay}
+                    fontFamily={FONT_FAMILY_PREVIEW[pptFont]}
+                    vAlignItems={vAlignItems}
+                  />
+                );
+              });
+            })()}
           </div>
         )}
       </div>

@@ -28,6 +28,7 @@ import { listSetsAsync } from '@/lib/conti-cloud';
 import { listLibraryAsync } from '@/lib/song-library-cloud';
 import type { LibrarySong } from '@/lib/song-library';
 import { buildSlidesFromText, songToText, appendText, docHasSongTitle } from '@/lib/text-doc';
+import SongThemePicker from '@/components/SongThemePicker';
 import {
   exportToPptx,
   isEmbeddableFont,
@@ -99,6 +100,8 @@ export default function WorshipBuilderPage() {
 
   // PPT 옵션
   const [theme, setTheme] = useState<PptTheme>('black');
+  // 곡별 배경 — 곡 순번(0번부터)별 테마. 이 페이지는 전체가 유료 게이트라 항상 활성.
+  const [songThemes, setSongThemes] = useState<(PptTheme | undefined)[]>([]);
   const [font, setFont] = useState<PptFont>('nanum-gothic');
   const [includeSummary, setIncludeSummary] = useState(true);
   const [embedFont, setEmbedFont] = useState(true); // 메인과 같은 기본값 ON — 임베드 가능 글꼴일 때만 적용
@@ -273,7 +276,10 @@ export default function WorshipBuilderPage() {
         theme,
         undefined,
         'middle',
-        embedFont && isEmbeddableFont(font)
+        embedFont && isEmbeddableFont(font),
+        undefined, // customBgData — 예배 빌더는 custom 배경 미사용
+        undefined, // customBgIsGif
+        songThemes
       );
     } finally {
       setBusy(false);
@@ -521,6 +527,20 @@ export default function WorshipBuilderPage() {
             </label>
             <span style={{ fontSize: 12, color: 'var(--ink-2)', marginLeft: 'auto' }}>총 {slideCount}장</span>
           </div>
+
+          {/* 곡별 배경 — 곡 목록은 다운로드 때와 똑같은 orderToText→buildSlidesFromText로 뽑아
+              곡 순번이 엔진과 일치하게 한다. 이 페이지는 전체가 유료라 항상 활성. */}
+          <SongThemePicker
+            songTitles={buildSlidesFromText(orderToText(blocks, includeSummary))
+              .filter((s) => s.kind === 'title')
+              .map((s) => (s.kind === 'title' ? s.title : ''))}
+            baseTheme={theme}
+            songThemes={songThemes}
+            setSongThemes={setSongThemes}
+            premiumUnlocked={true}
+            onLockedPremium={() => {}}
+          />
+
           <button
             onClick={handleDownload}
             disabled={busy || slideCount === 0}

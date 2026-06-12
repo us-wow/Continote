@@ -1499,6 +1499,69 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   cursor: pointer;
 }
 
+/* ── 예배 순서 빌더 진입 카드 (PPT 만들기 아래, 유료=왕관) ── */
+.worship-entry-card {
+  /* 한 줄 배너형 버튼 — 왼쪽 제목/설명, 오른쪽 CTA */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 18px 22px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.worship-entry-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05);
+}
+.worship-entry-card:active { transform: translateY(1px); }
+.worship-entry-left {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0; /* 긴 설명이 줄바꿈되도록 */
+}
+.worship-entry-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  word-break: keep-all;
+}
+.worship-entry-badge {
+  margin-left: 9px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a6d1a;
+  background: #fbeec2;
+  border-radius: var(--radius-pill);
+}
+.worship-entry-sub {
+  font-size: 13px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.worship-entry-cta {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  /* 좁은 화면에선 세로로 쌓고 CTA를 아래로 */
+  .worship-entry-card { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
 /* ── PptSection (4번 PPT 만들기) ── */
 .ppt-panel {
   display: flex;

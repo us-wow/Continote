@@ -244,7 +244,10 @@ export async function exportToPptx(
   // 내 교회 PPT(custom 테마) 배경 — dataURL 또는 클라우드 https URL.
   customBgData?: string,
   // 커스텀 배경이 GIF(움직임)인지 — true면 홀리 배경처럼 전면 이미지+흰 글자로 출력.
-  customBgIsGif?: boolean
+  customBgIsGif?: boolean,
+  // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 곡 경계는 title 슬라이드(# 제목)로 센다.
+  // 비어 있거나 해당 곡이 undefined면 기본 theme를 쓴다 → 기존 동작과 100% 호환.
+  songThemes?: (PptTheme | undefined)[]
 ): Promise<void> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
@@ -276,50 +279,84 @@ export async function exportToPptx(
   }
   pres.layout = 'LAYOUT_WIDE';
 
-  // 테마에 맞는 배경/글자색 선택. 이미지는 한 번만 만들어 모든 슬라이드 재사용.
-  const config = THEME_CONFIG[theme];
-  // 흰 반투명 오버레이 사용 여부 — 실사 사진은 기본 ON, 그라데이션(overlay:false)은 OFF.
-  const useOverlay = config.kind === 'image' ? config.overlay !== false : false;
-  // 흰 글자 테마(빛내림/새벽)인지 — 이미지 로드 실패 시 폴백 배경색을 정하는 데 쓴다.
-  const isLightText = config.kind === 'image' && config.text.toUpperCase() === 'FFFFFF';
-  // 움직이는 배경인지 — 홀리 GIF 테마이거나, 사용자가 올린 커스텀 GIF.
-  const animatedBg = config.kind === 'image' && (config.animated === true || (theme === 'custom' && customBgIsGif === true));
-  // 커스텀 GIF는 어두운 배경 가정 → 흰 글자 + 오버레이 없음 (홀리 테마와 동일 규칙)
-  const textColor = theme === 'custom' && customBgIsGif ? 'FFFFFF' : config.text;
+  // ── 테마별 렌더 정보 ──────────────────────────────────────────────────
+  // 곡별 배경 기능: 슬라이드마다 다른 테마를 쓸 수 있으므로, 테마 1개를 고정으로
+  // 쓰던 기존 방식 대신 "쓰인 테마마다 배경을 1번씩 로드해 캐시"한다.
+  // (같은 테마를 여러 곡이 써도 이미지는 한 번만 받아온다 → 네트워크·메모리 절약)
+  type ThemeRender = {
+    config: ThemeConfig;
+    bgData?: string;       // 배경 이미지 데이터(없으면 단색 폴백)
+    useOverlay: boolean;   // 흰 반투명 가독성 레이어 여부
+    animatedBg: boolean;   // 움직이는 GIF 배경인지
+    textColor: string;     // 글자색
+    isLightText: boolean;  // 흰 글자 테마인지(이미지 로드 실패 시 폴백 배경색 결정)
+  };
+  const themeCache = new Map<PptTheme, ThemeRender>();
 
-  let bgData: string | undefined;
-  if (config.kind === 'image') {
-    try {
-      if (theme === 'custom') {
-        // dataURL이면 'data:' 접두사만 떼고, 클라우드 https URL이면 받아와서 base64로.
-        bgData = customBgData
-          ? customBgData.startsWith('data:')
-            ? customBgData.replace(/^data:/, '')
-            : await loadPublicImageAsBase64(customBgData)
-          : undefined;
-      } else {
-        bgData = await loadPublicImageAsBase64(config.path);
+  // 한 테마의 배경을 로드해 렌더 정보로 만든다(이미 만든 건 캐시에서 바로 반환).
+  const resolveTheme = async (t: PptTheme): Promise<ThemeRender> => {
+    const cached = themeCache.get(t);
+    if (cached) return cached;
+    const cfg = THEME_CONFIG[t];
+    // 흰 반투명 오버레이 — 실사 사진은 기본 ON, 그라데이션(overlay:false)은 OFF.
+    const overlay = cfg.kind === 'image' ? cfg.overlay !== false : false;
+    // 흰 글자 테마인지 — 이미지 로드 실패 시 폴백 배경색을 정하는 데 쓴다.
+    const lightText = cfg.kind === 'image' && cfg.text.toUpperCase() === 'FFFFFF';
+    // 움직이는 배경 — 홀리 GIF 테마이거나, 사용자가 올린 커스텀 GIF(custom 테마에서만).
+    const animated = cfg.kind === 'image' && (cfg.animated === true || (t === 'custom' && customBgIsGif === true));
+    // 커스텀 GIF는 어두운 배경 가정 → 흰 글자(홀리 테마와 동일 규칙).
+    const txt = t === 'custom' && customBgIsGif ? 'FFFFFF' : cfg.text;
+    let data: string | undefined;
+    if (cfg.kind === 'image') {
+      try {
+        if (t === 'custom') {
+          // dataURL이면 'data:' 접두사만 떼고, 클라우드 https URL이면 받아와서 base64로.
+          data = customBgData
+            ? customBgData.startsWith('data:')
+              ? customBgData.replace(/^data:/, '')
+              : await loadPublicImageAsBase64(customBgData)
+            : undefined;
+        } else {
+          data = await loadPublicImageAsBase64(cfg.path);
+        }
+      } catch (err) {
+        console.warn(`이미지 배경 로드 실패 → 단색으로 대체 (${t}):`, err);
       }
-    } catch (err) {
-      console.warn('이미지 배경 로드 실패 → 단색으로 대체:', err);
+    }
+    const entry: ThemeRender = {
+      config: cfg, bgData: data, useOverlay: overlay,
+      animatedBg: animated, textColor: txt, isLightText: lightText,
+    };
+    themeCache.set(t, entry);
+    return entry;
+  };
+
+  // 기본 테마 + 곡별로 쓰인 테마를 미리 모두 로드해 캐시에 채운다.
+  // (아래 슬라이드 루프는 동기로 그려야 하므로 배경 로드는 여기서 끝낸다.)
+  const baseRender = await resolveTheme(theme);
+  if (songThemes) {
+    for (const st of songThemes) {
+      if (st) await resolveTheme(st);
     }
   }
 
-  const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>) => {
-    if (config.kind === 'solid') {
-      slide.background = { color: config.bg };
-    } else if (bgData && animatedBg) {
+  // 한 슬라이드에 주어진 테마의 배경을 적용한다.
+  const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>, tr: ThemeRender) => {
+    const cfg = tr.config;
+    if (cfg.kind === 'solid') {
+      slide.background = { color: cfg.bg };
+    } else if (tr.bgData && tr.animatedBg) {
       // 움직이는 GIF 배경 — '배경 채우기'에 넣으면 PowerPoint가 첫 프레임 정지화면만
       // 보여주므로, 슬라이드 맨 처음(=맨 뒤 레이어)에 전면 이미지로 깐다.
       // 뒤에 단색을 깔아 GIF 로드가 늦거나 실패해도 글자가 읽히게 한다.
       // 재생은 슬라이드쇼(발표) 모드에서만 된다 — 편집 화면에선 정지로 보이는 게 정상.
-      slide.background = { color: ('fallback' in config ? config.fallback : undefined) ?? '000000' };
-      slide.addImage({ data: bgData, x: 0, y: 0, w: 13.333, h: 7.5 });
-    } else if (bgData) {
-      slide.background = { data: bgData };
+      slide.background = { color: ('fallback' in cfg ? cfg.fallback : undefined) ?? '000000' };
+      slide.addImage({ data: tr.bgData, x: 0, y: 0, w: 13.333, h: 7.5 });
+    } else if (tr.bgData) {
+      slide.background = { data: tr.bgData };
       // 실사 이미지는 글자 가독성을 위해 흰 반투명 레이어를 깐다.
       // 그라데이션 배경은 자체 대비가 충분해 레이어를 생략(useOverlay=false)한다.
-      if (useOverlay) {
+      if (tr.useOverlay) {
         slide.addShape('rect', {
           x: 0,
           y: 0,
@@ -331,16 +368,29 @@ export async function exportToPptx(
       }
     } else {
       // 이미지 로드 실패 시 글자색과 대비되는 단색으로 폴백 (흰 글자면 어두운 배경).
-      slide.background = { color: isLightText ? '111111' : 'FFFFFF' };
+      slide.background = { color: tr.isLightText ? '111111' : 'FFFFFF' };
     }
   };
 
   // 슬라이드 박스 공통 위치 — 모든 종류에서 동일
   const boxFrame = { x: 0.5, y: 0.5, w: 12.333, h: 6.5 } as const;
 
+  // 곡 순번 — title 슬라이드(# 제목)를 만날 때마다 1 증가. 첫 title 전 슬라이드는 -1(기본 테마).
+  let songIndex = -1;
+  // 한 슬라이드라도 움직이는 배경을 썼는지 — 마지막 GIF 후처리(dedupe) 트리거에 사용.
+  let anyAnimated = false;
+
   for (const pptSlide of slides) {
+    if (pptSlide.kind === 'title') songIndex++;
+    // 이 슬라이드가 속한 곡의 테마(곡별 지정이 없으면 기본 theme).
+    const slideTheme = (songIndex >= 0 && songThemes?.[songIndex]) || theme;
+    const tr = themeCache.get(slideTheme) ?? baseRender;
+    if (tr.animatedBg && tr.bgData) anyAnimated = true;
+    // 글자색은 슬라이드가 속한 테마에 따라 달라진다(기존 전역 textColor 대체).
+    const textColor = tr.textColor;
+
     const slide = pres.addSlide();
-    applyThemeBackground(slide);
+    applyThemeBackground(slide, tr);
 
     if (pptSlide.kind === 'title') {
       // 제목 슬라이드 — 제목은 크고 굵게, 부제는 작게.
@@ -404,7 +454,7 @@ export async function exportToPptx(
 
   // 저작권(CCLI) 슬라이드 제거됨 — 한국 교회는 거의 안 써서. copyright 파라미터는 호환 위해 남겨두고 미사용.
 
-  if (animatedBg && bgData) {
+  if (anyAnimated) {
     // 움직이는 배경은 pptxgenjs가 슬라이드마다 같은 GIF를 통째로 중복 저장한다
     // (10장이면 30MB+). zip을 열어 같은 내용의 GIF를 하나만 남기고 참조를 통일한 뒤 내려준다.
     // 후처리에 실패하면 중복 제거 없이(파일만 클 뿐 정상인) 원본을 그대로 내려준다.

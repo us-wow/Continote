@@ -36,6 +36,7 @@ import ExtractedSection from '@/components/ExtractedSection';
 // MobileSongPicker 제거 — 단일 스크롤에선 위 ExtractedSection의 칩으로 콘티에 추가한다.
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
+import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
@@ -90,6 +91,8 @@ export default function MobilePage() {
   // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
   const [premiumUnlocked, setPremiumUnlocked] = useState(false);
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
+  // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 비어 있으면 전부 기본 테마(pptTheme)를 따른다.
+  const [songThemes, setSongThemes] = useState<(PptTheme | undefined)[]>([]);
   // PPT 세로 정렬 — 기본 가운데. 데스크탑과 동일하게 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
   // 글꼴 포함(임베드) — 기본 ON. 본명조 선택 시 글꼴을 PPT에 심어 어디서나 똑같이.
@@ -689,7 +692,7 @@ export default function MobilePage() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif');
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -963,6 +966,18 @@ export default function MobilePage() {
             onDownloadOpenSong={handleSaveOpenSong}
             onDownloadPlainSlides={handleSavePlainSlides}
           />
+
+          {/* 곡별 배경(유료) — 곡 목록은 배경 그릴 때와 똑같은 buildSlidesFromText로 뽑는다. */}
+          <SongThemePicker
+            songTitles={buildSlidesFromText(text)
+              .filter((s) => s.kind === 'title')
+              .map((s) => (s.kind === 'title' ? s.title : ''))}
+            baseTheme={pptTheme}
+            songThemes={songThemes}
+            setSongThemes={setSongThemes}
+            premiumUnlocked={premiumUnlocked}
+            onLockedPremium={() => setPricingOpen(true)}
+          />
         </div>
       </main>
 
@@ -972,6 +987,7 @@ export default function MobilePage() {
         onClose={() => setPreviewOpen(false)}
         text={text}
         pptTheme={pptTheme}
+        songThemes={songThemes}
         pptFont={pptFont}
         pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}

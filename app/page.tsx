@@ -53,6 +53,7 @@ import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
+import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
@@ -170,6 +171,8 @@ export default function Home() {
   const [premiumUnlocked, setPremiumUnlocked] = useState(false);
   // PPT 배경 테마 — 어두운 예배실 기본은 검정.
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
+  // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 비어 있으면 전부 기본 테마(pptTheme)를 따른다.
+  const [songThemes, setSongThemes] = useState<(PptTheme | undefined)[]>([]);
   // PPT 세로 정렬 — 기본은 가운데(기존 동작). 상단/하단 선택 시 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
   // 글꼴 포함(임베드) — 기본 ON. 본명조 선택 시 글꼴을 PPT에 심어 어디서나 똑같이 보이게.
@@ -882,7 +885,7 @@ export default function Home() {
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
-      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif');
+      await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes);
       showToast('PPT 다운로드 시작');
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
@@ -1309,6 +1312,62 @@ export default function Home() {
           onDownloadOpenSong={handleSaveOpenSong}
           onDownloadPlainSlides={handleSavePlainSlides}
         />
+
+        {/* 곡별 배경(유료) — 곡 목록은 배경 그릴 때와 똑같은 buildSlidesFromText로 뽑아
+            곡 순번이 엔진과 정확히 일치하게 한다. */}
+        <SongThemePicker
+          songTitles={buildSlidesFromText(text)
+            .filter((s) => s.kind === 'title')
+            .map((s) => (s.kind === 'title' ? s.title : ''))}
+          baseTheme={pptTheme}
+          songThemes={songThemes}
+          setSongThemes={setSongThemes}
+          premiumUnlocked={premiumUnlocked}
+          onLockedPremium={() => setPricingOpen(true)}
+        />
+
+        {/* Row 4: 예배 순서 빌더 진입 — PPT 만들기 바로 아래 항상 노출(유료=왕관).
+            프리미엄이면 빌더로 이동, 아니면 가격 모달을 띄워 "유료 기능"임을 안내한다.
+            작업 중 콘티는 상단의 디바운스 effect가 localStorage에 자동 저장 → 빌더가 읽어간다. */}
+        <button
+          type="button"
+          className="worship-entry-card"
+          onClick={() => {
+            // 잠긴 사용자는 바로 잠금 페이지로 보내지 않고 가격 안내부터 — 업셀 흐름이 자연스럽다
+            if (premiumUnlocked) window.location.href = '/worship';
+            else setPricingOpen(true);
+          }}
+        >
+          <div className="worship-entry-left">
+            <span className="worship-entry-title">
+              {/* 왕관 — PptSection 테마 카드와 동일한 노란 선 각진 왕관(유료 표시 통일) */}
+              <svg
+                width={18}
+                height={Math.round(18 * (21 / 24))}
+                viewBox="0 0 24 21"
+                fill="none"
+                aria-label="유료 기능"
+                style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: 7 }}
+              >
+                <path
+                  d="M3 18 L3 6 L8.5 10.5 L12 3 L15.5 10.5 L21 6 L21 18 Z"
+                  stroke="#F2C14E"
+                  strokeWidth="2.2"
+                  strokeLinejoin="miter"
+                  fill="none"
+                />
+              </svg>
+              예배 순서 빌더
+              <span className="worship-entry-badge">유료</span>
+            </span>
+            <span className="worship-entry-sub">
+              찬양·기도·설교까지 예배 전체 순서를 한 번에 PPT로 — 방금 만든 콘티도 그대로 이어집니다
+            </span>
+          </div>
+          <span className="worship-entry-cta" aria-hidden="true">
+            {premiumUnlocked ? '열기 →' : '미리보기 →'}
+          </span>
+        </button>
       </main>
 
       {/* PPT 전체 미리보기 모달 — 04 PptSection의 "전체 미리보기" 버튼이 트리거 */}
@@ -1317,6 +1376,7 @@ export default function Home() {
         onClose={() => setPreviewOpen(false)}
         text={text}
         pptTheme={pptTheme}
+        songThemes={songThemes}
         pptFont={pptFont}
         pptVAlign={pptVAlign}
         overflowSlideIndices={overflowSlideIndices}
