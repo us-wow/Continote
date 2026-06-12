@@ -7,7 +7,7 @@
 //
 // proxy.ts는 '/'와 '/m'만 매칭하므로 이 페이지는 모바일 리다이렉트를 안 탄다 → 반응형 한 벌로 처리.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { CUSTOM_BG_ADMIN_EMAILS, checkPremiumAccess } from '@/lib/custom-bg';
 import {
@@ -204,6 +204,21 @@ export default function WorshipBuilderPage() {
     });
 
   const removeBlock = (id: string) => setBlocks((prev) => prev.filter((b) => b.id !== id));
+
+  // "방금 작업하던 콘티"를 비어 있는 '찬양과 경배(콘티)' 슬롯에 자동으로 한 번만 채운다.
+  // → 빌더를 열면 메인에서 만들던 콘티가 이미 들어가 있어, 따로 "콘티 가져오기"를 안 눌러도 된다.
+  //   (ref로 한 번만 — 사용자가 지우거나 바꾼 뒤 다시 덮어쓰지 않게)
+  const contiAutoFilledRef = useRef(false);
+  useEffect(() => {
+    if (gate !== 'open' || contiAutoFilledRef.current) return;
+    if (!draftText || !draftText.trim()) return;
+    // 본문이 비어 있는 콘티 슬롯을 찾는다(기본 골격의 '찬양과 경배' 자리).
+    const target = blocks.find((b) => b.presetKey === 'conti' && !b.body.trim());
+    if (!target) return;
+    contiAutoFilledRef.current = true;
+    patchBlock(target.id, { body: draftText.trim() });
+    flash('방금 작업하던 콘티를 "찬양과 경배"에 넣어뒀어요');
+  }, [gate, draftText, blocks]);
 
   const addBlock = (presetKey: string) => {
     const block = createBlock(presetKey);

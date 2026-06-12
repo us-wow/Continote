@@ -40,6 +40,7 @@ import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
+import SongLibraryModal from '@/components/SongLibraryModal';
 import type { DesignTheme } from '@/components/Header';
 
 export default function MobilePage() {
@@ -182,6 +183,9 @@ export default function MobilePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   // 사용법 가이드(OnboardingGuide) 표시 여부 — 메뉴의 "사용법 보기"로 연다.
   const [showGuide, setShowGuide] = useState(false);
+  // 곡 라이브러리 모달 표시 여부 — 메뉴의 "곡 라이브러리"로 연다.
+  // 한 번 추출한 곡들을 다시 불러와 콘티에 추가할 수 있다.
+  const [showLibrary, setShowLibrary] = useState(false);
 
   // 오타 검토 — page.tsx와 동일 구조
   const extractedImagesRef = useRef<{ data: string; mimeType: string }[]>([]);
@@ -791,6 +795,10 @@ export default function MobilePage() {
             setMenuOpen(false);
             setShowGuide(true);
           }}
+          onOpenLibrary={() => {
+            setMenuOpen(false);
+            setShowLibrary(true);
+          }}
           authUser={authUser}
           authBusy={authBusy}
           onSignIn={() => {
@@ -807,6 +815,21 @@ export default function MobilePage() {
 
       {/* ===== 사용법 가이드 (메뉴 → 사용법 보기) ===== */}
       {showGuide && <OnboardingGuide onClose={() => setShowGuide(false)} />}
+
+      {/* ===== 곡 라이브러리 (메뉴 → 곡 라이브러리) ===== */}
+      {/* onAdd: 라이브러리에서 고른 곡을 현재 콘티(songs) 맨 뒤에 추가한다. */}
+      {/* 데스크탑(app/page.tsx)의 onAdd 로직과 동일하게 맞췄다. */}
+      {showLibrary && (
+        <SongLibraryModal
+          isCloudUser={Boolean(authUser)}
+          onClose={() => setShowLibrary(false)}
+          onAdd={(song) => {
+            setSongs((prev) => [...prev, { title: song.title, sections: song.sections }]);
+            showToast(`"${song.title || 'Untitled'}" 곡 추가됨`);
+            setShowLibrary(false);
+          }}
+        />
+      )}
 
       {/* ===== 빠른 이동 칩 — 누르면 해당 패널로 스크롤 (sticky) ===== */}
       <div className="m-steps">
@@ -1010,6 +1033,7 @@ export default function MobilePage() {
 function MobileMenuSheet({
   onClose,
   onOpenGuide,
+  onOpenLibrary,
   authUser,
   authBusy,
   onSignIn,
@@ -1018,6 +1042,7 @@ function MobileMenuSheet({
 }: {
   onClose: () => void;
   onOpenGuide: () => void;
+  onOpenLibrary: () => void;
   authUser: User | null;
   authBusy: boolean;
   onSignIn: () => void;
@@ -1056,6 +1081,12 @@ function MobileMenuSheet({
           <button type="button" className="m-sheet-item" onClick={onOpenGuide}>
             <span className="m-sheet-item-label">사용법 보기</span>
             <span className="m-sheet-item-sub">4단계로 보는 그림 가이드</span>
+          </button>
+
+          {/* 곡 라이브러리 — 한 번 추출한 곡을 다시 불러와 콘티에 추가 */}
+          <button type="button" className="m-sheet-item" onClick={onOpenLibrary}>
+            <span className="m-sheet-item-label">곡 라이브러리</span>
+            <span className="m-sheet-item-sub">저장된 곡 검색해서 다시 추가</span>
           </button>
 
           {supabaseEnabled && (

@@ -82,7 +82,7 @@ export const BLOCK_PRESETS: BlockPreset[] = [
   { key: 'choir', name: '찬양', hint: '찬양대(성가대) 찬양', subtitlePlaceholder: '예: 할렐루야 찬양대' },
   // 콘티노트 본체와의 연결 고리 — 메인에서 만든 콘티(찬양 묶음)를 통째로 이 자리에 끼운다.
   // 콘티 텍스트는 이미 "# 곡제목 + 가사" 형식이라 body에 그대로 넣으면 슬라이드로 풀린다.
-  { key: 'conti', name: '찬양(콘티)', hint: '콘티노트에서 만든 찬양 묶음을 통째로 가져와 끼우기', bodyPlaceholder: '아래 "콘티 가져오기"로 저장된 콘티나 방금 작업하던 콘티를 불러오세요' },
+  { key: 'conti', name: '찬양과 경배', hint: '콘티노트에서 만든 찬양 묶음(콘티)을 통째로 가져와 끼우기 — 곡 제목·가사 슬라이드로 풀립니다', bodyPlaceholder: '아래 "콘티 가져오기"로 저장된 콘티나 방금 작업하던 콘티를 불러오세요' },
   { key: 'sermon', name: '설교', hint: '말씀·말씀선포·말씀증거 등으로 표기 바꿔 쓰세요', subtitlePlaceholder: '예: "다시 일어서는 믿음" · ○○○ 목사' },
   { key: 'offering', name: '봉헌', hint: '헌금 — 장로교·감리교 모두 봉헌/헌금 혼용', subtitlePlaceholder: '예: 다 같이' },
   { key: 'offeringPrayer', name: '봉헌기도', hint: '봉헌 뒤 기도' },
@@ -107,10 +107,12 @@ export function createBlock(presetKey: string): WorshipBlock {
 }
 
 // 기본 템플릿 — 12교회 합산 최빈 순서 (공통 골격)
+// 'conti'(찬양과 경배)를 예배의 부름 뒤에 기본 슬롯으로 넣어, 빌더를 열면 "내 콘티가 들어갈 자리"가
+// 바로 보이게 한다. (이 슬롯은 아래 worship 페이지에서 "방금 작업하던 콘티"로 자동 채워진다.)
 const DEFAULT_ORDER_KEYS = [
-  'entrance', 'call', 'hymn', 'creed', 'responsive',
-  'hymn', 'prayer', 'scripture', 'choir', 'sermon',
-  'hymn', 'offering', 'news', 'hymn', 'benediction',
+  'entrance', 'call', 'conti', 'hymn', 'creed',
+  'responsive', 'hymn', 'prayer', 'scripture', 'choir',
+  'sermon', 'hymn', 'offering', 'news', 'hymn', 'benediction',
 ];
 
 export function createDefaultOrder(): WorshipBlock[] {

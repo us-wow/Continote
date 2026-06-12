@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { buildSlidesFromText, type Slide } from '@/lib/text-doc';
-import { PPT_FONT_LABELS, PPT_THEME_LABELS, validateSlide, type PptFont, type PptTheme, type PptVAlign } from '@/lib/pptx';
+import { PPT_FONT_LABELS, PPT_THEME_LABELS, computeUniformLyricSizes, type PptFont, type PptTheme, type PptVAlign } from '@/lib/pptx';
 
 type PreviewModalProps = {
   open: boolean;
@@ -140,6 +140,8 @@ export default function PreviewModal({
   if (!open) return null;
 
   const slides = buildSlidesFromText(text);
+  // 가사 글씨 크기 — 실제 PPT와 동일하게 곡 단위로 통일한 값(슬라이드 인덱스로 조회).
+  const lyricSizes = computeUniformLyricSizes(slides);
 
   // 한 테마의 카드 배경/글자색/오버레이를 계산한다(곡별 배경에서 슬라이드마다 다른 테마를 쓰므로 함수로).
   const themeVisual = (t: PptTheme) => {
@@ -279,6 +281,7 @@ export default function PreviewModal({
                     themeBg={v.bg}
                     themeFg={v.fg}
                     overlay={v.overlay}
+                    lyricFontPt={lyricSizes[i]}
                     fontFamily={FONT_FAMILY_PREVIEW[pptFont]}
                     vAlignItems={vAlignItems}
                   />
@@ -299,6 +302,7 @@ function SlidePreview({
   themeBg,
   themeFg,
   overlay,
+  lyricFontPt,
   fontFamily,
   vAlignItems,
 }: {
@@ -308,6 +312,8 @@ function SlidePreview({
   themeBg: string;
   themeFg: string;
   overlay?: string;
+  // 가사 글씨 크기(pt) — 곡 단위로 통일된 값을 부모가 넘겨준다.
+  lyricFontPt: number;
   fontFamily: string;
   vAlignItems: 'flex-start' | 'center' | 'flex-end';
 }) {
@@ -315,9 +321,8 @@ function SlidePreview({
   // pt → cqw(카드 폭의 %) 환산. 카드가 커지든 작아지든 실제 PPT와 같은 글자/줄 배치가 유지된다.
   // 0.95는 폰트 미세 차이로 글자 한두 개가 줄을 이탈하지 않게 살짝 작게 잡는 안전 여유.
   const ptToCqw = (pt: number) => `${((pt / 960) * 95).toFixed(2)}cqw`;
-  // 가사 슬라이드는 줄 수·줄 길이에 맞춰 자동 계산된 크기(lib/pptx.ts와 동일)를 그대로 비율 적용.
-  const lyricFontSize =
-    slide.kind === 'lyric' ? ptToCqw(validateSlide(slide).fontSize) : undefined;
+  // 가사 슬라이드는 곡 단위로 통일된 크기(lib/pptx.ts와 동일)를 그대로 비율 적용.
+  const lyricFontSize = slide.kind === 'lyric' ? ptToCqw(lyricFontPt) : undefined;
 
   return (
     <figure style={{ margin: 0, position: 'relative' }}>

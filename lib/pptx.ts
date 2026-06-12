@@ -214,6 +214,48 @@ export function validateSlide(slide: PptSlide): PptValidation {
   return { ok: true, fontSize: computeLyricFontSize(slide.lines), lineCount };
 }
 
+// ── 곡 단위 가사 글씨 크기 통일 ──────────────────────────────────────────
+// 문제: 슬라이드마다 따로 크기를 계산하면(2줄=48pt, 4줄=32pt) 넘길 때 글씨가 튀어 통일감이 없다.
+// 해법: "한 곡(# 제목 ~ 다음 # 제목)" 안의 가사 슬라이드들을 그 곡에서 '가장 빡빡한(가장 작은)'
+//       크기로 전부 통일한다. → 곡 내내 글씨가 안 흔들리고, 제일 긴 가사도 안 넘친다.
+//       단, computeLyricFontSize가 24pt(MIN_FONT_SIZE)에서 멈추므로 무한정 작아지진 않는다.
+//       그래도 안 들어갈 만큼 긴 슬라이드는 addText의 fit:'shrink'가 그 한 장만 더 줄여 담고,
+//       미리보기에서 빨간 경고로 "이 슬라이드를 둘로 나누세요"라고 알려준다(3단 방어).
+// 반환: slides와 같은 길이의 배열 — 각 슬라이드가 쓸 글씨 크기(pt). title/memo는 고정 56.
+export function computeUniformLyricSizes(slides: PptSlide[]): number[] {
+  const sizes: number[] = new Array(slides.length).fill(MAX_FONT_SIZE);
+
+  // 1) 곡 순번별로 가사 슬라이드 인덱스를 모은다 (title 슬라이드를 만날 때마다 곡이 바뀜).
+  let songIndex = -1;
+  const groups = new Map<number, number[]>(); // 곡 순번 → 그 곡 가사 슬라이드 인덱스들
+  slides.forEach((slide, i) => {
+    if (slide.kind === 'title') songIndex++;
+    if (slide.kind === 'lyric') {
+      const list = groups.get(songIndex) ?? [];
+      list.push(i);
+      groups.set(songIndex, list);
+    }
+  });
+
+  // 2) 각 곡 그룹: 가사들의 '필요 크기' 중 가장 작은 값으로 통일.
+  for (const indices of groups.values()) {
+    let groupSize = MAX_FONT_SIZE;
+    for (const i of indices) {
+      const slide = slides[i];
+      if (slide.kind !== 'lyric') continue;
+      groupSize = Math.min(groupSize, computeLyricFontSize(slide.lines));
+    }
+    for (const i of indices) sizes[i] = groupSize;
+  }
+
+  // 3) title/memo는 자체 고정 크기(56).
+  slides.forEach((slide, i) => {
+    if (slide.kind === 'title' || slide.kind === 'memo') sizes[i] = 56;
+  });
+
+  return sizes;
+}
+
 // public/ 경로의 이미지 파일을 fetch해서 base64로 변환.
 // pptxgenjs background.path는 브라우저에서 동작하지 않아 'image/jpeg;base64,...' 형식의 data 문자열이 필요하다.
 async function loadPublicImageAsBase64(path: string): Promise<string> {
@@ -375,12 +417,18 @@ export async function exportToPptx(
   // 슬라이드 박스 공통 위치 — 모든 종류에서 동일
   const boxFrame = { x: 0.5, y: 0.5, w: 12.333, h: 6.5 } as const;
 
+  // 가사 글씨 크기 — 곡 단위로 통일한 값을 미리 계산(슬라이드 인덱스로 조회).
+  const uniformSizes = computeUniformLyricSizes(slides);
+
   // 곡 순번 — title 슬라이드(# 제목)를 만날 때마다 1 증가. 첫 title 전 슬라이드는 -1(기본 테마).
   let songIndex = -1;
   // 한 슬라이드라도 움직이는 배경을 썼는지 — 마지막 GIF 후처리(dedupe) 트리거에 사용.
   let anyAnimated = false;
+  // 슬라이드 인덱스 — uniformSizes 조회용.
+  let slideIdx = -1;
 
   for (const pptSlide of slides) {
+    slideIdx++;
     if (pptSlide.kind === 'title') songIndex++;
     // 이 슬라이드가 속한 곡의 테마(곡별 지정이 없으면 기본 theme).
     const slideTheme = (songIndex >= 0 && songThemes?.[songIndex]) || theme;
@@ -435,8 +483,8 @@ export async function exportToPptx(
     }
 
     // 가사 슬라이드 (kind === 'lyric')
-    // 줄 수·줄 길이에 맞춰 자동 계산된 글씨 크기를 쓴다 (항상 24~56pt 사이).
-    const { fontSize } = validateSlide(pptSlide);
+    // 곡 단위로 통일된 글씨 크기를 쓴다 (항상 24~56pt 사이). 같은 곡 가사는 전부 같은 크기.
+    const fontSize = uniformSizes[slideIdx];
     slide.addText(pptSlide.lines.join('\n'), {
       ...boxFrame,
       align: 'center',
