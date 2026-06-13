@@ -799,6 +799,13 @@ export default function MobilePage() {
             setMenuOpen(false);
             setShowLibrary(true);
           }}
+          onOpenWorship={() => {
+            setMenuOpen(false);
+            // 데스크탑과 동일 — 프리미엄은 빌더로, 아니면 요금제 안내(업셀)
+            if (premiumUnlocked) window.location.href = '/worship';
+            else setPricingOpen(true);
+          }}
+          premiumUnlocked={premiumUnlocked}
           authUser={authUser}
           authBusy={authBusy}
           onSignIn={() => {
@@ -1034,6 +1041,8 @@ function MobileMenuSheet({
   onClose,
   onOpenGuide,
   onOpenLibrary,
+  onOpenWorship,
+  premiumUnlocked,
   authUser,
   authBusy,
   onSignIn,
@@ -1043,6 +1052,8 @@ function MobileMenuSheet({
   onClose: () => void;
   onOpenGuide: () => void;
   onOpenLibrary: () => void;
+  onOpenWorship: () => void;
+  premiumUnlocked: boolean;
   authUser: User | null;
   authBusy: boolean;
   onSignIn: () => void;
@@ -1087,6 +1098,14 @@ function MobileMenuSheet({
           <button type="button" className="m-sheet-item" onClick={onOpenLibrary}>
             <span className="m-sheet-item-label">곡 라이브러리</span>
             <span className="m-sheet-item-sub">저장된 곡 검색해서 다시 추가</span>
+          </button>
+
+          {/* 예배 순서 빌더 — 유료(왕관). 프리미엄이면 /worship, 아니면 요금제 안내 */}
+          <button type="button" className="m-sheet-item" onClick={onOpenWorship}>
+            <span className="m-sheet-item-label">예배 순서 빌더</span>
+            <span className="m-sheet-item-sub">
+              {premiumUnlocked ? '예배 순서 전체를 한 PPT로' : '유료 기능 — 미리보기'}
+            </span>
           </button>
 
           {supabaseEnabled && (
