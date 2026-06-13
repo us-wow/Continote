@@ -58,6 +58,17 @@ export function buildSlidesFromText(text: string): Slide[] {
   return slides;
 }
 
+// 텍스트를 "슬라이드 한 장 = 글 한 덩어리(원문 그대로)"로 쪼갠다.
+// buildSlidesFromText와 같은 빈 줄 분리 규칙을 쓰되, 파싱하지 않고 원문 문자열을 그대로 돌려준다.
+// → 슬라이드 스튜디오에서 슬라이드 단위로 편집/이동/삭제할 때 쓴다(buildSlidesFromText 결과와 1:1 대응).
+export function splitTextIntoBlocks(text: string): string[] {
+  if (!text || !text.trim()) return [];
+  return text
+    .split(/\n[ \t]*\n+/)
+    .map((b) => b.replace(/^\n+|\n+$/g, '').replace(/[ \t]+$/gm, ''))
+    .filter((b) => b.trim().length > 0);
+}
+
 // 커서 위치(글자 offset) → 그 위치가 속한 슬라이드 인덱스(0-base).
 // 실시간 미리보기가 "커서 있는 슬라이드"를 따라가게 하는 데 쓴다.
 // 원리: 커서 앞쪽 텍스트만 잘라 슬라이드로 변환하면, 그 개수-1 = 커서가 있는(또는 직전) 슬라이드.

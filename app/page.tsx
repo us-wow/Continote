@@ -47,7 +47,7 @@ import Mascot from '@/components/Mascot';
 import Header, { type DesignTheme } from '@/components/Header';
 import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
-import WorkspacePane from '@/components/WorkspacePane';
+import SlideStudio from '@/components/SlideStudio';
 import PptSection from '@/components/PptSection';
 import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
@@ -1256,40 +1256,40 @@ export default function Home() {
           onExtract={handleExtract}
         />
 
-        {/* Row 2: 02 추출된 곡 | 03 콘티 편집 */}
-        <div className="work-grid">
-          <ExtractedSection
-            songs={songs}
-            text={text}
-            extracting={extracting}
-            onUpdateSong={updateSong}
-            onRemoveSong={removeSong}
-            onAddEmptySong={addEmptySong}
-            suspectMap={suspectMap}
-            onVerifyLyrics={handleVerifyLyrics}
-            verifying={verifying}
-          />
-          {/* 03 콘티 편집 → 좌 에디터 | 우 실시간 슬라이드.
-              편집/미리보기 연결과 빠른 도구바는 WorkspacePane이 담당한다.
-              배경/글씨체 칩은 04 PptSection과 같은 state(setPptTheme/setPptFont)를 바꾸는 단축일 뿐. */}
-          <WorkspacePane
-            text={text}
-            setText={setText}
-            onClear={onClear}
-            onCopy={handleCopy}
-            onDownloadTxt={handleSaveTxt}
-            onDownloadDocx={handleSaveDocx}
-            overflowSlideIndices={overflowSlideIndices}
-            pptTheme={pptTheme}
-            setPptTheme={setPptTheme}
-            pptFont={pptFont}
-            setPptFont={setPptFont}
-            songThemes={songThemes}
-            pptVAlign={pptVAlign}
-            customBg={customBg}
-            onOpenPreview={() => setPreviewOpen(true)}
-          />
-        </div>
+        {/* Row 2: 02 추출된 곡 (전체 폭) */}
+        <ExtractedSection
+          songs={songs}
+          text={text}
+          extracting={extracting}
+          onUpdateSong={updateSong}
+          onRemoveSong={removeSong}
+          onAddEmptySong={addEmptySong}
+          suspectMap={suspectMap}
+          onVerifyLyrics={handleVerifyLyrics}
+          verifying={verifying}
+        />
+
+        {/* Row 3: 03 슬라이드 스튜디오 — 좌 슬라이드 목록(이동·삭제·추가) | 우 선택 슬라이드 편집.
+            상단 도구바에 전체 배경 스와치 + 글씨체(04와 같은 state라 즉시 적용). 줄글 textarea를 대체한다. */}
+        <SlideStudio
+          text={text}
+          setText={setText}
+          pptTheme={pptTheme}
+          setPptTheme={setPptTheme}
+          pptFont={pptFont}
+          setPptFont={setPptFont}
+          songThemes={songThemes}
+          pptVAlign={pptVAlign}
+          customBg={customBg}
+          premiumUnlocked={premiumUnlocked}
+          onLockedPremium={() => setPricingOpen(true)}
+          overflowSlideIndices={overflowSlideIndices}
+          onClear={onClear}
+          onCopy={handleCopy}
+          onDownloadTxt={handleSaveTxt}
+          onDownloadDocx={handleSaveDocx}
+          onOpenPreview={() => setPreviewOpen(true)}
+        />
 
         {/* Row 3: 04 PPT 만들기 */}
         <PptSection

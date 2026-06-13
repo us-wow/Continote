@@ -122,7 +122,8 @@ export default function LivePreview({
 
 // 슬라이드 한 장 카드 — 실제 PPT(가로 13.333in ≈ 960px)와 같은 비율로 글씨를 그린다.
 // (예전 PreviewModal 안에 있던 것을 그대로 옮김 — 동작 동일.)
-function SlidePreview({
+// SlideStudio(슬라이드 목록 썸네일·편집 캔버스)에서도 재사용하므로 export 한다.
+export function SlidePreview({
   slide,
   index,
   isOverflow,
