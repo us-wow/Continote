@@ -639,7 +639,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 .work-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* 02(추출된 곡) : 03(편집+미리보기 워크스페이스) = 2 : 3.
+     워크스페이스가 에디터+미리보기 두 칸을 품으므로 03 쪽을 더 넓게 준다. */
+  grid-template-columns: 2fr 3fr;
   gap: 16px;
   align-items: stretch;
 }
@@ -655,6 +657,130 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   }
   /* 모바일 데스크탑 같은 페이지에서 좌우→상하 적층 시 02·03 순서 유지
      (02 추출된 곡 먼저, 그다음 03 콘티 편집) */
+}
+
+/* ── WorkspacePane (03 콘티 편집 — 좌 에디터 | 우 실시간 슬라이드) ── */
+.ws-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+/* 상단 도구바 — 좌측 칩 묶음 / 우측 텍스트 출구 */
+.ws-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ws-toolbar-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ws-chip-label {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-right: 2px;
+}
+/* 빠른 칩 — 04 테마/폰트 선택의 단축. 현재 값과 같으면 is-active로 강조. */
+.ws-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ws-chip:hover {
+  border-color: var(--ink-3);
+}
+.ws-chip.is-active {
+  background: var(--ink-1);
+  color: #fff;
+  border-color: var(--ink-1);
+  font-weight: 600;
+}
+.ws-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--rule);
+  margin: 0 4px;
+}
+.ws-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* 본문 — 좌 에디터 | 우 미리보기. 좁으면(is-narrow) 한 칸으로 떨어지고 우측은 숨김. */
+.ws-body {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 0.85fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+.ws-body.is-narrow {
+  grid-template-columns: 1fr;
+}
+.ws-editor {
+  min-width: 0;
+}
+/* 우측 미리보기 칼럼 — 위에서부터 자연스레 쌓이게 */
+.ws-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  position: sticky;
+  top: 12px; /* 스크롤해도 미리보기가 따라오게 — 편집하면서 계속 보이도록 */
+}
+/* single 모드 카드 폭을 칼럼에 꽉 차게 */
+.ws-preview .lp-single {
+  width: 100%;
+}
+/* 페이저 ◀ n/N ▶ — 가운데 정렬 */
+.ws-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.ws-pager-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface, #fff);
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 13px;
+}
+.ws-pager-btn:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+.ws-pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ws-pager-count {
+  font-size: 12px;
+  color: var(--ink-2);
+  min-width: 56px;
+  text-align: center;
+}
+.ws-preview-all {
+  align-self: center;
+}
+/* 좁은 화면 강하 — 에디터 아래 strip */
+.ws-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ── ExtractedSection (2번 추출된 곡 — 카드 + 섹션 칩) ── */

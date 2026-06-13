@@ -16,7 +16,7 @@
 // 푸터엔 텍스트 1차 출구(TXT / DOCX / 클립보드). PPT는 04 PptSection에 별도.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { buildSlidesFromText } from '@/lib/text-doc';
+import { buildSlidesFromText, slideIndexAtOffset } from '@/lib/text-doc';
 
 // 빈 줄(엔터 두 번)로 슬라이드 블록 분리 — buildSlidesFromText와 동일 규칙.
 // 거터 ↑↓ 순서이동에서 블록을 swap하려고 원문 그대로 보존한다.
@@ -42,6 +42,9 @@ type EditorSectionProps = {
   overflowSlideIndices?: number[];
   // 진행 중인지(저장 등으로 잠시 잠금) — 옵션
   busy?: boolean;
+  // 커서가 놓인 "슬라이드 인덱스(0-base)"를 부모로 보고 — 실시간 미리보기가 그 슬라이드를 따라가게 한다.
+  // 인덱스 환산을 여기서(현재 textarea 값 기준) 하므로, 타이핑 직후 stale 값 문제가 없다.
+  onCaretChange?: (slideIndex: number) => void;
   // 모바일용 — textarea를 컨텐츠 높이만큼 자동 늘림 + 자체 스크롤 끔.
   // 모바일은 페이지 전체 스크롤이 자연스러워 textarea 자체 스크롤 + transform 동기화가 깨진다.
   // 켜면 거터/번호/가사가 모두 페이지 흐름 안에서 같이 움직여 어긋남이 사라진다.
@@ -66,8 +69,13 @@ export default function EditorSection({
   overflowSlideIndices = [],
   busy = false,
   autoResize = false,
+  onCaretChange,
 }: EditorSectionProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // 커서가 놓인 슬라이드 인덱스를 부모로 보고 — onSelect(클릭·키보드 이동·드래그)·onChange에서 호출.
+  // ta.value(항상 최신)로 환산하므로 setText 직후 이전 값으로 계산되는 stale 문제가 없다.
+  const reportCaret = (ta: HTMLTextAreaElement) => onCaretChange?.(slideIndexAtOffset(ta.value, ta.selectionStart));
 
   // 02 → 03 chunk append 이벤트 수신.
   // page.tsx에서 dispatchEvent(new CustomEvent('conti:append', { detail: { chunk } })) 호출.
@@ -91,7 +99,12 @@ export default function EditorSection({
         window.scrollTo({ top: savedScrollY });
         requestAnimationFrame(() => {
           window.scrollTo({ top: savedScrollY });
-          if (ta) ta.scrollTop = ta.scrollHeight;
+          if (ta) {
+            ta.scrollTop = ta.scrollHeight;
+            // 이어붙인 새 슬라이드로 미리보기가 따라가게 커서를 맨 끝으로 옮기고 보고한다.
+            ta.selectionStart = ta.selectionEnd = ta.value.length;
+            reportCaret(ta);
+          }
         });
       });
     };
@@ -340,7 +353,11 @@ export default function EditorSection({
           ref={taRef}
           className="ed-textarea"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            reportCaret(e.currentTarget); // 타이핑 직후 커서 위치도 갱신
+          }}
+          onSelect={(e) => reportCaret(e.currentTarget)} // 클릭·키보드 커서 이동 추적
           onKeyDown={onKeyDown}
           onScroll={onScroll}
           placeholder={PLACEHOLDER}

@@ -36,6 +36,7 @@ import ExtractedSection from '@/components/ExtractedSection';
 // MobileSongPicker 제거 — 단일 스크롤에선 위 ExtractedSection의 칩으로 콘티에 추가한다.
 import EditorSection from '@/components/EditorSection';
 import PptSection from '@/components/PptSection';
+import PreviewDock from '@/components/PreviewDock';
 import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
@@ -55,6 +56,11 @@ export default function MobilePage() {
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [text, setText] = useState<string>('');
+  // 하단 미리보기 독이 크게 보여줄 슬라이드 — 콘티 편집기에서 커서가 놓인 슬라이드를 따라간다.
+  // EditorSection이 현재 값 기준으로 환산한 슬라이드 인덱스를 onCaretChange로 직접 넘겨준다.
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  // 하단 독(fixed)의 실제 높이 — 독이 보고해주는 값. m-main 하단 여백으로 써서 마지막 콘텐츠가 안 가리게.
+  const [dockHeight, setDockHeight] = useState(0);
 
   // 작업 중인 콘티 임시 저장 — 예배 순서 빌더(/worship)의 "방금 작업하던 콘티"가 읽어간다.
   // 데스크톱(app/page.tsx)과 같은 키·같은 규칙(0.5초 디바운스, 빈 텍스트는 건드리지 않음).
@@ -861,7 +867,9 @@ export default function MobilePage() {
       </div>
 
       {/* ===== 현재 단계 본문 ===== */}
-      <main className="m-main">
+      {/* 하단 미리보기 독(fixed)이 마지막 콘텐츠를 가리지 않게, 독이 보고한 실제 높이만큼
+          하단 여백을 확보한다. 독이 숨으면 dockHeight=0이라 여백도 0. */}
+      <main className="m-main" style={dockHeight ? { paddingBottom: dockHeight + 12 } : undefined}>
         <div id="m-sec-1" style={{ scrollMarginTop: 64 }}>
           <UploadSection
             dragging={dragging}
@@ -950,6 +958,8 @@ export default function MobilePage() {
             <EditorSection
               text={text}
               setText={setText}
+              // 커서 글자 offset → 슬라이드 인덱스로 바꿔 하단 독이 그 슬라이드를 크게 보여주게 함.
+              onCaretChange={(idx) => setActiveSlideIndex(idx)}
               onClear={() => {
                 if (confirm('콘티를 모두 비울까요?')) {
                   setText('');
@@ -1029,6 +1039,28 @@ export default function MobilePage() {
 
       {/* 토스트 */}
       {toast && <div className="toast">{toast}</div>}
+
+      {/* ===== 하단 sticky 실시간 미리보기 독 =====
+          - EditorSection 바깥 형제(fixed)라 textarea autoResize/거터 동기화에 영향 없음.
+          - 배경/글씨체 빠른 칩은 setPptTheme/setPptFont 단축이고, 전체 SSOT는 위 sec-4 PptSection.
+          - TXT/복사는 기존 핸들러(handleSaveTxt/handleCopy) 재사용, 전체 보기는 PreviewModal 재사용.
+          - text가 비면 독 컴포넌트가 스스로 숨는다. */}
+      <PreviewDock
+        text={text}
+        pptTheme={pptTheme}
+        setPptTheme={setPptTheme}
+        pptFont={pptFont}
+        setPptFont={setPptFont}
+        songThemes={songThemes}
+        pptVAlign={pptVAlign}
+        customBg={customBg}
+        overflowSlideIndices={overflowSlideIndices}
+        activeSlideIndex={activeSlideIndex}
+        onCopy={handleCopy}
+        onDownloadTxt={handleSaveTxt}
+        onOpenFull={() => setPreviewOpen(true)}
+        onHeightChange={setDockHeight}
+      />
     </div>
   );
 }

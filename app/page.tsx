@@ -47,7 +47,7 @@ import Mascot from '@/components/Mascot';
 import Header, { type DesignTheme } from '@/components/Header';
 import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
-import EditorSection from '@/components/EditorSection';
+import WorkspacePane from '@/components/WorkspacePane';
 import PptSection from '@/components/PptSection';
 import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
@@ -1269,7 +1269,10 @@ export default function Home() {
             onVerifyLyrics={handleVerifyLyrics}
             verifying={verifying}
           />
-          <EditorSection
+          {/* 03 콘티 편집 → 좌 에디터 | 우 실시간 슬라이드.
+              편집/미리보기 연결과 빠른 도구바는 WorkspacePane이 담당한다.
+              배경/글씨체 칩은 04 PptSection과 같은 state(setPptTheme/setPptFont)를 바꾸는 단축일 뿐. */}
+          <WorkspacePane
             text={text}
             setText={setText}
             onClear={onClear}
@@ -1277,6 +1280,14 @@ export default function Home() {
             onDownloadTxt={handleSaveTxt}
             onDownloadDocx={handleSaveDocx}
             overflowSlideIndices={overflowSlideIndices}
+            pptTheme={pptTheme}
+            setPptTheme={setPptTheme}
+            pptFont={pptFont}
+            setPptFont={setPptFont}
+            songThemes={songThemes}
+            pptVAlign={pptVAlign}
+            customBg={customBg}
+            onOpenPreview={() => setPreviewOpen(true)}
           />
         </div>
 

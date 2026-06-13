@@ -58,6 +58,17 @@ export function buildSlidesFromText(text: string): Slide[] {
   return slides;
 }
 
+// 커서 위치(글자 offset) → 그 위치가 속한 슬라이드 인덱스(0-base).
+// 실시간 미리보기가 "커서 있는 슬라이드"를 따라가게 하는 데 쓴다.
+// 원리: 커서 앞쪽 텍스트만 잘라 슬라이드로 변환하면, 그 개수-1 = 커서가 있는(또는 직전) 슬라이드.
+// buildSlidesFromText와 같은 분리 규칙을 쓰므로 미리보기 곡 순번과도 정확히 맞는다.
+export function slideIndexAtOffset(text: string, caretOffset: number): number {
+  if (!text) return 0;
+  const before = text.slice(0, Math.max(0, caretOffset));
+  const count = buildSlidesFromText(before).length;
+  return Math.max(0, count - 1);
+}
+
 // 곡 전체를 편집기 텍스트로 변환 (제목 + 2줄씩 그룹핑된 가사)
 // 기존 page.tsx의 groupLinesByTwo 동작을 텍스트 모델에 그대로 적용한다.
 export function songToText(song: Song): string {
