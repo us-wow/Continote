@@ -31,6 +31,8 @@ type LivePreviewProps = {
   mode: LivePreviewMode;
   // single 모드에서 크게 보여줄 슬라이드 인덱스(0-base). 범위를 벗어나면 자동으로 맞춘다.
   activeSlideIndex?: number;
+  // grid 모드에서 카드 클릭 시 호출(전체 보기 → 그 슬라이드로 점프해 편집). 없으면 클릭 비활성.
+  onCardClick?: (index: number) => void;
 };
 
 export default function LivePreview({
@@ -44,6 +46,7 @@ export default function LivePreview({
   customBgIsGif = false,
   mode,
   activeSlideIndex = 0,
+  onCardClick,
 }: LivePreviewProps) {
   // 슬라이드·글씨크기는 text가 바뀔 때만 다시 계산(매 렌더 재계산 방지).
   const slides = useMemo(() => buildSlidesFromText(text), [text]);
@@ -115,7 +118,22 @@ export default function LivePreview({
       className="lp-grid"
       style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}
     >
-      {slides.map((slide, i) => renderCard(slide, i))}
+      {slides.map((slide, i) =>
+        onCardClick ? (
+          // 클릭하면 그 슬라이드로 점프(전체 보기 닫고 편집). 버튼으로 감싸 접근성 확보.
+          <button
+            key={i}
+            type="button"
+            onClick={() => onCardClick(i)}
+            title="이 슬라이드 편집하기"
+            style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
+          >
+            {renderCard(slide, i)}
+          </button>
+        ) : (
+          renderCard(slide, i)
+        )
+      )}
     </div>
   );
 }

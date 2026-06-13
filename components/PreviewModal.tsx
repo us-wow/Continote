@@ -27,6 +27,8 @@ type PreviewModalProps = {
   customBgUrl?: string | null;
   // 커스텀 배경이 GIF(움직임)면 흰 글자·오버레이 없음 (실제 출력과 동일 규칙)
   customBgIsGif?: boolean;
+  // 카드 클릭 시 — 그 슬라이드로 점프해 편집(모달 닫기는 부모가 처리). 없으면 클릭 비활성.
+  onSelectSlide?: (index: number) => void;
 };
 
 export default function PreviewModal({
@@ -40,6 +42,7 @@ export default function PreviewModal({
   overflowSlideIndices = [],
   customBgUrl = null,
   customBgIsGif = false,
+  onSelectSlide,
 }: PreviewModalProps) {
   // ESC로 닫기
   useEffect(() => {
@@ -119,6 +122,11 @@ export default function PreviewModal({
           <p className="caption" style={{ marginTop: 4, color: 'var(--ink-3)', fontSize: 11.5 }}>
             ※ PowerPoint에서 글씨체가 달라 보이면 사용 PC에 해당 한국 폰트를 설치해 주세요.
           </p>
+          {onSelectSlide && slideCount > 0 && (
+            <p className="caption" style={{ marginTop: 4, color: 'var(--accent, #0f766e)', fontSize: 12, fontWeight: 600 }}>
+              슬라이드를 누르면 편집 화면으로 돌아가 바로 고칠 수 있어요.
+            </p>
+          )}
           {overflowSlideIndices.length > 0 && (
             <div
               role="alert"
@@ -150,6 +158,7 @@ export default function PreviewModal({
           customBgUrl={customBgUrl}
           customBgIsGif={customBgIsGif}
           mode="grid"
+          onCardClick={onSelectSlide}
         />
       </div>
     </div>

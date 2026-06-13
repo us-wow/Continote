@@ -168,6 +168,8 @@ export default function Home() {
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 비어 있으면 전부 기본 테마(pptTheme)를 따른다.
   const [songThemes, setSongThemes] = useState<(PptTheme | undefined)[]>([]);
+  // 슬라이드 스튜디오에서 편집 중인 슬라이드 번호 — 전체 보기에서 슬라이드를 누르면 이 값으로 점프한다.
+  const [studioSelected, setStudioSelected] = useState(0);
   // PPT 세로 정렬 — 기본은 가운데(기존 동작). 상단/하단 선택 시 미리보기·PPT 동시 적용.
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
   // 글꼴 포함(임베드) — 기본 ON. 본명조 선택 시 글꼴을 PPT에 심어 어디서나 똑같이 보이게.
@@ -1271,16 +1273,15 @@ export default function Home() {
           <SlideStudio
             text={text}
             setText={setText}
+            selected={studioSelected}
+            setSelected={setStudioSelected}
             pptTheme={pptTheme}
             setPptTheme={setPptTheme}
             pptFont={pptFont}
             setPptFont={setPptFont}
             pptVAlign={pptVAlign}
             setPptVAlign={setPptVAlign}
-            embedFont={embedFont}
-            setEmbedFont={setEmbedFont}
             songThemes={songThemes}
-            setSongThemes={setSongThemes}
             customBg={customBg}
             savedBgs={savedBgs}
             onCustomBgChange={handleCustomBgChange}
@@ -1296,12 +1297,8 @@ export default function Home() {
             onClear={onClear}
             onCopy={handleCopy}
             onDownloadTxt={handleSaveTxt}
-            onDownloadDocx={handleSaveDocx}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
-            onCopyShareLink={handleCopyShareLink}
-            onDownloadOpenSong={handleSaveOpenSong}
-            onDownloadPlainSlides={handleSavePlainSlides}
           />
         </div>
 
@@ -1361,6 +1358,11 @@ export default function Home() {
         overflowSlideIndices={overflowSlideIndices}
         customBgUrl={customBg?.src ?? null}
         customBgIsGif={customBg?.kind === 'gif'}
+        onSelectSlide={(i) => {
+          // 전체 보기에서 슬라이드 클릭 → 닫고 그 슬라이드로 점프해 바로 편집
+          setStudioSelected(i);
+          setPreviewOpen(false);
+        }}
       />
 
       <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
