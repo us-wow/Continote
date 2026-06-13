@@ -262,7 +262,7 @@ export default function SlideStudio(props: SlideStudioProps) {
       title={PPT_THEME_LABELS[theme] + (locked ? ' (유료)' : '')}
       aria-pressed={pptTheme === theme}
       style={{
-        position: 'relative', width: '100%', height: 44, borderRadius: 8,
+        position: 'relative', width: '100%', height: 90, borderRadius: 8,
         background: THEME_BG[theme], backgroundSize: 'cover', backgroundPosition: 'center',
         border: pptTheme === theme ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)',
         cursor: 'pointer', opacity: locked ? 0.6 : 1, flex: '0 0 auto',
@@ -396,15 +396,15 @@ export default function SlideStudio(props: SlideStudioProps) {
           {/* 저장된 내 배경 */}
           {savedBgs.map((bg) => (
             <div key={bg.id} style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <button type="button" onClick={() => onSelectSaved(bg)} title={bg.name} style={{ flex: 1, height: 44, borderRadius: 8, background: `url('${bg.url}') center/cover`, border: customBg?.src === bg.url ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }} />
-              <button type="button" onClick={() => onDeleteSaved(bg)} aria-label="배경 삭제" style={{ ...miniBtn, height: 44, color: 'var(--danger)' }}>🗑</button>
+              <button type="button" onClick={() => onSelectSaved(bg)} title={bg.name} style={{ flex: 1, height: 90, borderRadius: 8, background: `url('${bg.url}') center/cover`, border: customBg?.src === bg.url ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }} />
+              <button type="button" onClick={() => onDeleteSaved(bg)} aria-label="배경 삭제" style={{ ...miniBtn, height: 90, color: 'var(--danger)' }}>🗑</button>
             </div>
           ))}
 
           {/* 방금 올렸지만 저장 안 한 커스텀 배경 — 재선택 가능하게 */}
           {customBg?.src?.startsWith('data:') && (
             <button type="button" onClick={() => setPptTheme('custom')} aria-pressed={pptTheme === 'custom'} title="방금 올린 배경"
-              style={{ position: 'relative', width: '100%', height: 44, borderRadius: 8, background: `url('${customBg.src}') center/cover`, border: pptTheme === 'custom' ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }}>
+              style={{ position: 'relative', width: '100%', height: 90, borderRadius: 8, background: `url('${customBg.src}') center/cover`, border: pptTheme === 'custom' ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }}>
               <span style={{ position: 'absolute', left: 6, bottom: 3, fontSize: 10, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.5)', fontWeight: 600 }}>내 배경</span>
             </button>
           )}
