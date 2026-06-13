@@ -47,10 +47,21 @@ function toRaw(type: SlideType, content: string): string {
 function slideForBlock(raw: string): Slide {
   return buildSlidesFromText(raw)[0] ?? ({ kind: 'lyric', lines: [''] } as Slide);
 }
-// 스와치 라벨이 어두운 배경 위에서도 보이게 — 검정/어두운 폴백색이면 흰 글자.
-function swatchLabelColor(bg: string): string {
-  return bg === '#000000' || /,\s*#0/.test(bg) ? '#fff' : '#1F1B16';
+// 노란 선 각진 왕관(유료 표시) — 이모지 대신 브랜드 통일 마크.
+function CrownMark({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={Math.round(size * (21 / 24))} viewBox="0 0 24 21" fill="none" aria-label="유료" style={{ display: 'inline-block', verticalAlign: '-2px', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))' }}>
+      <path d="M3 18 L3 6 L8.5 10.5 L12 3 L15.5 10.5 L21 6 L21 18 Z" stroke="#F2C14E" strokeWidth="2.2" strokeLinejoin="miter" fill="none" />
+    </svg>
+  );
 }
+
+// 스와치 라벨 — 어떤 배경 위에서도 읽히게 반투명 검정 칩 + 흰 글자.
+const swatchLabel: React.CSSProperties = {
+  position: 'absolute', left: 5, bottom: 4, fontSize: 10.5, color: '#fff',
+  background: 'rgba(0,0,0,0.55)', padding: '1px 6px', borderRadius: 5, fontWeight: 600,
+  maxWidth: 'calc(100% - 12px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+};
 
 type SlideStudioProps = {
   text: string;
@@ -93,7 +104,7 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [blocks, setBlocks] = useState<string[]>(() => splitTextIntoBlocks(text));
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
-  const [premiumOpen, setPremiumOpen] = useState(false); // 움직이는 배경 펼침 여부
+  const [premiumOpen, setPremiumOpen] = useState(true); // 유료 배경 — 기본 펼침
   const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -268,10 +279,8 @@ export default function SlideStudio(props: SlideStudioProps) {
         cursor: 'pointer', opacity: locked ? 0.6 : 1, flex: '0 0 auto',
       }}
     >
-      <span style={{ position: 'absolute', left: 6, bottom: 3, fontSize: 10, color: swatchLabelColor(THEME_BG[theme]), textShadow: '0 1px 2px rgba(0,0,0,0.45)', fontWeight: 600 }}>
-        {PPT_THEME_LABELS[theme].split(' ')[0]}
-      </span>
-      {locked && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 11 }} aria-hidden="true">👑</span>}
+      <span style={swatchLabel}>{PPT_THEME_LABELS[theme].split(' ')[0]}</span>
+      {locked && <span style={{ position: 'absolute', top: 3, right: 5 }} aria-hidden="true"><CrownMark size={15} /></span>}
     </button>
   );
 
@@ -405,21 +414,22 @@ export default function SlideStudio(props: SlideStudioProps) {
           {customBg?.src?.startsWith('data:') && (
             <button type="button" onClick={() => setPptTheme('custom')} aria-pressed={pptTheme === 'custom'} title="방금 올린 배경"
               style={{ position: 'relative', width: '100%', height: 90, borderRadius: 8, background: `url('${customBg.src}') center/cover`, border: pptTheme === 'custom' ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }}>
-              <span style={{ position: 'absolute', left: 6, bottom: 3, fontSize: 10, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.5)', fontWeight: 600 }}>내 배경</span>
+              <span style={swatchLabel}>내 배경</span>
             </button>
           )}
 
-          {/* 움직이는 배경(유료) — 글자 목록이 아니라 펼치면 슬라이드 썸네일로 보여준다 */}
+          {/* 유료 배경 — 글자 목록이 아니라 펼치면 슬라이드 썸네일로 보여준다(기본 펼침) */}
           <button type="button" onClick={() => setPremiumOpen((o) => !o)} aria-expanded={premiumOpen}
             style={{ marginTop: 4, padding: '7px 8px', fontSize: 12, borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>움직이는 배경 👑</span><span aria-hidden="true">{premiumOpen ? '▴' : '▾'}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>유료 배경 <CrownMark /></span>
+            <span aria-hidden="true">{premiumOpen ? '▴' : '▾'}</span>
           </button>
           {premiumOpen && PREMIUM_THEMES.map((t) => <Swatch key={t} theme={t} locked={!premiumUnlocked} />)}
 
           {/* 커스텀 배경 추가(유료) — 크게 + 또렷하게 */}
           <button type="button" onClick={onPickCustom}
-            style={{ marginTop: 4, padding: '12px 8px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1.5px solid var(--accent, #0f766e)', background: customBg && pptTheme === 'custom' ? 'color-mix(in oklab, var(--accent, #0f766e) 14%, transparent)' : 'color-mix(in oklab, var(--accent, #0f766e) 6%, transparent)', color: 'var(--ink)', cursor: 'pointer' }}>
-            {converting ? `변환 중 ${converting.pct}%` : '＋ 커스텀 배경 추가'}{!premiumUnlocked && ' 👑'}
+            style={{ marginTop: 4, padding: '12px 8px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1.5px solid var(--accent, #0f766e)', background: customBg && pptTheme === 'custom' ? 'color-mix(in oklab, var(--accent, #0f766e) 14%, transparent)' : 'color-mix(in oklab, var(--accent, #0f766e) 6%, transparent)', color: 'var(--ink)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            {converting ? `변환 중 ${converting.pct}%` : '＋ 커스텀 배경 추가'}{!premiumUnlocked && <CrownMark />}
           </button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" onChange={onFileInput} style={{ display: 'none' }} />
         </div>
