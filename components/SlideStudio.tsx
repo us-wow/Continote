@@ -76,6 +76,7 @@ type SlideStudioProps = {
   pptVAlign: PptVAlign;
   setPptVAlign: (v: PptVAlign) => void;
   songThemes?: (PptTheme | undefined)[];
+  setSongThemes: (next: (PptTheme | undefined)[]) => void; // 곡별 배경(유료) 저장
   customBg: CustomBg | null;
   savedBgs: SavedBg[];
   onCustomBgChange: (bg: CustomBg, note?: string) => void;
@@ -95,7 +96,7 @@ type SlideStudioProps = {
 export default function SlideStudio(props: SlideStudioProps) {
   const {
     text, setText, selected, setSelected, pptTheme, setPptTheme, pptFont, setPptFont,
-    pptVAlign, setPptVAlign, songThemes, customBg, savedBgs,
+    pptVAlign, setPptVAlign, songThemes, setSongThemes, customBg, savedBgs,
     onCustomBgChange, onCustomNotice, onSelectSaved, onDeleteSaved,
     premiumUnlocked, onLockedPremium, overflowSlideIndices = [],
     onClear, onCopy, onDownloadTxt, onOpenPreview, onDownloadPptx,
@@ -105,6 +106,8 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [premiumOpen, setPremiumOpen] = useState(true); // 유료 배경 — 기본 펼침
+  // 배경 적용 범위 — '전체'(모든 슬라이드) vs '이 곡만'(유료, 선택한 슬라이드가 속한 곡에만).
+  const [bgScope, setBgScope] = useState<'all' | 'song'>('all');
   const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -160,6 +163,31 @@ export default function SlideStudio(props: SlideStudioProps) {
   const customBgIsGif = customBg?.kind === 'gif';
   const previewFont = FONT_FAMILY_PREVIEW[pptFont];
   const previewVAlign = vAlignToFlex(pptVAlign);
+
+  // 지금 선택한 슬라이드가 속한 곡의 순번(0번부터). title 슬라이드를 세어 구한다(없으면 -1).
+  const curSongIndex = useMemo(() => {
+    let n = -1;
+    for (let k = 0; k <= safeSelected && k < slidesForBlocks.length; k++) {
+      if (slidesForBlocks[k].kind === 'title') n++;
+    }
+    return n;
+  }, [slidesForBlocks, safeSelected]);
+
+  // '이 곡만' 모드에선 그 곡의 배경을, '전체'에선 기본 테마를 활성으로 표시.
+  const songScope = bgScope === 'song' && curSongIndex >= 0;
+  const activeBgTheme = songScope ? (songThemes?.[curSongIndex] ?? pptTheme) : pptTheme;
+
+  // 배경 한 칸을 눌렀을 때 — 범위에 따라 전체(setPptTheme) 또는 이 곡만(songThemes) 적용.
+  const applyBg = (theme: PptTheme) => {
+    if (songScope) {
+      const next = [...(songThemes ?? [])];
+      while (next.length <= curSongIndex) next.push(undefined);
+      next[curSongIndex] = theme;
+      setSongThemes(next);
+    } else {
+      setPptTheme(theme);
+    }
+  };
 
   // ── 슬라이드 조작 ──
   const move = (i: number, dir: -1 | 1) => {
@@ -269,13 +297,13 @@ export default function SlideStudio(props: SlideStudioProps) {
   const Swatch = ({ theme, locked }: { theme: PptTheme; locked: boolean }) => (
     <button
       type="button"
-      onClick={() => (locked ? onLockedPremium() : setPptTheme(theme))}
+      onClick={() => (locked ? onLockedPremium() : applyBg(theme))}
       title={PPT_THEME_LABELS[theme] + (locked ? ' (유료)' : '')}
-      aria-pressed={pptTheme === theme}
+      aria-pressed={activeBgTheme === theme}
       style={{
         position: 'relative', width: '100%', height: 90, borderRadius: 8,
         background: THEME_BG[theme], backgroundSize: 'cover', backgroundPosition: 'center',
-        border: pptTheme === theme ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)',
+        border: activeBgTheme === theme ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)',
         cursor: 'pointer', opacity: locked ? 0.6 : 1, flex: '0 0 auto',
       }}
     >
@@ -290,6 +318,15 @@ export default function SlideStudio(props: SlideStudioProps) {
 
   return (
     <section className="ss-root panel" aria-label="슬라이드 스튜디오" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+      {/* ── 섹션 헤더 — 02 가사 편집과 같은 번호 배지 스타일로 통일 ── */}
+      <div className="section-head">
+        <div className="left">
+          <span className="step-num-inline">03</span>
+          <h2>슬라이드 편집</h2>
+        </div>
+        <div className="right mono">{realSlideCount}장</div>
+      </div>
+
       {/* ── 상단 액션바: 글씨체·정렬 | 복사·TXT·전체확인·PPT ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, paddingBottom: 8, borderBottom: '1px solid var(--rule)' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
@@ -400,6 +437,27 @@ export default function SlideStudio(props: SlideStudioProps) {
         {/* 배경 패널 — 세로 나열(크게) + 움직이는 배경 펼침 + 커스텀 추가 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: '70vh', overflowY: 'auto' }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>배경</span>
+          {/* 적용 범위 — 전체 vs 이 곡만(유료). '이 곡만'은 선택 슬라이드가 속한 곡에만 배경 지정. */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button type="button" onClick={() => setBgScope('all')} aria-pressed={bgScope === 'all'}
+              style={{ flex: 1, padding: '5px 4px', fontSize: 11.5, borderRadius: 7, cursor: 'pointer', border: bgScope === 'all' ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgScope === 'all' ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}>
+              전체
+            </button>
+            <button type="button" onClick={() => (premiumUnlocked ? setBgScope('song') : onLockedPremium())} aria-pressed={bgScope === 'song'}
+              style={{ flex: 1, padding: '5px 4px', fontSize: 11.5, borderRadius: 7, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, border: bgScope === 'song' ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgScope === 'song' ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}>
+              이 곡만 {!premiumUnlocked && <CrownMark size={13} />}
+            </button>
+          </div>
+          {songScope && (
+            <p style={{ fontSize: 11, color: 'var(--accent-ink)', margin: '0 0 2px', fontWeight: 600, wordBreak: 'keep-all' }}>
+              {curSongIndex + 1}번째 곡에만 배경이 적용돼요.
+            </p>
+          )}
+          {bgScope === 'song' && curSongIndex < 0 && (
+            <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: '0 0 2px', wordBreak: 'keep-all' }}>
+              곡 제목(# ) 슬라이드가 있는 곡을 선택하면 그 곡에만 적용돼요.
+            </p>
+          )}
           {FREE_THEMES.map((t) => <Swatch key={t} theme={t} locked={false} />)}
 
           {/* 저장된 내 배경 */}

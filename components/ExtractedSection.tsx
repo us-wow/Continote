@@ -75,7 +75,7 @@ export default function ExtractedSection({
       <div className="section-head">
         <div className="left">
           <span className="step-num-inline">02</span>
-          <h2 id="extracted-h">추출된 곡</h2>
+          <h2 id="extracted-h">가사 편집</h2>
         </div>
         <div className="right mono">
           {empty ? '0곡' : `${songs.length}곡 추출됨`}

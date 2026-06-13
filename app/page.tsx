@@ -1299,6 +1299,7 @@ export default function Home() {
             pptVAlign={pptVAlign}
             setPptVAlign={setPptVAlign}
             songThemes={songThemes}
+            setSongThemes={setSongThemes}
             customBg={customBg}
             savedBgs={savedBgs}
             onCustomBgChange={handleCustomBgChange}

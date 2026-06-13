@@ -3106,7 +3106,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   display: grid;
   grid-template-columns: 3fr 7fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch; /* 02 가사 편집 카드와 오른쪽 스튜디오 높이를 같게(아래 여백 맞춤) */
   margin-top: 8px;
 }
 /* 좁은 화면(<1100px)에선 가로 4분할이 빡빡 → 02를 위로 올리고 스튜디오를 전체 폭으로 */
