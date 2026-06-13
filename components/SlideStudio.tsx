@@ -320,13 +320,13 @@ export default function SlideStudio(props: SlideStudioProps) {
       {/* ── 본문 3분할: 목록 | 캔버스 | 배경 ── */}
       <div className="ss-grid" style={{ display: 'grid', gridTemplateColumns: '21fr 42fr 16fr', gap: 12, alignItems: 'start' }}>
         {/* 슬라이드 목록 (크게) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '70vh', overflowY: 'auto', paddingRight: 2 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '70vh', overflowY: 'auto', padding: '2px 3px' }}>
           {isEmpty && <p style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 2px' }}>아래 [+ 슬라이드]·[붙여넣기]로 시작하세요.</p>}
           {blocks.map((raw, i) => {
             const v = themeVisual(perSlideTheme[i], customBgUrl, customBgIsGif);
             const active = i === safeSelected;
             return (
-              <div key={i} style={{ display: 'flex', gap: 5, alignItems: 'center', borderRadius: 8, padding: 4, outline: active ? '2.5px solid var(--accent, #0f766e)' : '1px solid transparent', background: active ? 'color-mix(in oklab, var(--accent, #0f766e) 8%, transparent)' : 'transparent' }}>
+              <div key={i} style={{ display: 'flex', gap: 5, alignItems: 'center', borderRadius: 8, padding: 4, boxSizing: 'border-box', border: active ? '2.5px solid var(--accent, #0f766e)' : '2.5px solid transparent', background: active ? 'color-mix(in oklab, var(--accent, #0f766e) 8%, transparent)' : 'transparent' }}>
                 <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', width: 16, textAlign: 'right', flex: '0 0 auto' }}>{i + 1}</span>
                 <button type="button" onClick={() => setSelected(i)} aria-label={`${i + 1}번 슬라이드 선택`} style={{ flex: 1, minWidth: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}>
                   <SlidePreview slide={slidesForBlocks[i]} index={i + 1} isOverflow={overflowSlideIndices.includes(i)} themeBg={v.bg} themeFg={v.fg} overlay={v.overlay} lyricFontPt={lyricSizes[i]} fontFamily={previewFont} vAlignItems={previewVAlign} />
