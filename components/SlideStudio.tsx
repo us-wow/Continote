@@ -428,7 +428,7 @@ export default function SlideStudio(props: SlideStudioProps) {
 
           {/* 내 배경 추가(유료) — 다른 스와치처럼 크게(90px) + 또렷하게 */}
           <button type="button" onClick={onPickCustom}
-            style={{ marginTop: 4, height: 90, padding: '0 8px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '1.5px dashed var(--accent, #0f766e)', background: customBg && pptTheme === 'custom' ? 'color-mix(in oklab, var(--accent, #0f766e) 14%, transparent)' : 'color-mix(in oklab, var(--accent, #0f766e) 6%, transparent)', color: 'var(--ink)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            style={{ marginTop: 4, height: 90, flex: '0 0 auto', padding: '0 8px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '1.5px dashed var(--accent, #0f766e)', background: customBg && pptTheme === 'custom' ? 'color-mix(in oklab, var(--accent, #0f766e) 14%, transparent)' : 'color-mix(in oklab, var(--accent, #0f766e) 6%, transparent)', color: 'var(--ink)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
             {converting ? `변환 중 ${converting.pct}%` : '＋ 내 배경 추가'}{!premiumUnlocked && <CrownMark />}
           </button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" onChange={onFileInput} style={{ display: 'none' }} />
