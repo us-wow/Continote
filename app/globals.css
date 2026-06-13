@@ -2286,15 +2286,22 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .hero-copy {
   margin-bottom: 0;
 }
+/* 히어로 카드 안에서 텍스트 옆 오른쪽 무게중심으로(절대배치 X → flex 항목). */
 .hero-mascot {
-  position: absolute;
-  right: 32px;
-  top: 24px;
-  opacity: 0.95;
+  flex: 0 0 auto;
+  opacity: 0.97;
 }
 .hero-mascot img {
-  width: clamp(88px, 12vw, 120px);
+  width: clamp(96px, 13vw, 140px);
   height: auto;
+}
+/* 좁은 화면 — 텍스트 위, 마스코트 아래로 세로 스택 */
+@media (max-width: 760px) {
+  .hero-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
 }
 
 /* 자식 요소 사이 간격 유틸 — --gap 변수로 조절 */

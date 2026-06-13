@@ -1182,47 +1182,64 @@ export default function Home() {
       )}
 
       {/* ----- 히어로 ----- */}
+      {/* 히어로 — 텍스트(좌) ↔ 마스코트(우)를 한 카드 안에 좌우 균형으로. 따뜻한 배경+테두리로 안착. */}
       <section
         className="hero-section"
         style={{
-          padding: '34px 32px 22px',
           maxWidth: 1240,
-          margin: '0 auto',
-          position: 'relative',
+          margin: '14px auto 0',
+          padding: '28px 36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 28,
+          // 종이 톤 → 살짝 초록 틴트 그라데이션. 텅 빈 느낌 대신 의도된 패널처럼.
+          background: 'linear-gradient(115deg, color-mix(in oklab, var(--accent-ink) 8%, var(--paper)) 0%, var(--paper) 58%)',
+          border: '1px solid var(--rule)',
+          borderRadius: 'var(--radius-lg)',
         }}
       >
-        {/* 히어로 헤드라인 — 한글 강제 이탤릭 어색해서 굵기+색으로만 강조 */}
-        <h1 className="h-display" style={{ margin: 0, maxWidth: 920 }}>
-          찬양 악보 한 장이면,
-          <br />
+        <div style={{ minWidth: 0 }}>
+          {/* 작은 라벨 — "이게 뭐 하는 도구인지" 한 줄로 신뢰 + 헤드라인 위 무게중심 */}
           <span
             style={{
-              color: 'var(--accent-ink)',
+              display: 'inline-block',
+              fontSize: 12.5,
               fontWeight: 700,
+              letterSpacing: '0.01em',
+              color: 'var(--accent-ink)',
+              background: 'color-mix(in oklab, var(--accent-ink) 12%, transparent)',
+              padding: '4px 11px',
+              borderRadius: 99,
+              marginBottom: 14,
             }}
           >
-            콘티부터 PPT까지.
+            찬양팀을 위한 콘티 · PPT 도구
           </span>
-        </h1>
-        <p
-          className="hero-copy"
-          style={{
-            marginTop: 14,
-            maxWidth: 620,
-            fontSize: 16.5,
-            lineHeight: 1.65,
-            color: 'var(--ink-2)',
-            // 한국어 단어 단위 줄바꿈 — '콘티'처럼 두 글자 단어가 줄 끝에서 잘리지 않게 한다.
-            wordBreak: 'keep-all',
-          }}
-        >
-          악보를 사진이나 PDF로 올리면 AI가 가사를 깔끔하게 뽑아줘요.
-          <br />
-          묶음을 눌러 콘티를 짜고, 배경을 입힌 예배 PPT까지 바로 받아요.
-        </p>
-        {/* 히어로 마스코트 — done 포즈로 차별화 (헤더에 미니 idle, 에디터 빈 상태에 큰 idle 있음) */}
+          {/* 헤드라인 — 한글 강제 이탤릭 어색해서 굵기+색으로만 강조 */}
+          <h1 className="h-display" style={{ margin: 0 }}>
+            찬양 악보 한 장이면,
+            <br />
+            <span style={{ color: 'var(--accent-ink)', fontWeight: 700 }}>콘티부터 PPT까지.</span>
+          </h1>
+          <p
+            className="hero-copy"
+            style={{
+              marginTop: 12,
+              maxWidth: 560,
+              fontSize: 16,
+              lineHeight: 1.65,
+              color: 'var(--ink-2)',
+              // 한국어 단어 단위 줄바꿈 — '콘티'처럼 두 글자 단어가 줄 끝에서 잘리지 않게 한다.
+              wordBreak: 'keep-all',
+            }}
+          >
+            악보를 사진이나 PDF로 올리면 AI가 가사를 깔끔하게 뽑아줘요. 묶음을 눌러 콘티를 짜고, 배경을 입힌 예배 PPT까지 바로 받아요.
+          </p>
+        </div>
+        {/* 마스코트 — 좌우 균형의 오른쪽 무게중심(살림). done 포즈. */}
         <div className="mascot-float hero-mascot">
-          <Mascot pose="done" size={120} />
+          <Mascot pose="done" size={132} />
         </div>
       </section>
 
