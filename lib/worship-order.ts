@@ -110,7 +110,7 @@ export function createBlock(presetKey: string): WorshipBlock {
 // 'conti'(찬양과 경배)를 예배의 부름 뒤에 기본 슬롯으로 넣어, 빌더를 열면 "내 콘티가 들어갈 자리"가
 // 바로 보이게 한다. (이 슬롯은 아래 worship 페이지에서 "방금 작업하던 콘티"로 자동 채워진다.)
 const DEFAULT_ORDER_KEYS = [
-  'entrance', 'call', 'conti', 'hymn', 'creed',
+  'entrance', 'call', 'hymn', 'creed', 'conti',
   'responsive', 'hymn', 'prayer', 'scripture', 'choir',
   'sermon', 'hymn', 'offering', 'news', 'hymn', 'benediction',
 ];

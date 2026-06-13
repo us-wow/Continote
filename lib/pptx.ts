@@ -180,6 +180,18 @@ const HEIGHT_FONT_BY_LINES: Record<number, number> = {
 // 기존 한도표(56×19 ≈ 48×24 ≈ 38×29 ≈ 32×36 ≈ 1100)에서 뽑은 평균값.
 const BOX_CHAR_CAPACITY = 1080;
 
+// 한 줄의 '화면 폭'을 칸 단위로 잰다 — 한글/한자/전각은 1칸, 영문·숫자·기호·공백은 0.55칸.
+// (글자 개수가 아니라 폭으로 재야 영어 가사가 부당하게 작아지지 않는다.)
+function visualWidth(line: string): number {
+  let width = 0;
+  for (const ch of line) {
+    // 한글(자모·완성형)·CJK 한자·전각 기호 = 넓은 글자(1칸)
+    const isWide = /[ᄀ-ᇿ　-鿿가-힯豈-﫿＀-￯]/.test(ch);
+    width += isWide ? 1 : 0.55;
+  }
+  return width;
+}
+
 // 한 가사 슬라이드의 글씨 크기를 계산한다 (결과는 항상 MIN~MAX 사이).
 function computeLyricFontSize(lines: string[]): number {
   // 실제 글자가 있는 줄만 센다 (공백 줄은 크기 계산에서 제외).
@@ -189,9 +201,11 @@ function computeLyricFontSize(lines: string[]): number {
   // 세로 기준 — 줄 수가 표에 없으면(8줄 이상) 최소 글씨로.
   const heightFont = HEIGHT_FONT_BY_LINES[visible.length] ?? MIN_FONT_SIZE;
 
-  // 가로 기준 — 가장 긴 줄의 글자수로 결정.
-  // Array.from으로 세면 한글·이모지 같은 유니코드 문자를 화면 글자 단위에 가깝게 센다.
-  const longest = Math.max(...visible.map((line) => Array.from(line).length));
+  // 가로 기준 — 가장 긴 줄의 '실제 폭'으로 결정.
+  // 글자 개수가 아니라 폭으로 세는 이유: 영문자·숫자·공백은 한글보다 훨씬 좁다.
+  // 개수로 세면 영어 많은 찬양("Because of You")을 긴 줄로 착각해 글씨를 과하게 줄인다.
+  // → 한글/한자/전각은 1칸, 그 외(영문·숫자·기호·공백)는 0.55칸으로 가중치를 준다.
+  const longest = Math.max(...visible.map((line) => visualWidth(line)));
   const widthFont = longest > 0 ? Math.floor(BOX_CHAR_CAPACITY / longest) : MAX_FONT_SIZE;
 
   // 세로·가로 중 더 빡빡한(작은) 쪽을 택하고, 최소~최대 범위로 자른다.

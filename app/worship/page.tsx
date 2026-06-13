@@ -103,7 +103,8 @@ export default function WorshipBuilderPage() {
   // 곡별 배경 — 곡 순번(0번부터)별 테마. 이 페이지는 전체가 유료 게이트라 항상 활성.
   const [songThemes, setSongThemes] = useState<(PptTheme | undefined)[]>([]);
   const [font, setFont] = useState<PptFont>('nanum-gothic');
-  const [includeSummary, setIncludeSummary] = useState(true);
+  // 순서 요약 슬라이드 — 기본 끔. 원하는 사람만 체크박스로 켠다(PPT 앞에 "오늘의 예배 순서" 목록 1장).
+  const [includeSummary, setIncludeSummary] = useState(false);
   const [embedFont, setEmbedFont] = useState(true); // 메인과 같은 기본값 ON — 임베드 가능 글꼴일 때만 적용
 
   // ── 게이트: 로그인 → 운영자 목록 또는 premium_access 테이블 확인 ──
