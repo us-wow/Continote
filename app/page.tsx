@@ -48,8 +48,6 @@ import Header, { type DesignTheme } from '@/components/Header';
 import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
 import SlideStudio from '@/components/SlideStudio';
-import PptSection from '@/components/PptSection';
-import SongThemePicker from '@/components/SongThemePicker';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
@@ -1256,83 +1254,56 @@ export default function Home() {
           onExtract={handleExtract}
         />
 
-        {/* Row 2: 02 추출된 곡 (전체 폭) */}
-        <ExtractedSection
-          songs={songs}
-          text={text}
-          extracting={extracting}
-          onUpdateSong={updateSong}
-          onRemoveSong={removeSong}
-          onAddEmptySong={addEmptySong}
-          suspectMap={suspectMap}
-          onVerifyLyrics={handleVerifyLyrics}
-          verifying={verifying}
-        />
-
-        {/* Row 3: 03 슬라이드 스튜디오 — 좌 슬라이드 목록(이동·삭제·추가) | 우 선택 슬라이드 편집.
-            상단 도구바에 전체 배경 스와치 + 글씨체(04와 같은 state라 즉시 적용). 줄글 textarea를 대체한다. */}
-        <SlideStudio
-          text={text}
-          setText={setText}
-          pptTheme={pptTheme}
-          setPptTheme={setPptTheme}
-          pptFont={pptFont}
-          setPptFont={setPptFont}
-          songThemes={songThemes}
-          pptVAlign={pptVAlign}
-          customBg={customBg}
-          premiumUnlocked={premiumUnlocked}
-          onLockedPremium={() => setPricingOpen(true)}
-          overflowSlideIndices={overflowSlideIndices}
-          onClear={onClear}
-          onCopy={handleCopy}
-          onDownloadTxt={handleSaveTxt}
-          onDownloadDocx={handleSaveDocx}
-          onOpenPreview={() => setPreviewOpen(true)}
-        />
-
-        {/* Row 3: 04 PPT 만들기 */}
-        <PptSection
-          slideCount={buildSlidesFromText(text).length}
-          pptFont={pptFont}
-          setPptFont={setPptFont}
-          pptTheme={pptTheme}
-          setPptTheme={setPptTheme}
-          pptVAlign={pptVAlign}
-          setPptVAlign={setPptVAlign}
-          embedFont={embedFont}
-          setEmbedFont={setEmbedFont}
-          customBg={customBg}
-          premiumUnlocked={premiumUnlocked}
-          onCustomBgChange={handleCustomBgChange}
-          onCustomNotice={showToast}
-          savedBgs={savedBgs}
-          onSelectSaved={(bg) => {
-            setCustomBg({ src: bg.url, kind: bg.kind });
-            setPptTheme('custom');
-          }}
-          onDeleteSaved={handleDeleteSavedBg}
-          onLockedPremium={() => setPricingOpen(true)}
-            isLoggedIn={!!authUser}
-          onOpenPreview={() => setPreviewOpen(true)}
-          onDownloadPptx={handleSavePptx}
-          onCopyShareLink={handleCopyShareLink}
-          onDownloadOpenSong={handleSaveOpenSong}
-          onDownloadPlainSlides={handleSavePlainSlides}
-        />
-
-        {/* 곡별 배경(유료) — 곡 목록은 배경 그릴 때와 똑같은 buildSlidesFromText로 뽑아
-            곡 순번이 엔진과 정확히 일치하게 한다. */}
-        <SongThemePicker
-          songTitles={buildSlidesFromText(text)
-            .filter((s) => s.kind === 'title')
-            .map((s) => (s.kind === 'title' ? s.title : ''))}
-          baseTheme={pptTheme}
-          songThemes={songThemes}
-          setSongThemes={setSongThemes}
-          premiumUnlocked={premiumUnlocked}
-          onLockedPremium={() => setPricingOpen(true)}
-        />
+        {/* Row 2~3 통합 워크스페이스: 02 추출된 곡(좌) | 슬라이드 스튜디오(우, 04 흡수).
+            스튜디오 안에서 목록·캔버스·배경·내보내기를 다 한다 → 별도 04 섹션 없음. */}
+        <div className="studio-outer">
+          <ExtractedSection
+            songs={songs}
+            text={text}
+            extracting={extracting}
+            onUpdateSong={updateSong}
+            onRemoveSong={removeSong}
+            onAddEmptySong={addEmptySong}
+            suspectMap={suspectMap}
+            onVerifyLyrics={handleVerifyLyrics}
+            verifying={verifying}
+          />
+          <SlideStudio
+            text={text}
+            setText={setText}
+            pptTheme={pptTheme}
+            setPptTheme={setPptTheme}
+            pptFont={pptFont}
+            setPptFont={setPptFont}
+            pptVAlign={pptVAlign}
+            setPptVAlign={setPptVAlign}
+            embedFont={embedFont}
+            setEmbedFont={setEmbedFont}
+            songThemes={songThemes}
+            setSongThemes={setSongThemes}
+            customBg={customBg}
+            savedBgs={savedBgs}
+            onCustomBgChange={handleCustomBgChange}
+            onCustomNotice={showToast}
+            onSelectSaved={(bg) => {
+              setCustomBg({ src: bg.url, kind: bg.kind });
+              setPptTheme('custom');
+            }}
+            onDeleteSaved={handleDeleteSavedBg}
+            premiumUnlocked={premiumUnlocked}
+            onLockedPremium={() => setPricingOpen(true)}
+            overflowSlideIndices={overflowSlideIndices}
+            onClear={onClear}
+            onCopy={handleCopy}
+            onDownloadTxt={handleSaveTxt}
+            onDownloadDocx={handleSaveDocx}
+            onOpenPreview={() => setPreviewOpen(true)}
+            onDownloadPptx={handleSavePptx}
+            onCopyShareLink={handleCopyShareLink}
+            onDownloadOpenSong={handleSaveOpenSong}
+            onDownloadPlainSlides={handleSavePlainSlides}
+          />
+        </div>
 
         {/* Row 4: 예배 순서 빌더 진입 — PPT 만들기 바로 아래 항상 노출(유료=왕관).
             프리미엄이면 빌더로 이동, 아니면 가격 모달을 띄워 "유료 기능"임을 안내한다.

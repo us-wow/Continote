@@ -3092,3 +3092,23 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   animation: toastUp .25s ease;
   box-shadow: 0 8px 24px -8px rgba(0,0,0,0.3);
 }
+
+/* ── 슬라이드 스튜디오 워크스페이스 (02 추출곡 | 스튜디오) ── */
+/* 02(30%) + 스튜디오(70%). 스튜디오 내부에서 다시 목록/캔버스/배경으로 나뉜다. */
+.studio-outer {
+  display: grid;
+  grid-template-columns: 3fr 7fr;
+  gap: 16px;
+  align-items: start;
+  margin-top: 8px;
+}
+/* 좁은 화면(<1100px)에선 가로 4분할이 빡빡 → 02를 위로 올리고 스튜디오를 전체 폭으로 */
+@media (max-width: 1100px) {
+  .studio-outer { grid-template-columns: 1fr; }
+  /* 스튜디오 내부 목록/캔버스/배경도 한 줄에 욱여넣지 않고 캔버스 우선 */
+  .ss-grid { grid-template-columns: 14fr 30fr 12fr !important; }
+}
+@media (max-width: 760px) {
+  /* 모바일급: 스튜디오 내부를 세로로 (목록→캔버스→배경) */
+  .ss-grid { grid-template-columns: 1fr !important; }
+}
