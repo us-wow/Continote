@@ -216,8 +216,9 @@ export function SlidePreview({
             display: 'flex',
             alignItems: vAlignItems,
             justifyContent: 'center',
-            // 가로 여백을 카드 폭 비례(cqw)로 — 실제 슬라이드 텍스트 박스(전체 폭 92.5%)와 같은 비율.
-            padding: '12px 3.75cqw',
+            // 가로·세로 여백을 카드 폭 비례(cqw)로 — 실제 PPT 텍스트 박스(상하좌우 0.5in≈3.75cqw)와 같은 비율.
+            // 세로도 cqw로 줘야 '상단' 정렬이 너무 위로, '하단'이 너무 아래로 붙지 않는다.
+            padding: '3.75cqw',
             textAlign: 'center',
           }}
         >

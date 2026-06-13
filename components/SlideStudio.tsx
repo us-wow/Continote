@@ -366,7 +366,7 @@ export default function SlideStudio(props: SlideStudioProps) {
             </div>
           ) : (
             <>
-              <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center' }}>
+              <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: '3.75cqw 0' }}>
                 {canvasVisual.overlay && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: canvasVisual.overlay }} />}
                 <textarea
                   ref={editRef}
@@ -426,10 +426,10 @@ export default function SlideStudio(props: SlideStudioProps) {
           </button>
           {premiumOpen && PREMIUM_THEMES.map((t) => <Swatch key={t} theme={t} locked={!premiumUnlocked} />)}
 
-          {/* 커스텀 배경 추가(유료) — 크게 + 또렷하게 */}
+          {/* 내 배경 추가(유료) — 다른 스와치처럼 크게(90px) + 또렷하게 */}
           <button type="button" onClick={onPickCustom}
-            style={{ marginTop: 4, padding: '12px 8px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: '1.5px solid var(--accent, #0f766e)', background: customBg && pptTheme === 'custom' ? 'color-mix(in oklab, var(--accent, #0f766e) 14%, transparent)' : 'color-mix(in oklab, var(--accent, #0f766e) 6%, transparent)', color: 'var(--ink)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-            {converting ? `변환 중 ${converting.pct}%` : '＋ 커스텀 배경 추가'}{!premiumUnlocked && <CrownMark />}
+            style={{ marginTop: 4, height: 90, padding: '0 8px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: '1.5px dashed var(--accent, #0f766e)', background: customBg && pptTheme === 'custom' ? 'color-mix(in oklab, var(--accent, #0f766e) 14%, transparent)' : 'color-mix(in oklab, var(--accent, #0f766e) 6%, transparent)', color: 'var(--ink)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            {converting ? `변환 중 ${converting.pct}%` : '＋ 내 배경 추가'}{!premiumUnlocked && <CrownMark />}
           </button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" onChange={onFileInput} style={{ display: 'none' }} />
         </div>
