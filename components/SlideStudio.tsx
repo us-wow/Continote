@@ -21,7 +21,7 @@ import {
   type PptTheme,
   type PptVAlign,
 } from '@/lib/pptx';
-import { themeVisual, vAlignToFlex, FONT_FAMILY_PREVIEW, ptToCqw, THEME_BG } from '@/lib/slide-visual';
+import { themeVisual, vAlignToFlex, vAlignVPad, FONT_FAMILY_PREVIEW, ptToCqw, THEME_BG } from '@/lib/slide-visual';
 import { BG_CATALOG, bgMatches } from '@/lib/bg-catalog';
 import { fileToDataUrl, CUSTOM_BG_MAX_BYTES, type CustomBg } from '@/lib/custom-bg';
 import { videoFileToGif } from '@/lib/video-to-gif';
@@ -300,6 +300,21 @@ export default function SlideStudio(props: SlideStudioProps) {
   const canvasFontPt = sel.type === 'title' ? 60 : sel.type === 'memo' ? 36 : lyricSizes[safeSelected] ?? 40;
   const canvasVisual = themeVisual(perSlideTheme[safeSelected] ?? pptTheme, customBgUrl, customBgIsGif);
 
+  // 캔버스 세로 여백 — 정렬(상/중/하)에 맞춰 위/아래로 더 바짝. 가로는 0(글자칸이 92% 폭).
+  const vpad = vAlignVPad(pptVAlign);
+  const canvasPad = `${vpad.top} 0 ${vpad.bottom}`;
+
+  // 빈 화면용 "배경 미리보기" — 가사가 없어도 지금 고른 배경·글씨체·정렬을 샘플 문구로 미리 본다.
+  const SAMPLE_LINES = ['주 은혜가 넘치는 곳', '내 영혼 주를 찬양하네'];
+  const samplePreview = (
+    <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: canvasPad }}>
+      {canvasVisual.overlay && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: canvasVisual.overlay }} />}
+      <div style={{ position: 'relative', zIndex: 1, width: '92%', textAlign: 'center', color: canvasVisual.fg, fontFamily: previewFont, fontSize: ptToCqw(46), lineHeight: 1.4 }}>
+        {SAMPLE_LINES.map((l, i) => <div key={i}>{l}</div>)}
+      </div>
+    </div>
+  );
+
   // 캔버스 입력칸 높이를 내용에 맞춰(세로 중앙정렬 유지).
   useLayoutEffect(() => {
     const ta = editRef.current;
@@ -353,8 +368,8 @@ export default function SlideStudio(props: SlideStudioProps) {
 
   const bulkBox = bulkOpen && (
     <div style={{ border: '1px solid var(--rule)', borderRadius: 8, padding: 8 }}>
-      <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: '0 0 6px' }}>빈 줄로 슬라이드가 나뉘고, # =제목 · &gt; =메모.</p>
-      <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={6} placeholder={'# 곡 제목\n\n가사 첫 줄\n가사 둘째 줄'} style={{ width: '100%', fontSize: 13, fontFamily: 'var(--font-sans)', padding: 8, borderRadius: 6, border: '1px solid var(--rule)', resize: 'vertical' }} />
+      <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: '0 0 6px' }}>가사를 통째로 붙여넣으세요. <b>빈 줄 = 슬라이드 구분</b>, <code># </code>=제목 · <code>&gt; </code>=메모.</p>
+      <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={7} placeholder={'# 나 가난할 때도\n\n나 가난할 때도\n나 부요할 때도\n\n언제나 주님을 의지해\n\n주 예수 나의 산 소망'} style={{ width: '100%', fontSize: 13, fontFamily: 'var(--font-sans)', padding: 8, borderRadius: 6, border: '1px solid var(--rule)', resize: 'vertical' }} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 6 }}>
         <button type="button" onClick={() => { setBulkOpen(false); setBulkText(''); }} style={addBtn}>취소</button>
         <button type="button" onClick={doBulkAppend} disabled={!bulkText.trim()} style={{ ...addBtn, fontWeight: 700 }}>추가</button>
@@ -373,11 +388,14 @@ export default function SlideStudio(props: SlideStudioProps) {
 
         {isEmpty ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ aspectRatio: '16 / 9', border: '1px dashed var(--rule)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>슬라이드를 추가하면 여기서 바로 편집해요.</div>
+            {/* 배경 미리보기 — 가사 없이도 배경·글씨체·정렬을 미리 맞춰볼 수 있게 샘플 문구로 보여준다 */}
+            <p style={{ fontSize: 12, color: 'var(--ink-2)', margin: 0 }}>🔎 배경 미리보기 <span style={{ color: 'var(--ink-3)' }}>— 배경·글씨체·정렬을 미리 골라두세요</span></p>
+            {samplePreview}
             <div style={{ display: 'flex', gap: 6 }}>
               <button type="button" onClick={() => addAfter(blocks.length - 1)} style={addBtn}>+ 슬라이드</button>
-              <button type="button" onClick={() => setBulkOpen((o) => !o)} style={addBtn}>붙여넣기</button>
+              <button type="button" onClick={() => setBulkOpen((o) => !o)} style={{ ...addBtn, fontWeight: 700 }}>가사 붙여넣기</button>
             </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: 0 }}>가사를 통째로 붙여넣으면 빈 줄 기준으로 슬라이드가 자동으로 나뉘어요.</p>
             {bulkBox}
           </div>
         ) : (
@@ -397,7 +415,7 @@ export default function SlideStudio(props: SlideStudioProps) {
             </div>
 
             {/* 캔버스 — 실제 배경 위에서 바로 편집 */}
-            <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: '3.75cqw 0' }}>
+            <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: canvasPad }}>
               {canvasVisual.overlay && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: canvasVisual.overlay }} />}
               <textarea ref={editRef} value={sel.content} onChange={(e) => editContent(e.target.value)}
                 placeholder={sel.type === 'title' ? '제목 (다음 줄은 부제)' : sel.type === 'memo' ? '광고·기도제목 메모' : '가사를 입력하세요'}
@@ -572,12 +590,19 @@ export default function SlideStudio(props: SlideStudioProps) {
         {/* 편집 캔버스 — 실제 배경 위에서 그 자리에서 지우고 쓰기 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'sticky', top: 10 }}>
           {isEmpty ? (
-            <div style={{ aspectRatio: '16 / 9', border: '1px dashed var(--rule)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-              왼쪽에서 슬라이드를 추가하면 여기서 바로 편집해요.
-            </div>
+            // 배경 미리보기 — 가사 없이도 배경·글씨체·정렬을 미리 맞춰볼 수 있게 샘플 문구로 보여준다.
+            <>
+              <p style={{ fontSize: 12, color: 'var(--ink-2)', margin: 0 }}>🔎 배경 미리보기 <span style={{ color: 'var(--ink-3)' }}>— 배경·글씨체·정렬을 미리 골라두세요</span></p>
+              {samplePreview}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" onClick={() => addAfter(blocks.length - 1)} style={addBtn}>+ 슬라이드</button>
+                <button type="button" onClick={() => setBulkOpen(true)} style={{ ...addBtn, fontWeight: 700 }}>가사 붙여넣기</button>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: 0 }}>가사를 통째로 붙여넣으면 빈 줄 기준으로 슬라이드가 자동으로 나뉘어요. (왼쪽 목록에서 입력)</p>
+            </>
           ) : (
             <>
-              <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: '3.75cqw 0' }}>
+              <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: canvasPad }}>
                 {canvasVisual.overlay && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: canvasVisual.overlay }} />}
                 <textarea
                   ref={editRef}

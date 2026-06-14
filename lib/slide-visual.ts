@@ -70,6 +70,16 @@ export function vAlignToFlex(v: PptVAlign): 'flex-start' | 'center' | 'flex-end'
   return v === 'top' ? 'flex-start' : v === 'bottom' ? 'flex-end' : 'center';
 }
 
+// 세로 정렬별 위/아래 여백(cqw). '상단'은 위로, '하단'은 아래로 더 바짝 붙도록
+// 해당 가장자리 여백을 줄인다. 실제 PPT 출력(lib/pptx.ts boxFrame)과 같은 비율:
+//   기본 0.5in≈3.75cqw, 가장자리 0.22in≈1.6cqw. (슬라이드 폭 13.333in=100cqw → 1in≈7.5cqw)
+export function vAlignVPad(v: PptVAlign): { top: string; bottom: string } {
+  const BASE = '3.75cqw', EDGE = '1.6cqw';
+  if (v === 'top') return { top: EDGE, bottom: BASE };
+  if (v === 'bottom') return { top: BASE, bottom: EDGE };
+  return { top: BASE, bottom: BASE };
+}
+
 // pt → cqw(카드 폭의 %) 환산. 실제 슬라이드(가로 13.333in ≈ 960px) 비율로 글씨를 그린다.
 // 0.95는 폰트 미세 차이로 글자가 줄을 이탈하지 않게 하는 안전 여유.
 export const ptToCqw = (pt: number) => `${((pt / 960) * 95).toFixed(2)}cqw`;

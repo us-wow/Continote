@@ -13,7 +13,7 @@
 import { useMemo } from 'react';
 import { buildSlidesFromText, type Slide } from '@/lib/text-doc';
 import { computeUniformLyricSizes, type PptFont, type PptTheme, type PptVAlign } from '@/lib/pptx';
-import { themeVisual, vAlignToFlex, ptToCqw, FONT_FAMILY_PREVIEW } from '@/lib/slide-visual';
+import { themeVisual, vAlignToFlex, vAlignVPad, ptToCqw, FONT_FAMILY_PREVIEW } from '@/lib/slide-visual';
 
 export type LivePreviewMode = 'single' | 'strip' | 'grid';
 
@@ -165,6 +165,9 @@ export function SlidePreview({
 }) {
   // 가사 슬라이드는 곡 단위로 통일된 크기를 그대로 비율 적용.
   const lyricFontSize = slide.kind === 'lyric' ? ptToCqw(lyricFontPt) : undefined;
+  // 세로 정렬별 위/아래 여백 — '상단'은 위로, '하단'은 아래로 더 바짝(실제 PPT와 동일 비율).
+  const vpad =
+    vAlignItems === 'flex-start' ? vAlignVPad('top') : vAlignItems === 'flex-end' ? vAlignVPad('bottom') : vAlignVPad('middle');
 
   return (
     <figure style={{ margin: 0, position: 'relative' }}>
@@ -216,9 +219,8 @@ export function SlidePreview({
             display: 'flex',
             alignItems: vAlignItems,
             justifyContent: 'center',
-            // 가로·세로 여백을 카드 폭 비례(cqw)로 — 실제 PPT 텍스트 박스(상하좌우 0.5in≈3.75cqw)와 같은 비율.
-            // 세로도 cqw로 줘야 '상단' 정렬이 너무 위로, '하단'이 너무 아래로 붙지 않는다.
-            padding: '3.75cqw',
+            // 가로는 항상 3.75cqw(PPT 0.5in), 세로는 정렬에 따라 가장자리로 더 붙임(vAlignVPad).
+            padding: `${vpad.top} 3.75cqw ${vpad.bottom}`,
             textAlign: 'center',
           }}
         >

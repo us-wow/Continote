@@ -374,8 +374,16 @@ export async function exportToPptx(
     }
   };
 
-  // 슬라이드 박스 공통 위치 — 모든 종류에서 동일
-  const boxFrame = { x: 0.5, y: 0.5, w: 12.333, h: 6.5 } as const;
+  // 슬라이드 텍스트 박스 위치 — 세로 정렬에 맞춰 '상단'은 위로, '하단'은 아래로 더 바짝 붙인다.
+  // (미리보기 lib/slide-visual.ts vAlignVPad와 같은 비율: 가장자리 0.22in, 기본 0.5in)
+  // valign이 박스 '안'에서 정렬하므로, 박스 자체를 가장자리로 옮겨야 글자가 더 위/아래로 간다.
+  const EDGE_IN = 0.22, BASE_IN = 0.5;
+  const boxFrame =
+    verticalAlign === 'top'
+      ? { x: 0.5, y: EDGE_IN, w: 12.333, h: 7.5 - EDGE_IN - BASE_IN }   // 위로 바짝
+      : verticalAlign === 'bottom'
+      ? { x: 0.5, y: BASE_IN, w: 12.333, h: 7.5 - EDGE_IN - BASE_IN }   // 아래로 바짝(박스 하단=7.28in)
+      : { x: 0.5, y: BASE_IN, w: 12.333, h: 7.5 - 2 * BASE_IN };        // 가운데(기존)
 
   // 가사 글씨 크기 — 곡 단위로 통일한 값을 미리 계산(슬라이드 인덱스로 조회).
   const uniformSizes = computeUniformLyricSizes(slides);
