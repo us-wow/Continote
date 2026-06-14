@@ -84,6 +84,14 @@ const THEME_SWATCH_BG: Record<PptTheme, string> = {
   wheat: "url('/pptx-bg-wheat.jpg') center/cover",
   sea: "url('/pptx-bg-sea.jpg') center/cover",
   flowers: "url('/pptx-bg-flowers.jpg') center/cover",
+  easter: "url('/pptx-bg-easter.jpg') center/cover",
+  christmas: "url('/pptx-bg-christmas.jpg') center/cover",
+  lent: "url('/pptx-bg-lent.jpg') center/cover",
+  harvest: "url('/pptx-bg-harvest.jpg') center/cover",
+  skyglow: "url('/pptx-bg-skyglow.jpg') center/cover",
+  ocean: "url('/pptx-bg-ocean.jpg') center/cover",
+  ripple: "url('/pptx-bg-ripple.gif') center/cover",
+  candlelive: "url('/pptx-bg-candlelive.gif') center/cover",
 };
 // 글자색 — lib/pptx.ts의 text 컬러와 동일. 이미지 테마는 흰 반투명 오버레이 위에 검정 잉크.
 const THEME_SWATCH_FG: Record<PptTheme, string> = {
@@ -114,21 +122,33 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
   wheat: '#1F1B16',
   sea: '#1F1B16',
   flowers: '#1F1B16',
+  easter: '#1F1B16',
+  harvest: '#1F1B16',
+  skyglow: '#1F1B16',
+  ocean: '#1F1B16',
+  christmas: '#FFFFFF',
+  lent: '#FFFFFF',
+  ripple: '#FFFFFF',
+  candlelive: '#FFFFFF',
 };
 // 흰 반투명 오버레이를 까는 실사 테마 — lib/pptx.ts와 동일 규칙 (은하수는 어두워서 제외)
-const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers'];
+const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers', 'easter', 'harvest', 'skyglow', 'ocean'];
 const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme);
 
 // 테마 26개를 묶음별로 접었다 펼 수 있게 그룹핑.
 // 기본 세팅은 "전부 펼침" — 접는 건 사용자의 선택이고, 접힘 상태는 localStorage에 기억된다.
 const THEME_GROUPS: { id: string; label: string; premium: boolean; themes: PptTheme[] }[] = [
   {
-    id: 'free', label: '기본 배경', premium: false,
-    themes: ['black', 'white', 'paper', 'bible', 'meadow', 'cross', 'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'],
+    id: 'free', label: '기본 배경(무료)', premium: false,
+    themes: ['black', 'white', 'paper', 'cross', 'bible', 'sunrise'],
   },
   {
-    id: 'motion', label: '움직이는 배경', premium: true,
-    themes: ['light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'],
+    id: 'paidstatic', label: '유료 배경', premium: true,
+    themes: ['easter', 'christmas', 'lent', 'harvest', 'skyglow', 'ocean', 'meadow', 'godrays', 'wheat', 'sea', 'flowers', 'milkyway'],
+  },
+  {
+    id: 'motion', label: '움직이는 배경(유료)', premium: true,
+    themes: ['ripple', 'candlelive', 'light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'],
   },
 ];
 // 기본 접힘 상태 — 전부 펼침 (사용자 요청: "기본 세팅이 다 보이는 게 세팅")
@@ -145,7 +165,7 @@ function readUsage(): Record<string, number> {
   }
 }
 // 유료 예정 기능(움직이는 배경 전부) — 오른쪽 위에 왕관 표시 (지금은 운영자만 사용 가능)
-const PREMIUM_THEMES: PptTheme[] = THEME_GROUPS.find((g) => g.id === 'motion')!.themes;
+const PREMIUM_THEMES: PptTheme[] = THEME_GROUPS.filter((g) => g.premium).flatMap((g) => g.themes);
 
 // 그룹 제목용 인라인 왕관 — 배지(절대 배치)와 달리 글자 옆에 흐름대로 놓인다
 function CrownInline() {

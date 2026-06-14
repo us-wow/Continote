@@ -36,6 +36,15 @@ export const THEME_BG: Record<PptTheme, string> = {
   wheat: "url('/pptx-bg-wheat.jpg') center/cover, #C89A50",
   sea: "url('/pptx-bg-sea.jpg') center/cover, #A8C4D8",
   flowers: "url('/pptx-bg-flowers.jpg') center/cover, #B89060",
+  // 2026-06 추가 — 절기·컨셉
+  easter: "url('/pptx-bg-easter.jpg') center/cover, #C9C2B8",
+  christmas: "url('/pptx-bg-christmas.jpg') center/cover, #120E0A",
+  lent: "url('/pptx-bg-lent.jpg') center/cover, #14161F",
+  harvest: "url('/pptx-bg-harvest.jpg') center/cover, #C89A50",
+  skyglow: "url('/pptx-bg-skyglow.jpg') center/cover, #C99B8A",
+  ocean: "url('/pptx-bg-ocean.jpg') center/cover, #A8C4D8",
+  ripple: "url('/pptx-bg-ripple.gif') center/cover, #0A1420",
+  candlelive: "url('/pptx-bg-candlelive.gif') center/cover, #1A1206",
 };
 
 // 테마별 글자색 (lib/pptx.ts THEME_CONFIG의 text 값과 일치해야 한다).
@@ -69,6 +78,15 @@ export const THEME_FG: Record<PptTheme, string> = {
   wheat: '#1F1B16',
   sea: '#1F1B16',
   flowers: '#1F1B16',
+  // 2026-06 추가 — 밝은 사진=검정글자, 어두운 사진/움직이는=흰글자
+  easter: '#1F1B16',
+  harvest: '#1F1B16',
+  skyglow: '#1F1B16',
+  ocean: '#1F1B16',
+  christmas: '#FFFFFF',
+  lent: '#FFFFFF',
+  ripple: '#FFFFFF',
+  candlelive: '#FFFFFF',
 };
 
 // 실사 이미지 테마는 흰 반투명 오버레이 위에 검정 글자 (lib/pptx.ts useOverlay 규칙과 일치).
@@ -84,6 +102,11 @@ export const THEME_OVERLAY: Partial<Record<PptTheme, string>> = {
   flowers: 'rgba(255,255,255,0.65)',
   // 내 교회 PPT — 실제 출력(overlay:true, 흰 65%)과 동일 톤.
   custom: 'rgba(255,255,255,0.65)',
+  // 2026-06 추가 — 밝은 실사만 흰 오버레이(어두운/움직이는은 오버레이 없음).
+  easter: 'rgba(255,255,255,0.55)',
+  harvest: 'rgba(255,255,255,0.6)',
+  skyglow: 'rgba(255,255,255,0.5)',
+  ocean: 'rgba(255,255,255,0.6)',
 };
 
 // 미리보기 글씨체를 실제 PPT 출력 폰트와 일치시킨다 (layout.tsx가 해당 웹폰트를 로드해야 함).

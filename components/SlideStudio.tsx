@@ -22,13 +22,13 @@ import {
   type PptVAlign,
 } from '@/lib/pptx';
 import { themeVisual, vAlignToFlex, FONT_FAMILY_PREVIEW, ptToCqw, THEME_BG } from '@/lib/slide-visual';
+import { BG_CATALOG, BG_FILTER_CATEGORIES, bgMatches } from '@/lib/bg-catalog';
 import { fileToDataUrl, CUSTOM_BG_MAX_BYTES, type CustomBg } from '@/lib/custom-bg';
 import { videoFileToGif } from '@/lib/video-to-gif';
 import type { SavedBg } from '@/lib/custom-bg-cloud';
 import { SlidePreview } from '@/components/LivePreview';
 
-const FREE_THEMES: PptTheme[] = ['black', 'white', 'paper', 'bible', 'meadow', 'cross', 'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'];
-const PREMIUM_THEMES: PptTheme[] = ['light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'];
+// 배경 목록·분류·무료유료·움직임은 lib/bg-catalog.ts(SSOT)에서 가져온다.
 
 type SlideType = 'lyric' | 'title' | 'memo';
 
@@ -105,7 +105,8 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [blocks, setBlocks] = useState<string[]>(() => splitTextIntoBlocks(text));
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
-  const [premiumOpen, setPremiumOpen] = useState(true); // 유료 배경 — 기본 펼침
+  const [bgSearch, setBgSearch] = useState(''); // 배경 검색어
+  const [bgCat, setBgCat] = useState<string | null>(null); // 배경 분류 필터(칩)
   // 배경 적용 범위 — '전체'(모든 슬라이드) vs '이 곡만'(유료, 선택한 슬라이드가 속한 곡에만).
   const [bgScope, setBgScope] = useState<'all' | 'song'>('all');
   const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
@@ -293,12 +294,12 @@ export default function SlideStudio(props: SlideStudioProps) {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // 배경 스와치 — 세로 패널용. 크게(44px) + 라벨로 또렷하게.
-  const Swatch = ({ theme, locked }: { theme: PptTheme; locked: boolean }) => (
+  // 배경 스와치 — 세로 패널용. 크게(90px) + 라벨. 유료=왕관, 움직이는 배경=▶움직임 배지.
+  const Swatch = ({ theme, locked, animated }: { theme: PptTheme; locked: boolean; animated?: boolean }) => (
     <button
       type="button"
       onClick={() => (locked ? onLockedPremium() : applyBg(theme))}
-      title={PPT_THEME_LABELS[theme] + (locked ? ' (유료)' : '')}
+      title={PPT_THEME_LABELS[theme] + (animated ? ' · 움직이는 배경' : '') + (locked ? ' (유료)' : '')}
       aria-pressed={activeBgTheme === theme}
       style={{
         position: 'relative', width: '100%', height: 90, borderRadius: 8,
@@ -308,6 +309,12 @@ export default function SlideStudio(props: SlideStudioProps) {
       }}
     >
       <span style={swatchLabel}>{PPT_THEME_LABELS[theme].split(' ')[0]}</span>
+      {/* 움직이는 배경 표시 — 좌상단 ▶ 배지(정적 배경과 구분). 유료 잠금과 별개로 항상 표시. */}
+      {animated && (
+        <span style={{ position: 'absolute', top: 4, left: 4, display: 'inline-flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 999 }}>
+          ▶ 움직임
+        </span>
+      )}
       {locked && <span style={{ position: 'absolute', top: 3, right: 5 }} aria-hidden="true"><CrownMark size={15} /></span>}
     </button>
   );
@@ -434,8 +441,8 @@ export default function SlideStudio(props: SlideStudioProps) {
           )}
         </div>
 
-        {/* 배경 패널 — 세로 나열(크게) + 움직이는 배경 펼침 + 커스텀 추가 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: '70vh', overflowY: 'auto' }}>
+        {/* 배경 패널 — 검색·분류 + 무료/유료(왕관)·움직임 배지 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: '72vh', overflowY: 'auto' }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>배경</span>
           {/* 적용 범위 — 전체 vs 이 곡만(유료). '이 곡만'은 선택 슬라이드가 속한 곡에만 배경 지정. */}
           <div style={{ display: 'flex', gap: 4 }}>
@@ -458,7 +465,37 @@ export default function SlideStudio(props: SlideStudioProps) {
               곡 제목(# ) 슬라이드가 있는 곡을 선택하면 그 곡에만 적용돼요.
             </p>
           )}
-          {FREE_THEMES.map((t) => <Swatch key={t} theme={t} locked={false} />)}
+
+          {/* 검색창 */}
+          <input
+            type="search"
+            value={bgSearch}
+            onChange={(e) => setBgSearch(e.target.value)}
+            placeholder="배경 검색 (예: 부활, 십자가, 바다)"
+            style={{ width: '100%', fontSize: 12, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--rule)' }}
+          />
+          {/* 분류 칩 — 전체 + 주요 컨셉 */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {[null, ...BG_FILTER_CATEGORIES].map((c) => (
+              <button
+                key={c ?? 'all'}
+                type="button"
+                onClick={() => setBgCat(c)}
+                aria-pressed={bgCat === c}
+                style={{ padding: '3px 9px', fontSize: 11, borderRadius: 999, cursor: 'pointer', border: bgCat === c ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgCat === c ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}
+              >
+                {c ?? '전체'}
+              </button>
+            ))}
+          </div>
+
+          {/* 스와치 — 검색·분류 필터 적용. 무료가 위, 유료(왕관)·움직임(▶) 배지. */}
+          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, bgCat)).map((m) => (
+            <Swatch key={m.key} theme={m.key} locked={m.tier === 'paid' && !premiumUnlocked} animated={m.animated} />
+          ))}
+          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, bgCat)).length === 0 && (
+            <p style={{ fontSize: 11.5, color: 'var(--ink-3)', padding: '6px 2px' }}>검색 결과가 없어요.</p>
+          )}
 
           {/* 저장된 내 배경 */}
           {savedBgs.map((bg) => (
@@ -475,14 +512,6 @@ export default function SlideStudio(props: SlideStudioProps) {
               <span style={swatchLabel}>내 배경</span>
             </button>
           )}
-
-          {/* 유료 배경 — 글자 목록이 아니라 펼치면 슬라이드 썸네일로 보여준다(기본 펼침) */}
-          <button type="button" onClick={() => setPremiumOpen((o) => !o)} aria-expanded={premiumOpen}
-            style={{ marginTop: 4, padding: '7px 8px', fontSize: 12, borderRadius: 8, border: '1px solid var(--rule)', background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>유료 배경 <CrownMark /></span>
-            <span aria-hidden="true">{premiumOpen ? '▴' : '▾'}</span>
-          </button>
-          {premiumOpen && PREMIUM_THEMES.map((t) => <Swatch key={t} theme={t} locked={!premiumUnlocked} />)}
 
           {/* 내 배경 추가(유료) — 다른 스와치처럼 크게(90px) + 또렷하게 */}
           <button type="button" onClick={onPickCustom}

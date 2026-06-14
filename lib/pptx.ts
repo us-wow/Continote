@@ -20,6 +20,9 @@ export type PptTheme =
   | 'sunrise' | 'milkyway' | 'godrays' | 'wheat' | 'sea' | 'flowers'
   | 'light' | 'dawn' | 'serene' | 'green' | 'gold' | 'pink' | 'violet'
   | 'wave' | 'mist' | 'candle' | 'grace' | 'aurora' | 'crosslight'
+  // 2026-06 추가(Pexels 상업무료) — 절기·컨셉 확장
+  | 'easter' | 'christmas' | 'lent' | 'harvest' | 'skyglow' | 'ocean'
+  | 'ripple' | 'candlelive'
   | 'custom';
 
 export const PPT_THEME_LABELS: Record<PptTheme, string> = {
@@ -50,6 +53,15 @@ export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'wheat': '들녘 (황금 밀밭)',
   'sea': '바다 (새벽 수평선)',
   'flowers': '들꽃 (가을 역광)',
+  // 2026-06 추가 — 절기·컨셉(Pexels 상업무료)
+  'easter': '부활 (새벽빛)',
+  'christmas': '성탄 (촛불)',
+  'lent': '사순 (십자가)',
+  'harvest': '추수감사 (밀밭)',
+  'skyglow': '노을 (저녁 하늘)',
+  'ocean': '바다 (수평선)',
+  'ripple': '잔물결 (수면)',
+  'candlelive': '촛불빛 (흔들림)',
   'custom': '내 교회 PPT (직접 등록)',
 };
 
@@ -109,6 +121,16 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   'grace': { kind: 'image', path: '/pptx-bg-grace.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0E0A1E' },
   'aurora': { kind: 'image', path: '/pptx-bg-aurora.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '050A18' },
   'crosslight': { kind: 'image', path: '/pptx-bg-crosslight.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0C0908' },
+  // 2026-06 추가 — 절기·컨셉(Pexels 상업무료). 밝은 사진=흰 오버레이+검정글자, 어두운 사진=흰글자.
+  'easter': { kind: 'image', path: '/pptx-bg-easter.jpg', text: '1F1B16' },
+  'harvest': { kind: 'image', path: '/pptx-bg-harvest.jpg', text: '1F1B16' },
+  'skyglow': { kind: 'image', path: '/pptx-bg-skyglow.jpg', text: '1F1B16' },
+  'ocean': { kind: 'image', path: '/pptx-bg-ocean.jpg', text: '1F1B16' },
+  'christmas': { kind: 'image', path: '/pptx-bg-christmas.jpg', text: 'FFFFFF', overlay: false, fallback: '120E0A' },
+  'lent': { kind: 'image', path: '/pptx-bg-lent.jpg', text: 'FFFFFF', overlay: false, fallback: '14161F' },
+  // 움직이는 신규(영상→GIF)
+  'ripple': { kind: 'image', path: '/pptx-bg-ripple.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A1420' },
+  'candlelive': { kind: 'image', path: '/pptx-bg-candlelive.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '1A1206' },
   // 내 교회 PPT — 이미지 데이터는 exportToPptx의 customBgData 파라미터로 받는다(path 미사용).
   // 실사 테마처럼 흰 반투명 오버레이를 깔아 "투명도를 낮추고 가사를 얹는" 효과를 낸다.
   'custom': { kind: 'image', path: '', text: '1F1B16', overlay: true },
