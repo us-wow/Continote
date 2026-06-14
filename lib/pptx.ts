@@ -50,11 +50,9 @@ function parseScrim(css: string): { color: string; transparency: number } | null
 }
 
 // 테마별 PPT 출력 설정 — 배경 SSOT(BACKGROUNDS)에서 파생.
-// solid는 배경색+글자색, image는 경로+글자색(+오버레이/움직임/폴백).
-// 오버레이 규칙: SSOT의 image.overlay(흰 스크림)가 있으면 가독성 레이어 ON,
-//   없으면 overlay:false로 명시(그라데이션·어두운 배경은 자체 대비로 충분).
-// (export: scripts/verify-bg-ssot.mjs가 SSOT 일관성 회귀 검증에 사용)
-export const THEME_CONFIG: Record<PptTheme, ThemeConfig> = Object.fromEntries(
+// solid는 배경색+글자색, image는 경로+글자색(+가독성 스크림/움직임/폴백).
+// 스크림 규칙: SSOT의 image.overlay(흰/검정 rgba)가 있으면 그 값으로 가독성 레이어를 깐다.
+const THEME_CONFIG: Record<PptTheme, ThemeConfig> = Object.fromEntries(
   BG_DEFS.map((d) => {
     if (d.solid) {
       return [d.key, { kind: 'solid', bg: d.solid.bg, text: d.solid.text }];

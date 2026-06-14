@@ -199,9 +199,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ songs: parsed.songs });
   } catch (err: any) {
-    console.error('analyze error:', err);
+    console.error('analyze error:', err); // 상세는 서버 로그에만 — 내부 예외 메시지를 클라이언트로 흘리지 않음
     return NextResponse.json(
-      { error: err.message || '분석 중 오류 발생' },
+      { error: '가사 분석 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

@@ -24,6 +24,9 @@ export type Slide =
 // 텍스트를 슬라이드 배열로 변환. 빈 줄 기준 paragraph 분리.
 export function buildSlidesFromText(text: string): Slide[] {
   if (!text || !text.trim()) return [];
+  // 줄끝 정규화 — 윈도우·워드·파워포인트·웹에서 복사한 가사는 줄끝이 \r\n 이라
+  // 빈 줄이 '\r\n\r\n'이 되어 아래 [ \t] 분리에 안 걸린다. LF로 통일해야 슬라이드가 제대로 나뉜다.
+  text = text.replace(/\r\n?/g, '\n');
 
   // \n[ \t]*\n+ → 한 줄 이상의 빈 줄(공백만 있는 줄 포함)을 paragraph 경계로
   const paragraphs = text
@@ -63,6 +66,7 @@ export function buildSlidesFromText(text: string): Slide[] {
 // → 슬라이드 스튜디오에서 슬라이드 단위로 편집/이동/삭제할 때 쓴다(buildSlidesFromText 결과와 1:1 대응).
 export function splitTextIntoBlocks(text: string): string[] {
   if (!text || !text.trim()) return [];
+  text = text.replace(/\r\n?/g, '\n'); // 줄끝 CRLF 정규화(붙여넣기 분리·잔여 \r 제거)
   return text
     .split(/\n[ \t]*\n+/)
     .map((b) => b.replace(/^\n+|\n+$/g, '').replace(/[ \t]+$/gm, ''))
@@ -75,6 +79,7 @@ export function splitTextIntoBlocks(text: string): string[] {
 // buildSlidesFromText와 같은 분리 규칙을 쓰므로 미리보기 곡 순번과도 정확히 맞는다.
 export function slideIndexAtOffset(text: string, caretOffset: number): number {
   if (!text) return 0;
+  text = text.replace(/\r\n?/g, '\n'); // 줄끝 정규화 — 커서→슬라이드 인덱스 계산도 분리 규칙과 일치
   const before = text.slice(0, Math.max(0, caretOffset));
   const count = buildSlidesFromText(before).length;
   return Math.max(0, count - 1);

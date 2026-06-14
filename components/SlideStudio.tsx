@@ -114,7 +114,10 @@ export default function SlideStudio(props: SlideStudioProps) {
   // 기기에 저장(localStorage)해서 새로고침해도 유지. (서버 저장은 결제 도입 때 묶어서)
   const [bookmarks, setBookmarks] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
-    try { return JSON.parse(localStorage.getItem('contionote.bgBookmarks') || '[]'); } catch { return []; }
+    try {
+      const v = JSON.parse(localStorage.getItem('contionote.bgBookmarks') || '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; // 배열·문자열만 신뢰(손상값 방어)
+    } catch { return []; }
   });
   const isBookmarked = (k: string) => bookmarks.includes(k);
   const toggleBookmark = (k: string) => {
@@ -380,9 +383,13 @@ export default function SlideStudio(props: SlideStudioProps) {
       {paid && (
         <span
           role="button"
-          tabIndex={-1}
+          tabIndex={0}
+          aria-label={isBookmarked(theme) ? '즐겨찾기 해제' : '즐겨찾기 — 맨 위로 고정 (유료)'}
+          aria-pressed={isBookmarked(theme)}
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => { e.stopPropagation(); toggleBookmark(theme); }}
+          // 키보드로도 즐겨찾기 토글 — Enter/Space (마우스 전용 방지)
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleBookmark(theme); } }}
           title={isBookmarked(theme) ? '즐겨찾기 해제' : '즐겨찾기 — 맨 위로 고정 (유료)'}
           style={{ position: 'absolute', top: 2, right: 3, padding: 3, cursor: 'pointer', lineHeight: 0 }}
         >

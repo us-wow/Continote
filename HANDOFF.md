@@ -23,7 +23,7 @@
 - **`lib/bg-catalog.ts`의 `BACKGROUNDS` 배열 = 모든 배경의 단일 진실원(SSOT).** 한 배경의 모든 속성(key·label·tier·categories·animated·실제색/그림·previewColor·overlay·fallback)을 여기 한 항목에 담는다.
 - 나머지 맵은 **전부 여기서 파생**된다(직접 정의 ❌): `pptx.ts`의 `PPT_THEME_LABELS`·`THEME_CONFIG`(실제 PPT 출력), `slide-visual.ts`의 `THEME_BG/FG/OVERLAY`(미리보기 카드), `bg-catalog.ts`의 `BG_CATALOG`(패널 검색·필터·배지). `PptTheme` 타입도 `BACKGROUNDS` 키에서 파생(union 유지).
 - ✅ **이제 배경 1개 추가 = `BACKGROUNDS`에 한 줄 추가가 전부**(예전 5곳→1곳). `public/`에 이미지 넣고 항목 추가하면 끝.
-- **2026-06-15 대량 추가**: 절기/컨셉 배경 62종(사진 42 + 영상→GIF 20). 총 50→**112종**, 전부 paid. 라이브 확인됨. 소싱=Pexels 상업무료(WebSearch로 ID 수집→curl 검증), GIF는 ffmpeg로 ≤6MB 루프. **오버레이/글자색은 이미지 밝기 자동 측정으로 결정**(밝음=검정+흰스크림 0.55~0.62 / 어두움=흰글자+오버레이 없음). 변환 스크립트는 `/tmp`(일회성, 미커밋).
+- **2026-06-15 대량 추가**: 절기/컨셉 배경 62종(사진 42 + 영상→GIF 20). 총 50→**95종**(노출), 전부 paid. 라이브 확인됨. 소싱=Pexels 상업무료(WebSearch로 ID 수집→curl 검증), GIF는 ffmpeg로 ≤6MB 루프. **오버레이/글자색은 이미지 밝기 자동 측정으로 결정**(밝거나 중간톤=검정글자+흰스크림 / 진짜 어두운것=흰글자+검정스크림, 움직이는 GIF도 PPT 스크림 적용=parseScrim). 변환 스크립트는 `/tmp`(일회성, 미커밋).
 - **순회 주의**: `BACKGROUNDS`는 `as const`라 옵셔널 필드(solid/image) 접근이 막힘 → 맵 파생 시 `BG_DEFS`(BgDef[] 뷰)로 순회. 키 union은 `BACKGROUNDS`가 보존.
 - **회귀 가드**: `scripts/verify-bg-ssot.mjs` (`npx tsx`로 실행) — 파생 맵이 기대값과 일치하는지 대조. 리팩터 시 원본 리터럴과 100% 동일 확인에 사용했음.
 - **무료** = 단색 3(검정/흰색/종이) + 실사 3(십자가/성경책/초원). **나머지 전부 유료**. 유료엔 왕관 SVG, 움직이는 배경엔 ▶움직임 배지.

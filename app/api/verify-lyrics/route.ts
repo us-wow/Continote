@@ -207,9 +207,9 @@ export async function POST(req: NextRequest) {
     const out = Array.isArray(parsed.songs) ? parsed.songs : [];
     return NextResponse.json({ songs: out });
   } catch (err: any) {
-    console.error('verify-lyrics error:', err);
+    console.error('verify-lyrics error:', err); // 상세는 서버 로그에만 — 내부 예외 메시지 비노출
     return NextResponse.json(
-      { error: err.message || '검토 중 오류 발생' },
+      { error: '가사 검토 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.' },
       { status: 500 }
     );
   }

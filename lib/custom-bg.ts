@@ -38,6 +38,7 @@ export async function checkPremiumAccess(email: string | null | undefined): Prom
     const { data, error } = await sb
       .from('premium_access')
       .select('email, expires_at')
+      .eq('email', email.toLowerCase()) // RLS에만 기대지 말고 본인 행만 명시 — 타인/임의 행 오판 방지
       .limit(1);
     if (error || !data || data.length === 0) return false;
     const row = data[0];
