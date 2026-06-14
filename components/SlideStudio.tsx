@@ -305,7 +305,7 @@ export default function SlideStudio(props: SlideStudioProps) {
   const canvasPad = `${vpad.top} 0 ${vpad.bottom}`;
 
   // 빈 화면용 "배경 미리보기" — 가사가 없어도 지금 고른 배경·글씨체·정렬을 샘플 문구로 미리 본다.
-  const SAMPLE_LINES = ['주 은혜가 넘치는 곳', '내 영혼 주를 찬양하네'];
+  const SAMPLE_LINES = ['배경 미리보기'];
   const samplePreview = (
     <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: canvasPad }}>
       {canvasVisual.overlay && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: canvasVisual.overlay }} />}
