@@ -106,6 +106,17 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [bgSearch, setBgSearch] = useState(''); // 배경 검색어 (분류 칩은 제거, 검색만)
+  const [isNarrow, setIsNarrow] = useState(false); // 모바일(좁은 화면) 여부 → 캔버스 중심 레이아웃
+  const [decorOpen, setDecorOpen] = useState(false); // 모바일 '꾸미기' 시트(배경·글씨체·정렬) 열림
+
+  // 화면 폭 감지 — 760px 이하면 모바일 전용 레이아웃.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 760px)');
+    const apply = () => setIsNarrow(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
   // 배경 적용 범위 — '전체'(모든 슬라이드) vs '이 곡만'(유료, 선택한 슬라이드가 속한 곡에만).
   const [bgScope, setBgScope] = useState<'all' | 'song'>('all');
   const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
@@ -163,6 +174,20 @@ export default function SlideStudio(props: SlideStudioProps) {
   const customBgIsGif = customBg?.kind === 'gif';
   const previewFont = FONT_FAMILY_PREVIEW[pptFont];
   const previewVAlign = vAlignToFlex(pptVAlign);
+
+  // 배경 목록 — 검색 필터 + 항상 같은 순서(무료 → 유료 정지 그림 → 유료 움직이는).
+  // 카탈로그에 어디에 추가하든 이 정렬로 자리가 잡혀서, 새 배경이 뒤죽박죽 안 섞인다.
+  const visibleBgs = useMemo(
+    () =>
+      [...BG_CATALOG]
+        .filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null))
+        .sort(
+          (a, b) =>
+            (a.tier === 'paid' ? 1 : 0) - (b.tier === 'paid' ? 1 : 0) ||
+            (a.animated ? 1 : 0) - (b.animated ? 1 : 0)
+        ),
+    [bgSearch]
+  );
 
   // 지금 선택한 슬라이드가 속한 곡의 순번(0번부터). title 슬라이드를 세어 구한다(없으면 -1).
   const curSongIndex = useMemo(() => {
@@ -323,6 +348,147 @@ export default function SlideStudio(props: SlideStudioProps) {
   const miniBtn: React.CSSProperties = { width: 24, height: 22, fontSize: 12, lineHeight: 1, border: '1px solid var(--rule)', borderRadius: 5, background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer', padding: 0 };
   const addBtn: React.CSSProperties = { flex: 1, padding: '8px', fontSize: 12.5, border: '1px dashed var(--rule)', borderRadius: 8, background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer' };
   const valignBtn = (on: boolean): React.CSSProperties => ({ padding: '4px 10px', fontSize: 12, borderRadius: 12, cursor: 'pointer', border: on ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: on ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' });
+  const navBtn: React.CSSProperties = { width: 42, height: 38, fontSize: 16, border: '1px solid var(--rule)', borderRadius: 8, background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer' };
+  const goSlide = (dir: -1 | 1) => setSelected(Math.max(0, Math.min(safeSelected + dir, blocks.length - 1)));
+
+  const bulkBox = bulkOpen && (
+    <div style={{ border: '1px solid var(--rule)', borderRadius: 8, padding: 8 }}>
+      <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: '0 0 6px' }}>빈 줄로 슬라이드가 나뉘고, # =제목 · &gt; =메모.</p>
+      <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={6} placeholder={'# 곡 제목\n\n가사 첫 줄\n가사 둘째 줄'} style={{ width: '100%', fontSize: 13, fontFamily: 'var(--font-sans)', padding: 8, borderRadius: 6, border: '1px solid var(--rule)', resize: 'vertical' }} />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 6 }}>
+        <button type="button" onClick={() => { setBulkOpen(false); setBulkText(''); }} style={addBtn}>취소</button>
+        <button type="button" onClick={doBulkAppend} disabled={!bulkText.trim()} style={{ ...addBtn, fontWeight: 700 }}>추가</button>
+      </div>
+    </div>
+  );
+
+  // ── 모바일 전용 레이아웃 — 캔버스 중심 + 가로 필름스트립 + ◀▶ + '꾸미기' 시트 ──
+  if (isNarrow) {
+    return (
+      <section className="ss-root panel" aria-label="슬라이드 스튜디오" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="section-head">
+          <div className="left"><span className="step-num-inline">03</span><h2>슬라이드 편집</h2></div>
+          <div className="right mono">{realSlideCount}장</div>
+        </div>
+
+        {isEmpty ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ aspectRatio: '16 / 9', border: '1px dashed var(--rule)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>슬라이드를 추가하면 여기서 바로 편집해요.</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" onClick={() => addAfter(blocks.length - 1)} style={addBtn}>+ 슬라이드</button>
+              <button type="button" onClick={() => setBulkOpen((o) => !o)} style={addBtn}>붙여넣기</button>
+            </div>
+            {bulkBox}
+          </div>
+        ) : (
+          <>
+            {/* 가로 필름스트립 — 스와이프로 슬라이드 고르기 */}
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+              {blocks.map((raw, i) => {
+                const v = themeVisual(perSlideTheme[i], customBgUrl, customBgIsGif);
+                return (
+                  <button key={i} type="button" onClick={() => setSelected(i)} onMouseDown={(e) => e.preventDefault()} aria-label={`${i + 1}번 슬라이드`}
+                    style={{ flex: '0 0 116px', padding: 0, border: i === safeSelected ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', borderRadius: 8, background: 'transparent', cursor: 'pointer' }}>
+                    <SlidePreview slide={slidesForBlocks[i]} index={i + 1} isOverflow={overflowSlideIndices.includes(i)} themeBg={v.bg} themeFg={v.fg} overlay={v.overlay} lyricFontPt={lyricSizes[i]} fontFamily={previewFont} vAlignItems={previewVAlign} />
+                  </button>
+                );
+              })}
+              <button type="button" onClick={() => addAfter(blocks.length - 1)} aria-label="슬라이드 추가" style={{ flex: '0 0 64px', border: '1px dashed var(--rule)', borderRadius: 8, background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 18 }}>＋</button>
+            </div>
+
+            {/* 캔버스 — 실제 배경 위에서 바로 편집 */}
+            <div style={{ position: 'relative', aspectRatio: '16 / 9', background: canvasVisual.bg, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--rule)', containerType: 'inline-size', display: 'flex', alignItems: previewVAlign, justifyContent: 'center', padding: '3.75cqw 0' }}>
+              {canvasVisual.overlay && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: canvasVisual.overlay }} />}
+              <textarea ref={editRef} value={sel.content} onChange={(e) => editContent(e.target.value)}
+                placeholder={sel.type === 'title' ? '제목 (다음 줄은 부제)' : sel.type === 'memo' ? '광고·기도제목 메모' : '가사를 입력하세요'}
+                spellCheck={false} rows={1}
+                style={{ position: 'relative', zIndex: 1, width: '92%', background: 'transparent', border: 'none', outline: 'none', resize: 'none', overflow: 'hidden', textAlign: 'center', color: canvasVisual.fg, fontFamily: previewFont, fontSize: ptToCqw(canvasFontPt), lineHeight: 1.4, fontWeight: sel.type === 'title' ? 700 : 400, fontStyle: sel.type === 'memo' ? 'italic' : 'normal' }} />
+            </div>
+
+            {/* 페이저(◀ n/N ▶) + 이동·삭제 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button type="button" onClick={() => goSlide(-1)} disabled={safeSelected === 0} style={navBtn}>◀</button>
+              <span className="mono" style={{ fontSize: 13, fontWeight: 700, minWidth: 60, textAlign: 'center' }}>{safeSelected + 1} / {blocks.length}</span>
+              <button type="button" onClick={() => goSlide(1)} disabled={safeSelected === blocks.length - 1} style={navBtn}>▶</button>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                <button type="button" onClick={() => move(safeSelected, -1)} disabled={safeSelected === 0} aria-label="위로" style={{ ...miniBtn, width: 34, height: 34 }}>↑</button>
+                <button type="button" onClick={() => move(safeSelected, 1)} disabled={safeSelected === blocks.length - 1} aria-label="아래로" style={{ ...miniBtn, width: 34, height: 34 }}>↓</button>
+                <button type="button" onClick={() => removeSlide(safeSelected)} aria-label="삭제" style={{ ...miniBtn, width: 34, height: 34, color: 'var(--danger)' }}>🗑</button>
+              </div>
+            </div>
+
+            {/* 종류 */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>종류</span>
+              {(['lyric', 'title', 'memo'] as SlideType[]).map((t) => (
+                <button key={t} type="button" onClick={() => setType(t)} aria-pressed={sel.type === t} style={valignBtn(sel.type === t)}>
+                  {t === 'lyric' ? '가사' : t === 'title' ? '제목' : '메모'}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: 0 }}>엔터 두 번 = 다음 슬라이드로 나뉨.</p>
+
+            {/* 액션 — 꾸미기(배경·글씨체 시트) / 전체 보기 / PPT */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" onClick={() => setDecorOpen(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 8, border: '1.5px solid var(--accent, #0f766e)', background: 'color-mix(in oklab, var(--accent, #0f766e) 8%, transparent)', color: 'var(--ink)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>🎨 배경·글씨체</button>
+              <button type="button" onClick={onOpenPreview} className="btn btn-text btn-sm">전체 보기</button>
+              <button type="button" onClick={onDownloadPptx} className="btn btn-primary btn-sm">PPT</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" onClick={() => setBulkOpen((o) => !o)} style={addBtn}>붙여넣기</button>
+              <button type="button" onClick={onClear} style={addBtn}>전체 비우기</button>
+            </div>
+            {bulkBox}
+          </>
+        )}
+
+        {/* '꾸미기' 바텀시트 — 배경·글씨체·정렬·곡별배경을 평소엔 숨기고 여기 모음 */}
+        {decorOpen && (
+          <>
+            <div onClick={() => setDecorOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(31,27,22,0.45)', zIndex: 60 }} aria-hidden="true" />
+            <div role="dialog" aria-label="배경·글씨체 꾸미기" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 61, background: 'var(--surface, #fff)', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '82vh', overflowY: 'auto', padding: '14px 14px calc(16px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <strong style={{ fontSize: 15 }}>배경 · 글씨체</strong>
+                <button type="button" onClick={() => setDecorOpen(false)} className="btn btn-text btn-sm">닫기</button>
+              </div>
+              {/* 글씨체 + 정렬 */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
+                  글씨체
+                  <select value={pptFont} onChange={(e) => setPptFont(e.target.value as PptFont)} style={{ fontSize: 13, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--rule)' }}>
+                    {(Object.keys(PPT_FONT_LABELS) as PptFont[]).map((f) => <option key={f} value={f}>{PPT_FONT_LABELS[f]}{f === 'nanum-gothic' ? ' (추천)' : ''}</option>)}
+                  </select>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>정렬</span>
+                  {(Object.keys(PPT_VALIGN_LABELS) as PptVAlign[]).map((v) => (
+                    <button key={v} type="button" onClick={() => setPptVAlign(v)} aria-pressed={pptVAlign === v} style={valignBtn(pptVAlign === v)}>{PPT_VALIGN_LABELS[v]}</button>
+                  ))}
+                </div>
+              </div>
+              {/* 배경 적용 범위 */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                <button type="button" onClick={() => setBgScope('all')} aria-pressed={bgScope === 'all'} style={{ flex: 1, padding: '6px', fontSize: 12, borderRadius: 7, cursor: 'pointer', border: bgScope === 'all' ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgScope === 'all' ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}>전체</button>
+                <button type="button" onClick={() => (premiumUnlocked ? setBgScope('song') : onLockedPremium())} aria-pressed={bgScope === 'song'} style={{ flex: 1, padding: '6px', fontSize: 12, borderRadius: 7, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, border: bgScope === 'song' ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgScope === 'song' ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}>이 곡만 {!premiumUnlocked && <CrownMark size={13} />}</button>
+              </div>
+              {songScope && <p style={{ fontSize: 11, color: 'var(--accent-ink)', margin: '0 0 6px', fontWeight: 600 }}>{curSongIndex + 1}번째 곡에만 적용돼요.</p>}
+              {/* 배경 검색 + 스와치(2열) */}
+              <input type="search" value={bgSearch} onChange={(e) => setBgSearch(e.target.value)} placeholder="배경 검색 (예: 부활, 십자가, 바다)" style={{ width: '100%', fontSize: 13, padding: '8px', borderRadius: 7, border: '1px solid var(--rule)', marginBottom: 8 }} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                {visibleBgs.map((m) => <Swatch key={m.key} theme={m.key} paid={m.tier === 'paid'} locked={m.tier === 'paid' && !premiumUnlocked} animated={m.animated} />)}
+              </div>
+              {visibleBgs.length === 0 && <p style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 2px' }}>검색 결과가 없어요.</p>}
+              {/* 텍스트 출구 */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={onCopy} className="btn btn-text btn-sm">복사</button>
+                <button type="button" onClick={onDownloadTxt} className="btn btn-text btn-sm">TXT</button>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="ss-root panel" aria-label="슬라이드 스튜디오" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -475,11 +641,11 @@ export default function SlideStudio(props: SlideStudioProps) {
             placeholder="배경 검색 (예: 부활, 십자가, 바다)"
             style={{ width: '100%', fontSize: 12, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--rule)' }}
           />
-          {/* 스와치 — 검색 필터 적용. 무료가 위, 유료=왕관·움직임=▶ 배지. (분류 칩은 뺌, 검색만) */}
-          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null)).map((m) => (
+          {/* 스와치 — 무료→유료정지→유료움직임 순. 유료=왕관·움직임=▶ 배지. (분류 칩은 뺌, 검색만) */}
+          {visibleBgs.map((m) => (
             <Swatch key={m.key} theme={m.key} paid={m.tier === 'paid'} locked={m.tier === 'paid' && !premiumUnlocked} animated={m.animated} />
           ))}
-          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null)).length === 0 && (
+          {visibleBgs.length === 0 && (
             <p style={{ fontSize: 11.5, color: 'var(--ink-3)', padding: '6px 2px' }}>검색 결과가 없어요.</p>
           )}
 
