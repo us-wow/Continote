@@ -406,24 +406,30 @@ function IllustChips() {
   );
 }
 
-// STEP 4 — PPT 다운로드 (어두운 슬라이드 + 테마 점 + 내려받기 화살표)
+// STEP 4 — 배경 고르고 PPT 다운로드.
+// 어두운 슬라이드 + 아래에 배경 타일 여러 개(절기·자연·움직이는…) + 한 칸엔 금빛 왕관(유료/즐겨찾기) + 내려받기 화살표.
 function IllustDownload() {
+  const tiles = ['#3a6a4a', '#c8923f', '#2a3d6b', '#9a5a6a', '#1f1b16'];
   return (
     <svg viewBox="0 0 200 130" width={200} height={CARD.height} aria-hidden="true">
-      <rect x="40" y="14" width="120" height="74" rx="8" fill="var(--ink)" />
-      <circle cx="148" cy="26" r="16" fill="var(--accent)" opacity="0.3" />
+      <rect x="40" y="10" width="120" height="64" rx="8" fill="var(--ink)" />
+      <circle cx="148" cy="20" r="14" fill="var(--accent)" opacity="0.3" />
       <g fill="#fff">
-        <rect x="64" y="42" width="72" height="6" rx="3" />
-        <rect x="76" y="56" width="48" height="6" rx="3" />
+        <rect x="64" y="34" width="72" height="6" rx="3" />
+        <rect x="76" y="48" width="48" height="6" rx="3" />
       </g>
+      {/* 고를 수 있는 배경이 많다는 걸 보여주는 작은 타일 줄 */}
       <g>
-        <circle cx="62" cy="102" r="6" fill="var(--ink)" />
-        <circle cx="82" cy="102" r="6" fill="var(--surface)" stroke="var(--rule)" strokeWidth="1.5" />
-        <circle cx="102" cy="102" r="6" fill="var(--accent)" />
+        {tiles.map((c, i) => (
+          <rect key={i} x={20 + i * 26} y={92} width="22" height="16" rx="3" fill={c} stroke="var(--rule)" strokeWidth="0.8" />
+        ))}
+        {/* 마지막 타일에 금빛 왕관 = 유료·즐겨찾기 */}
+        <path d="M150 95 L150 91 L153.5 93.5 L156 89 L158.5 93.5 L162 91 L162 95 Z" fill="#F2C14E" stroke="#F2C14E" strokeWidth="0.8" strokeLinejoin="miter" />
       </g>
-      <g transform="translate(128 92)" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        <path d="M12 2 V18" />
-        <path d="M5 12 L12 19 L19 12" />
+      {/* 내려받기 화살표 */}
+      <g transform="translate(170 88)" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        <path d="M9 2 V16" />
+        <path d="M3 11 L9 17 L15 11" />
       </g>
     </svg>
   );
@@ -460,8 +466,8 @@ const SLIDES: GuideSlide[] = [
   {
     kind: 'step',
     num: 4,
-    title: 'PPT로 내려받아요',
-    desc: '배경과 글꼴을 고르고 ‘PPT 다운로드’를 누르면, 예배용 PPT가 바로 완성돼요.',
+    title: '배경 고르고 PPT로 내려받아요',
+    desc: '절기·자연·움직이는 배경 중에서 골라요(검색으로 찾아요). 글꼴·정렬까지 맞춘 뒤 ‘PPT 다운로드’를 누르면 예배용 PPT가 완성돼요.',
     illust: <IllustDownload />,
   },
 ];
