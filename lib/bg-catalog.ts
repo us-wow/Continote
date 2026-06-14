@@ -23,10 +23,10 @@ export const BG_CATALOG: BgMeta[] = [
   { key: 'paper', categories: ['단색'], tier: 'free', animated: false },
   { key: 'cross', categories: ['십자가', '예배'], tier: 'free', animated: false },
   { key: 'bible', categories: ['예배'], tier: 'free', animated: false },
-  { key: 'sunrise', categories: ['자연', '빛'], tier: 'free', animated: false },
+  { key: 'meadow', categories: ['자연'], tier: 'free', animated: false },
 
   // ── 유료 · 정적 실사 ──
-  { key: 'meadow', categories: ['자연'], tier: 'paid', animated: false },
+  { key: 'sunrise', categories: ['자연', '빛'], tier: 'paid', animated: false },
   { key: 'godrays', categories: ['자연', '빛'], tier: 'paid', animated: false },
   { key: 'wheat', categories: ['자연', '절기:추수감사'], tier: 'paid', animated: false },
   { key: 'sea', categories: ['자연', '묵상'], tier: 'paid', animated: false },
@@ -57,6 +57,22 @@ export const BG_CATALOG: BgMeta[] = [
   { key: 'ocean', categories: ['자연', '묵상'], tier: 'paid', animated: false },
   { key: 'ripple', categories: ['자연', '묵상'], tier: 'paid', animated: true },
   { key: 'candlelive', categories: ['묵상', '절기', '절기:성탄'], tier: 'paid', animated: true },
+  { key: 'dawnsea', categories: ['절기', '절기:부활', '자연', '묵상'], tier: 'paid', animated: false },
+  { key: 'tomb', categories: ['절기', '절기:부활', '십자가'], tier: 'paid', animated: false },
+  { key: 'starnight', categories: ['절기', '절기:성탄', '묵상'], tier: 'paid', animated: false },
+  { key: 'nativity', categories: ['절기', '절기:성탄'], tier: 'paid', animated: false },
+  { key: 'stormlight', categories: ['절기', '절기:사순', '빛'], tier: 'paid', animated: false },
+  { key: 'churchcross', categories: ['절기', '절기:사순', '십자가'], tier: 'paid', animated: false },
+  { key: 'wheatcloud', categories: ['절기', '절기:추수감사', '자연'], tier: 'paid', animated: false },
+  { key: 'bluesky', categories: ['자연'], tier: 'paid', animated: false },
+  { key: 'sunsetcloud', categories: ['자연', '빛'], tier: 'paid', animated: false },
+  { key: 'goldsea', categories: ['자연', '묵상'], tier: 'paid', animated: false },
+  { key: 'seaofclouds', categories: ['자연', '묵상'], tier: 'paid', animated: false },
+  { key: 'mistymtn', categories: ['자연', '묵상'], tier: 'paid', animated: false },
+  { key: 'forestray', categories: ['자연', '빛'], tier: 'paid', animated: false },
+  { key: 'wildflower', categories: ['자연'], tier: 'paid', animated: false },
+  { key: 'sunrays', categories: ['빛'], tier: 'paid', animated: false },
+  { key: 'clouds', categories: ['자연', '빛'], tier: 'paid', animated: true },
 ];
 
 // 필터 칩으로 보여줄 주요 분류(순서 고정). 절기 태그는 검색으로 찾게 둔다.

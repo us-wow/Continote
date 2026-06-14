@@ -92,6 +92,22 @@ const THEME_SWATCH_BG: Record<PptTheme, string> = {
   ocean: "url('/pptx-bg-ocean.jpg') center/cover",
   ripple: "url('/pptx-bg-ripple.gif') center/cover",
   candlelive: "url('/pptx-bg-candlelive.gif') center/cover",
+  dawnsea: "url('/pptx-bg-dawnsea.jpg') center/cover",
+  tomb: "url('/pptx-bg-tomb.jpg') center/cover",
+  starnight: "url('/pptx-bg-starnight.jpg') center/cover",
+  nativity: "url('/pptx-bg-nativity.jpg') center/cover",
+  stormlight: "url('/pptx-bg-stormlight.jpg') center/cover",
+  churchcross: "url('/pptx-bg-churchcross.jpg') center/cover",
+  wheatcloud: "url('/pptx-bg-wheatcloud.jpg') center/cover",
+  bluesky: "url('/pptx-bg-bluesky.jpg') center/cover",
+  sunsetcloud: "url('/pptx-bg-sunsetcloud.jpg') center/cover",
+  goldsea: "url('/pptx-bg-goldsea.jpg') center/cover",
+  seaofclouds: "url('/pptx-bg-seaofclouds.jpg') center/cover",
+  mistymtn: "url('/pptx-bg-mistymtn.jpg') center/cover",
+  forestray: "url('/pptx-bg-forestray.jpg') center/cover",
+  wildflower: "url('/pptx-bg-wildflower.jpg') center/cover",
+  sunrays: "url('/pptx-bg-sunrays.jpg') center/cover",
+  clouds: "url('/pptx-bg-clouds.gif') center/cover",
 };
 // 글자색 — lib/pptx.ts의 text 컬러와 동일. 이미지 테마는 흰 반투명 오버레이 위에 검정 잉크.
 const THEME_SWATCH_FG: Record<PptTheme, string> = {
@@ -130,9 +146,25 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
   lent: '#FFFFFF',
   ripple: '#FFFFFF',
   candlelive: '#FFFFFF',
+  dawnsea: '#1F1B16',
+  tomb: '#FFFFFF',
+  starnight: '#FFFFFF',
+  nativity: '#FFFFFF',
+  stormlight: '#FFFFFF',
+  churchcross: '#1F1B16',
+  wheatcloud: '#1F1B16',
+  bluesky: '#1F1B16',
+  sunsetcloud: '#1F1B16',
+  goldsea: '#1F1B16',
+  seaofclouds: '#1F1B16',
+  mistymtn: '#1F1B16',
+  forestray: '#1F1B16',
+  wildflower: '#1F1B16',
+  sunrays: '#1F1B16',
+  clouds: '#1F1B16',
 };
 // 흰 반투명 오버레이를 까는 실사 테마 — lib/pptx.ts와 동일 규칙 (은하수는 어두워서 제외)
-const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers', 'easter', 'harvest', 'skyglow', 'ocean'];
+const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers', 'easter', 'harvest', 'skyglow', 'ocean', 'dawnsea', 'churchcross', 'wheatcloud', 'bluesky', 'sunsetcloud', 'goldsea', 'seaofclouds', 'mistymtn', 'forestray', 'wildflower', 'sunrays'];
 const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme);
 
 // 테마 26개를 묶음별로 접었다 펼 수 있게 그룹핑.
@@ -140,15 +172,16 @@ const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme
 const THEME_GROUPS: { id: string; label: string; premium: boolean; themes: PptTheme[] }[] = [
   {
     id: 'free', label: '기본 배경(무료)', premium: false,
-    themes: ['black', 'white', 'paper', 'cross', 'bible', 'sunrise'],
+    themes: ['black', 'white', 'paper', 'cross', 'bible', 'meadow'],
   },
   {
     id: 'paidstatic', label: '유료 배경', premium: true,
-    themes: ['easter', 'christmas', 'lent', 'harvest', 'skyglow', 'ocean', 'meadow', 'godrays', 'wheat', 'sea', 'flowers', 'milkyway'],
+    themes: ['easter', 'christmas', 'lent', 'harvest', 'sunrise', 'skyglow', 'ocean', 'godrays', 'wheat', 'sea', 'flowers', 'milkyway',
+      'dawnsea', 'tomb', 'starnight', 'nativity', 'stormlight', 'churchcross', 'wheatcloud', 'bluesky', 'sunsetcloud', 'goldsea', 'seaofclouds', 'mistymtn', 'forestray', 'wildflower', 'sunrays'],
   },
   {
     id: 'motion', label: '움직이는 배경(유료)', premium: true,
-    themes: ['ripple', 'candlelive', 'light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'],
+    themes: ['ripple', 'candlelive', 'clouds', 'light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'],
   },
 ];
 // 기본 접힘 상태 — 전부 펼침 (사용자 요청: "기본 세팅이 다 보이는 게 세팅")

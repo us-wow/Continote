@@ -23,6 +23,9 @@ export type PptTheme =
   // 2026-06 추가(Pexels 상업무료) — 절기·컨셉 확장
   | 'easter' | 'christmas' | 'lent' | 'harvest' | 'skyglow' | 'ocean'
   | 'ripple' | 'candlelive'
+  | 'dawnsea' | 'tomb' | 'starnight' | 'nativity' | 'stormlight' | 'churchcross'
+  | 'wheatcloud' | 'bluesky' | 'sunsetcloud' | 'goldsea' | 'seaofclouds' | 'mistymtn'
+  | 'forestray' | 'wildflower' | 'sunrays' | 'clouds'
   | 'custom';
 
 export const PPT_THEME_LABELS: Record<PptTheme, string> = {
@@ -53,15 +56,31 @@ export const PPT_THEME_LABELS: Record<PptTheme, string> = {
   'wheat': '들녘 (황금 밀밭)',
   'sea': '바다 (새벽 수평선)',
   'flowers': '들꽃 (가을 역광)',
-  // 2026-06 추가 — 절기·컨셉(Pexels 상업무료)
-  'easter': '부활 (새벽빛)',
-  'christmas': '성탄 (촛불)',
-  'lent': '사순 (십자가)',
-  'harvest': '추수감사 (밀밭)',
-  'skyglow': '노을 (저녁 하늘)',
-  'ocean': '바다 (수평선)',
-  'ripple': '잔물결 (수면)',
-  'candlelive': '촛불빛 (흔들림)',
+  // 2026-06 추가 — 절기·컨셉(Pexels 상업무료). 이름은 짧고 자연스럽게.
+  'easter': '부활절',
+  'christmas': '성탄절',
+  'lent': '사순절',
+  'harvest': '추수감사',
+  'skyglow': '저녁노을',
+  'ocean': '수평선',
+  'ripple': '잔물결',
+  'candlelive': '촛불빛',
+  'dawnsea': '새벽바다',
+  'tomb': '빈무덤',
+  'starnight': '별밤',
+  'nativity': '구유',
+  'stormlight': '빛줄기',
+  'churchcross': '예배당',
+  'wheatcloud': '가을들녘',
+  'bluesky': '하늘',
+  'sunsetcloud': '노을구름',
+  'goldsea': '금빛바다',
+  'seaofclouds': '운해',
+  'mistymtn': '안개산',
+  'forestray': '숲빛',
+  'wildflower': '들꽃',
+  'sunrays': '햇살',
+  'clouds': '구름결',
   'custom': '내 교회 PPT (직접 등록)',
 };
 
@@ -131,6 +150,22 @@ const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
   // 움직이는 신규(영상→GIF)
   'ripple': { kind: 'image', path: '/pptx-bg-ripple.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A1420' },
   'candlelive': { kind: 'image', path: '/pptx-bg-candlelive.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '1A1206' },
+  'dawnsea': { kind: 'image', path: '/pptx-bg-dawnsea.jpg', text: '1F1B16' },
+  'tomb': { kind: 'image', path: '/pptx-bg-tomb.jpg', text: 'FFFFFF', overlay: false, fallback: '15120E' },
+  'starnight': { kind: 'image', path: '/pptx-bg-starnight.jpg', text: 'FFFFFF', overlay: false, fallback: '05060B' },
+  'nativity': { kind: 'image', path: '/pptx-bg-nativity.jpg', text: 'FFFFFF', overlay: false, fallback: '1A130A' },
+  'stormlight': { kind: 'image', path: '/pptx-bg-stormlight.jpg', text: 'FFFFFF', overlay: false, fallback: '15161B' },
+  'churchcross': { kind: 'image', path: '/pptx-bg-churchcross.jpg', text: '1F1B16' },
+  'wheatcloud': { kind: 'image', path: '/pptx-bg-wheatcloud.jpg', text: '1F1B16' },
+  'bluesky': { kind: 'image', path: '/pptx-bg-bluesky.jpg', text: '1F1B16' },
+  'sunsetcloud': { kind: 'image', path: '/pptx-bg-sunsetcloud.jpg', text: '1F1B16' },
+  'goldsea': { kind: 'image', path: '/pptx-bg-goldsea.jpg', text: '1F1B16' },
+  'seaofclouds': { kind: 'image', path: '/pptx-bg-seaofclouds.jpg', text: '1F1B16' },
+  'mistymtn': { kind: 'image', path: '/pptx-bg-mistymtn.jpg', text: '1F1B16' },
+  'forestray': { kind: 'image', path: '/pptx-bg-forestray.jpg', text: '1F1B16' },
+  'wildflower': { kind: 'image', path: '/pptx-bg-wildflower.jpg', text: '1F1B16' },
+  'sunrays': { kind: 'image', path: '/pptx-bg-sunrays.jpg', text: '1F1B16' },
+  'clouds': { kind: 'image', path: '/pptx-bg-clouds.gif', text: '1F1B16', overlay: false, animated: true, fallback: '7FA8C8' },
   // 내 교회 PPT — 이미지 데이터는 exportToPptx의 customBgData 파라미터로 받는다(path 미사용).
   // 실사 테마처럼 흰 반투명 오버레이를 깔아 "투명도를 낮추고 가사를 얹는" 효과를 낸다.
   'custom': { kind: 'image', path: '', text: '1F1B16', overlay: true },

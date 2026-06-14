@@ -22,7 +22,7 @@ import {
   type PptVAlign,
 } from '@/lib/pptx';
 import { themeVisual, vAlignToFlex, FONT_FAMILY_PREVIEW, ptToCqw, THEME_BG } from '@/lib/slide-visual';
-import { BG_CATALOG, BG_FILTER_CATEGORIES, bgMatches } from '@/lib/bg-catalog';
+import { BG_CATALOG, bgMatches } from '@/lib/bg-catalog';
 import { fileToDataUrl, CUSTOM_BG_MAX_BYTES, type CustomBg } from '@/lib/custom-bg';
 import { videoFileToGif } from '@/lib/video-to-gif';
 import type { SavedBg } from '@/lib/custom-bg-cloud';
@@ -105,8 +105,7 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [blocks, setBlocks] = useState<string[]>(() => splitTextIntoBlocks(text));
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
-  const [bgSearch, setBgSearch] = useState(''); // 배경 검색어
-  const [bgCat, setBgCat] = useState<string | null>(null); // 배경 분류 필터(칩)
+  const [bgSearch, setBgSearch] = useState(''); // 배경 검색어 (분류 칩은 제거, 검색만)
   // 배경 적용 범위 — '전체'(모든 슬라이드) vs '이 곡만'(유료, 선택한 슬라이드가 속한 곡에만).
   const [bgScope, setBgScope] = useState<'all' | 'song'>('all');
   const [converting, setConverting] = useState<{ pct: number; label: string } | null>(null);
@@ -295,11 +294,13 @@ export default function SlideStudio(props: SlideStudioProps) {
   }, []);
 
   // 배경 스와치 — 세로 패널용. 크게(90px) + 라벨. 유료=왕관, 움직이는 배경=▶움직임 배지.
-  const Swatch = ({ theme, locked, animated }: { theme: PptTheme; locked: boolean; animated?: boolean }) => (
+  const Swatch = ({ theme, locked, animated, paid }: { theme: PptTheme; locked: boolean; animated?: boolean; paid?: boolean }) => (
     <button
       type="button"
+      // 클릭 시 포커스가 스와치로 옮겨가며 화면이 스크롤되는 것 방지 — 편집창 포커스/스크롤 위치 유지.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={() => (locked ? onLockedPremium() : applyBg(theme))}
-      title={PPT_THEME_LABELS[theme] + (animated ? ' · 움직이는 배경' : '') + (locked ? ' (유료)' : '')}
+      title={PPT_THEME_LABELS[theme] + (animated ? ' · 움직이는 배경' : '') + (paid ? ' (유료)' : '')}
       aria-pressed={activeBgTheme === theme}
       style={{
         position: 'relative', width: '100%', height: 90, borderRadius: 8,
@@ -315,7 +316,7 @@ export default function SlideStudio(props: SlideStudioProps) {
           ▶ 움직임
         </span>
       )}
-      {locked && <span style={{ position: 'absolute', top: 3, right: 5 }} aria-hidden="true"><CrownMark size={15} /></span>}
+      {paid && <span style={{ position: 'absolute', top: 3, right: 5 }} aria-hidden="true"><CrownMark size={15} /></span>}
     </button>
   );
 
@@ -474,26 +475,11 @@ export default function SlideStudio(props: SlideStudioProps) {
             placeholder="배경 검색 (예: 부활, 십자가, 바다)"
             style={{ width: '100%', fontSize: 12, padding: '6px 8px', borderRadius: 7, border: '1px solid var(--rule)' }}
           />
-          {/* 분류 칩 — 전체 + 주요 컨셉 */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {[null, ...BG_FILTER_CATEGORIES].map((c) => (
-              <button
-                key={c ?? 'all'}
-                type="button"
-                onClick={() => setBgCat(c)}
-                aria-pressed={bgCat === c}
-                style={{ padding: '3px 9px', fontSize: 11, borderRadius: 999, cursor: 'pointer', border: bgCat === c ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgCat === c ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}
-              >
-                {c ?? '전체'}
-              </button>
-            ))}
-          </div>
-
-          {/* 스와치 — 검색·분류 필터 적용. 무료가 위, 유료(왕관)·움직임(▶) 배지. */}
-          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, bgCat)).map((m) => (
-            <Swatch key={m.key} theme={m.key} locked={m.tier === 'paid' && !premiumUnlocked} animated={m.animated} />
+          {/* 스와치 — 검색 필터 적용. 무료가 위, 유료=왕관·움직임=▶ 배지. (분류 칩은 뺌, 검색만) */}
+          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null)).map((m) => (
+            <Swatch key={m.key} theme={m.key} paid={m.tier === 'paid'} locked={m.tier === 'paid' && !premiumUnlocked} animated={m.animated} />
           ))}
-          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, bgCat)).length === 0 && (
+          {BG_CATALOG.filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null)).length === 0 && (
             <p style={{ fontSize: 11.5, color: 'var(--ink-3)', padding: '6px 2px' }}>검색 결과가 없어요.</p>
           )}
 

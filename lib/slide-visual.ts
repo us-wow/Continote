@@ -45,6 +45,22 @@ export const THEME_BG: Record<PptTheme, string> = {
   ocean: "url('/pptx-bg-ocean.jpg') center/cover, #A8C4D8",
   ripple: "url('/pptx-bg-ripple.gif') center/cover, #0A1420",
   candlelive: "url('/pptx-bg-candlelive.gif') center/cover, #1A1206",
+  dawnsea: "url('/pptx-bg-dawnsea.jpg') center/cover, #A9BBC6",
+  tomb: "url('/pptx-bg-tomb.jpg') center/cover, #15120E",
+  starnight: "url('/pptx-bg-starnight.jpg') center/cover, #05060B",
+  nativity: "url('/pptx-bg-nativity.jpg') center/cover, #1A130A",
+  stormlight: "url('/pptx-bg-stormlight.jpg') center/cover, #15161B",
+  churchcross: "url('/pptx-bg-churchcross.jpg') center/cover, #AEB4BD",
+  wheatcloud: "url('/pptx-bg-wheatcloud.jpg') center/cover, #C0A35A",
+  bluesky: "url('/pptx-bg-bluesky.jpg') center/cover, #8FB4D6",
+  sunsetcloud: "url('/pptx-bg-sunsetcloud.jpg') center/cover, #C99B7A",
+  goldsea: "url('/pptx-bg-goldsea.jpg') center/cover, #C79A5A",
+  seaofclouds: "url('/pptx-bg-seaofclouds.jpg') center/cover, #9AA6B4",
+  mistymtn: "url('/pptx-bg-mistymtn.jpg') center/cover, #9DB0A0",
+  forestray: "url('/pptx-bg-forestray.jpg') center/cover, #8FA08C",
+  wildflower: "url('/pptx-bg-wildflower.jpg') center/cover, #C0A06E",
+  sunrays: "url('/pptx-bg-sunrays.jpg') center/cover, #B9A98E",
+  clouds: "url('/pptx-bg-clouds.gif') center/cover, #7FA8C8",
 };
 
 // 테마별 글자색 (lib/pptx.ts THEME_CONFIG의 text 값과 일치해야 한다).
@@ -87,6 +103,22 @@ export const THEME_FG: Record<PptTheme, string> = {
   lent: '#FFFFFF',
   ripple: '#FFFFFF',
   candlelive: '#FFFFFF',
+  dawnsea: '#1F1B16',
+  tomb: '#FFFFFF',
+  starnight: '#FFFFFF',
+  nativity: '#FFFFFF',
+  stormlight: '#FFFFFF',
+  churchcross: '#1F1B16',
+  wheatcloud: '#1F1B16',
+  bluesky: '#1F1B16',
+  sunsetcloud: '#1F1B16',
+  goldsea: '#1F1B16',
+  seaofclouds: '#1F1B16',
+  mistymtn: '#1F1B16',
+  forestray: '#1F1B16',
+  wildflower: '#1F1B16',
+  sunrays: '#1F1B16',
+  clouds: '#1F1B16',
 };
 
 // 실사 이미지 테마는 흰 반투명 오버레이 위에 검정 글자 (lib/pptx.ts useOverlay 규칙과 일치).
@@ -107,6 +139,17 @@ export const THEME_OVERLAY: Partial<Record<PptTheme, string>> = {
   harvest: 'rgba(255,255,255,0.6)',
   skyglow: 'rgba(255,255,255,0.5)',
   ocean: 'rgba(255,255,255,0.6)',
+  dawnsea: 'rgba(255,255,255,0.55)',
+  churchcross: 'rgba(255,255,255,0.55)',
+  wheatcloud: 'rgba(255,255,255,0.55)',
+  bluesky: 'rgba(255,255,255,0.55)',
+  sunsetcloud: 'rgba(255,255,255,0.55)',
+  goldsea: 'rgba(255,255,255,0.55)',
+  seaofclouds: 'rgba(255,255,255,0.55)',
+  mistymtn: 'rgba(255,255,255,0.55)',
+  forestray: 'rgba(255,255,255,0.55)',
+  wildflower: 'rgba(255,255,255,0.55)',
+  sunrays: 'rgba(255,255,255,0.55)',
 };
 
 // 미리보기 글씨체를 실제 PPT 출력 폰트와 일치시킨다 (layout.tsx가 해당 웹폰트를 로드해야 함).
