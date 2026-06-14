@@ -19,13 +19,15 @@
   - 캔버스 = 실제 배경 위 투명 textarea(그 자리 편집). 엔터 두 번=슬라이드 나뉨(마지막 조각 포커스).
 - **공용 부품**: `LivePreview.tsx`(슬라이드 카드 single/strip/grid 렌더, `PreviewModal`이 grid로 사용), `Header`, `BrandMark`, `SongLibraryModal`, `PricingModal`, `OnboardingGuide`.
 
-## 4. ⭐ 배경 시스템 (카탈로그 기반)
-- **`lib/bg-catalog.ts`** = 배경 메타 SSOT: `{key, categories[], tier:'free'|'paid', animated}`. 검색·무료/유료·움직임 배지·정렬을 여기로 구동.
-- **`lib/slide-visual.ts`** = 미리보기 시각 SSOT: THEME_BG/THEME_FG/THEME_OVERLAY + themeVisual/vAlignToFlex/ptToCqw. (실제 PPT 출력 `lib/pptx.ts`를 화면으로 베낀 거울 — 어긋나면 안 됨)
-- **무료** = 단색 3(검정/흰색/종이) + 실사 3(십자가/성경책/초원). **나머지 전부 유료**(정지 실사 + 움직이는). 유료엔 왕관 SVG, 움직이는 배경엔 ▶움직임 배지.
-- **배경 정렬 고정**: 무료 → 유료 정지(그림) → 유료 움직이는 (SlideStudio `visibleBgs` sort. 카탈로그 어디 추가하든 이 순서).
-- **곡별 배경(유료)**: 배경 패널 [전체 | 이 곡만 👑] 토글. '이 곡만'=선택 슬라이드가 속한 곡에만 `songThemes` 적용(비프리미엄은 요금제).
-- ⚠️ **배경 1개 추가 = 코드 5곳 수정**: ① `pptx.ts`(PptTheme union + THEME_CONFIG + PPT_THEME_LABELS) ② `slide-visual.ts`(THEME_BG/FG/OVERLAY) ③ `PptSection.tsx`(THEME_SWATCH_BG/FG + OVERLAY_THEMES — **데드코드지만 Record<PptTheme>라 tsc 위해 키 필요**) ④ `bg-catalog.ts`. **대량 추가하려면 병목 → PptTheme를 string 기반 데이터드리븐으로 리팩터하면 1곳(catalog)만 고치면 됨**(다음 후보).
+## 4. ⭐ 배경 시스템 (단일 SSOT — 2026-06-15 데이터드리븐 리팩터 완료)
+- **`lib/bg-catalog.ts`의 `BACKGROUNDS` 배열 = 모든 배경의 단일 진실원(SSOT).** 한 배경의 모든 속성(key·label·tier·categories·animated·실제색/그림·previewColor·overlay·fallback)을 여기 한 항목에 담는다.
+- 나머지 맵은 **전부 여기서 파생**된다(직접 정의 ❌): `pptx.ts`의 `PPT_THEME_LABELS`·`THEME_CONFIG`(실제 PPT 출력), `slide-visual.ts`의 `THEME_BG/FG/OVERLAY`(미리보기 카드), `bg-catalog.ts`의 `BG_CATALOG`(패널 검색·필터·배지). `PptTheme` 타입도 `BACKGROUNDS` 키에서 파생(union 유지).
+- ✅ **이제 배경 1개 추가 = `BACKGROUNDS`에 한 줄 추가가 전부**(예전 5곳→1곳). `public/`에 이미지 넣고 항목 추가하면 끝.
+- **순회 주의**: `BACKGROUNDS`는 `as const`라 옵셔널 필드(solid/image) 접근이 막힘 → 맵 파생 시 `BG_DEFS`(BgDef[] 뷰)로 순회. 키 union은 `BACKGROUNDS`가 보존.
+- **회귀 가드**: `scripts/verify-bg-ssot.mjs` (`npx tsx`로 실행) — 파생 맵이 기대값과 일치하는지 대조. 리팩터 시 원본 리터럴과 100% 동일 확인에 사용했음.
+- **무료** = 단색 3(검정/흰색/종이) + 실사 3(십자가/성경책/초원). **나머지 전부 유료**. 유료엔 왕관 SVG, 움직이는 배경엔 ▶움직임 배지.
+- **배경 정렬 고정**: 무료 → 유료 정지 → 유료 움직이는 (SlideStudio `visibleBgs` sort. 카탈로그 순서와 무관).
+- **곡별 배경(유료)**: 배경 패널 [전체 | 이 곡만 👑] 토글. '이 곡만'=선택 슬라이드가 속한 곡에만 `songThemes` 적용.
 - **소싱 파이프라인(검증됨)**: 이미지 `curl "https://images.pexels.com/photos/{ID}/pexels-photo-{ID}.jpeg?auto=compress&w=1600"` → mime/크기 검증, 깨진 ID 폐기. 영상 `videos.pexels.com/video-files/...mp4` → `ffmpeg -t 4 -i v.mp4 -vf "fps=10,scale=900:-1,palettegen…paletteuse" -loop 0 out.gif`(6MB 이하). Pexels=상업무료·출처표기 불요. **검증된 Pexels 후보 ID 40+/영상 URL**은 워크플로우 결과 `w3q9x0g6f`에 있음. 파일 정리는 `trash`(강제삭제 명령은 훅 차단).
 
 ## 5. 핵심 동작
@@ -38,7 +40,7 @@
 ## 6. ⚠️ 주의사항 / 함정
 - **Gemini 키**: `AIza...` 형식만(AQ.키 ❌). 선불 충전식(잔액 0 → 429). Vercel 환경변수.
 - **Supabase 무료 일시중지** 가능 → 로그인/저장 실패 시 대시보드 확인.
-- **데드코드(이번에 발생)**: `PptSection.tsx`·`EditorSection.tsx`·`PreviewDock.tsx`·`SongThemePicker.tsx`·`MobileSongPicker.tsx` 전부 **미사용**(다 SlideStudio로 통합). `WorkspacePane.tsx`는 삭제됨. **PptSection은 지우거나, 안 지우면 배경 추가 때 그 안 swatch 맵도 같이 갱신 필요**(tsc 깨짐 방지). 정리 추천.
+- **데드코드 정리 완료(2026-06-15)**: `PptSection.tsx`·`EditorSection.tsx`·`PreviewDock.tsx`·`MobileSongPicker.tsx` 삭제함. ⚠️ `SongThemePicker.tsx`는 **삭제 금지** — `app/worship/page.tsx`가 실제로 씀(예전 HANDOFF가 데드코드로 잘못 적었음).
 - **OAuth**: 구글 동의화면 로고 등록 보류, 테스트 사용자 등록 필수. 콜백 `window.location.origin/auth/callback`(도메인 무관 — 커스텀 도메인 붙이면 OAuth 리디렉트 URL만 추가).
 - **iOS**: 입력칸 16px 미만이면 포커스 시 자동 확대. hover로만 보이는 요소는 첫 탭이 hover로 먹힘 → `@media (hover: none)`로 항상 노출(02 칩 적용 완료).
 - **어두운 절기 배경(빈무덤/별밤/구유)**: 흰 스크림+검정글자로 통일했는데 너무 연해 보이면 그 3개만 다시 흰글자(overlay:false)로 되돌릴 수 있음 — 사용자 피드백 대기.
@@ -59,8 +61,8 @@ git push origin main   # → Vercel 자동 배포(라이브)
 - **사업자**: 국내 KRW 결제 = 개인사업자(홈택스 무료·당일)+간이과세+토스페이먼츠 필요. **하나의 사업자로 콘티노트·북크루·합독·앱 다 커버**. 통신판매업은 간이과세 소규모면 보통 면제. 등록은 사용자가 집에서 "같이 하자" 요청 예정.
 
 ## 9. 다음 후보 (우선순위 순)
-1. **배경 데이터드리븐 리팩터** — PptTheme를 catalog 파생 string key로 → 배경 추가가 1곳(bg-catalog)만 고치면 되게. 그 후 검증된 Pexels 후보(w3q9x0g6f)로 절기/컨셉 대량 채우기.
-2. **데드코드 정리** — PptSection/EditorSection/PreviewDock/SongThemePicker/MobileSongPicker 삭제.
+1. ✅ **배경 데이터드리븐 리팩터 완료(2026-06-15)** — `BACKGROUNDS` SSOT 1곳에서 모든 맵 파생. 배경 추가 = 한 줄. → **다음: 검증된 Pexels 후보(워크플로우 결과 `w3q9x0g6f`)로 절기/컨셉 대량 채우기**가 이제 쉬워짐.
+2. ✅ **데드코드 정리 완료(2026-06-15)** — PptSection/EditorSection/PreviewDock/MobileSongPicker 삭제(SongThemePicker는 worship에서 사용 중이라 유지).
 3. **모바일 터치 마감** — 필름스트립/시트 손맛, 어두운 절기 배경 스크림 미세조정.
 4. **사업자 등록 동행** — 사용자 요청 시 개인사업자→토스 단계별, 토스 결제 연동 코드.
 5. 파킹: 중앙 저장·글로벌 공유 곡집(저작권 ❌ 영역 주의), 이미지 굽기(구글 슬라이드 대응), 팀/교회 상위 티어.

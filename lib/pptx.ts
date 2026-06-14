@@ -1,4 +1,8 @@
 import type { Slide } from './text-doc';
+import { BG_DEFS, type PptTheme } from './bg-catalog';
+
+// 테마 식별자는 배경 SSOT(lib/bg-catalog.ts)에서 파생된다. 기존 소비자 호환 위해 여기서 재노출.
+export type { PptTheme } from './bg-catalog';
 
 // 폰트 옵션 5종 — 나눔고딕이 기본(첫 외부 사용자 피드백: 가장 보기 좋다고 함)
 export type PptFont = 'nanum-gothic' | 'nanum-myeongjo' | 'noto-serif-kr' | 'nanum-square' | 'noto-sans-kr';
@@ -12,77 +16,10 @@ export const PPT_FONT_LABELS: Record<PptFont, string> = {
   'noto-sans-kr': '본고딕',
 };
 
-// 슬라이드 배경 템플릿 — 예배 분위기에 따라 선택
-// light~violet 7종 = 움직이는 홀리 배경(빛내림 + 글로우·빛망울 색 계열 6종)
-// 'custom' = 사용자가 직접 올린 교회 PPT 이미지 (유료 예정이지만 현재 전체 공개)
-export type PptTheme =
-  | 'black' | 'white' | 'paper' | 'meadow' | 'cross' | 'bible'
-  | 'sunrise' | 'milkyway' | 'godrays' | 'wheat' | 'sea' | 'flowers'
-  | 'light' | 'dawn' | 'serene' | 'green' | 'gold' | 'pink' | 'violet'
-  | 'wave' | 'mist' | 'candle' | 'grace' | 'aurora' | 'crosslight'
-  // 2026-06 추가(Pexels 상업무료) — 절기·컨셉 확장
-  | 'easter' | 'christmas' | 'lent' | 'harvest' | 'skyglow' | 'ocean'
-  | 'ripple' | 'candlelive'
-  | 'dawnsea' | 'tomb' | 'starnight' | 'nativity' | 'stormlight' | 'churchcross'
-  | 'wheatcloud' | 'bluesky' | 'sunsetcloud' | 'goldsea' | 'seaofclouds' | 'mistymtn'
-  | 'forestray' | 'wildflower' | 'sunrays' | 'clouds'
-  | 'custom';
-
-export const PPT_THEME_LABELS: Record<PptTheme, string> = {
-  'black': '검정 (어두운 예배실)',
-  'white': '흰색 (밝은 예배실)',
-  'paper': '종이 톤 (따뜻한 분위기)',
-  // 움직이는 홀리 배경 — scripts/gen-holy-bg.mjs로 생성(발표 모드에서 재생).
-  'light': '빛내림 (광선 다발)',
-  'dawn': '새벽 (따뜻한 빛망울)',
-  'serene': '푸른빛 (고요한 밤)',
-  'green': '초록빛 (깊은 숲)',
-  'gold': '금빛 (감사와 영광)',
-  'pink': '분홍빛 (따뜻한 사랑)',
-  'violet': '보랏빛 (경건한 묵상)',
-  'wave': '물결 (달빛 수면)',
-  'mist': '안개 (새벽 묵상)',
-  'candle': '촛불 (따뜻한 기도)',
-  'grace': '빛가루 (내리는 은혜)',
-  'aurora': '오로라 (밤하늘 물결)',
-  'crosslight': '십자가빛 (역광)',
-  'meadow': '초원 (실사 이미지)',
-  'cross': '십자가 (실사 이미지)',
-  'bible': '성경책 (실사 이미지)',
-  // 무료 실사 6종 — Pexels 무료 스톡 (상업 무료·출처표기 불요)
-  'sunrise': '일출 (산 위 운해)',
-  'milkyway': '은하수 (밤하늘)',
-  'godrays': '숲빛 (사이로 드는 해)',
-  'wheat': '들녘 (황금 밀밭)',
-  'sea': '바다 (새벽 수평선)',
-  'flowers': '들꽃 (가을 역광)',
-  // 2026-06 추가 — 절기·컨셉(Pexels 상업무료). 이름은 짧고 자연스럽게.
-  'easter': '부활절',
-  'christmas': '성탄절',
-  'lent': '사순절',
-  'harvest': '추수감사',
-  'skyglow': '저녁노을',
-  'ocean': '수평선',
-  'ripple': '잔물결',
-  'candlelive': '촛불빛',
-  'dawnsea': '새벽바다',
-  'tomb': '빈무덤',
-  'starnight': '별밤',
-  'nativity': '구유',
-  'stormlight': '빛줄기',
-  'churchcross': '예배당',
-  'wheatcloud': '가을들녘',
-  'bluesky': '하늘',
-  'sunsetcloud': '노을구름',
-  'goldsea': '금빛바다',
-  'seaofclouds': '운해',
-  'mistymtn': '안개산',
-  'forestray': '숲빛',
-  'wildflower': '들꽃',
-  'sunrays': '햇살',
-  'clouds': '구름결',
-  'custom': '내 교회 PPT (직접 등록)',
-};
+// 슬라이드 배경 라벨 — 배경 SSOT(BACKGROUNDS)에서 파생. UI 드롭다운·표시에 사용.
+export const PPT_THEME_LABELS = Object.fromEntries(
+  BG_DEFS.map((d) => [d.key, d.label])
+) as Record<PptTheme, string>;
 
 // 슬라이드 세로 정렬 — 가사/제목을 화면의 위/가운데/아래 어디에 둘지 선택.
 // 기본은 'middle'(가운데, 기존 동작). 예배실 스크린 위치나 하단 자막 영역에 따라 위·아래로 옮긴다.
@@ -104,72 +41,24 @@ type ThemeConfig =
   // fallback: 이미지 로드 실패 시(또는 GIF 뒤 안전망) 깔리는 단색 배경.
   | { kind: 'image'; path: string; text: string; overlay?: boolean; animated?: boolean; fallback?: string };
 
-const THEME_CONFIG: Record<PptTheme, ThemeConfig> = {
-  // 검정은 어두운 예배실 투사 환경에서 가장 높은 대비를 주기 위해 선택했다.
-  'black': { kind: 'solid', bg: '000000', text: 'FFFFFF' },
-  // 흰색은 밝은 예배실과 인쇄/공유 화면에서 깨끗하게 보이도록 선택했다.
-  'white': { kind: 'solid', bg: 'FFFFFF', text: '1F1B16' },
-  // 종이 톤은 콘티노트의 따뜻한 문서 분위기와 찬양 가사에 어울리도록 선택했다.
-  'paper': { kind: 'solid', bg: 'FAF5EC', text: '1F1B16' },
-  // gradient는 이미지 오버레이 방식과 시각 규칙을 단순화하기 위해 제거했다.
-  // 초원/십자가/성경책은 Unsplash 무료 저작권 이미지를 public/에 다운로드해서 사용한다.
-  // 이미지 위 글자 가독성을 위해 흰 반투명 레이어를 먼저 깔고 검정 글자를 올린다.
-  'meadow': { kind: 'image', path: '/pptx-bg-meadow.jpg', text: '1F1B16' },
-  'cross': { kind: 'image', path: '/pptx-bg-cross.jpg', text: '1F1B16' },
-  'bible': { kind: 'image', path: '/pptx-bg-bible.jpg', text: '1F1B16' },
-  // 무료 실사 6종(Pexels) — 밝은 사진은 흰 오버레이+검정 글자, 은하수만 어두워서 흰 글자
-  'sunrise': { kind: 'image', path: '/pptx-bg-sunrise.jpg', text: '1F1B16' },
-  'milkyway': { kind: 'image', path: '/pptx-bg-milkyway.jpg', text: 'FFFFFF', overlay: false, fallback: '060A14' },
-  'godrays': { kind: 'image', path: '/pptx-bg-godrays.jpg', text: '1F1B16' },
-  'wheat': { kind: 'image', path: '/pptx-bg-wheat.jpg', text: '1F1B16' },
-  'sea': { kind: 'image', path: '/pptx-bg-sea.jpg', text: '1F1B16' },
-  'flowers': { kind: 'image', path: '/pptx-bg-flowers.jpg', text: '1F1B16' },
-  // 움직이는 홀리 배경 7종 — GIF(scripts/gen-holy-bg.mjs v4, 4초 무한 루프).
-  // 슬라이드쇼(발표) 모드에서만 움직이고 편집 화면에선 정지로 보인다(PowerPoint 동작).
-  // 전부 어두운 배경이라 글자는 흰색, overlay 끔. fallback = 각 배경의 주조색.
-  'light': { kind: 'image', path: '/pptx-bg-light.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '04060D' },
-  'dawn': { kind: 'image', path: '/pptx-bg-dawn.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '1F0F20' },
-  'serene': { kind: 'image', path: '/pptx-bg-serene.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A142B' },
-  'green': { kind: 'image', path: '/pptx-bg-green.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A1F14' },
-  'gold': { kind: 'image', path: '/pptx-bg-gold.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '241804' },
-  'pink': { kind: 'image', path: '/pptx-bg-pink.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '260D1B' },
-  'violet': { kind: 'image', path: '/pptx-bg-violet.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '150E2E' },
-  'wave': { kind: 'image', path: '/pptx-bg-wave.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '060D1C' },
-  'mist': { kind: 'image', path: '/pptx-bg-mist.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '141B28' },
-  'candle': { kind: 'image', path: '/pptx-bg-candle.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '170E06' },
-  'grace': { kind: 'image', path: '/pptx-bg-grace.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0E0A1E' },
-  'aurora': { kind: 'image', path: '/pptx-bg-aurora.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '050A18' },
-  'crosslight': { kind: 'image', path: '/pptx-bg-crosslight.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0C0908' },
-  // 2026-06 추가 — 절기·컨셉(Pexels 상업무료). 밝은 사진=흰 오버레이+검정글자, 어두운 사진=흰글자.
-  'easter': { kind: 'image', path: '/pptx-bg-easter.jpg', text: '1F1B16' },
-  'harvest': { kind: 'image', path: '/pptx-bg-harvest.jpg', text: '1F1B16' },
-  'skyglow': { kind: 'image', path: '/pptx-bg-skyglow.jpg', text: '1F1B16' },
-  'ocean': { kind: 'image', path: '/pptx-bg-ocean.jpg', text: '1F1B16' },
-  'christmas': { kind: 'image', path: '/pptx-bg-christmas.jpg', text: '1F1B16', fallback: '120E0A' },
-  'lent': { kind: 'image', path: '/pptx-bg-lent.jpg', text: '1F1B16', fallback: '14161F' },
-  // 움직이는 신규(영상→GIF)
-  'ripple': { kind: 'image', path: '/pptx-bg-ripple.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '0A1420' },
-  'candlelive': { kind: 'image', path: '/pptx-bg-candlelive.gif', text: 'FFFFFF', overlay: false, animated: true, fallback: '1A1206' },
-  'dawnsea': { kind: 'image', path: '/pptx-bg-dawnsea.jpg', text: '1F1B16' },
-  'tomb': { kind: 'image', path: '/pptx-bg-tomb.jpg', text: '1F1B16', fallback: '15120E' },
-  'starnight': { kind: 'image', path: '/pptx-bg-starnight.jpg', text: '1F1B16', fallback: '05060B' },
-  'nativity': { kind: 'image', path: '/pptx-bg-nativity.jpg', text: '1F1B16', fallback: '1A130A' },
-  'stormlight': { kind: 'image', path: '/pptx-bg-stormlight.jpg', text: '1F1B16', fallback: '15161B' },
-  'churchcross': { kind: 'image', path: '/pptx-bg-churchcross.jpg', text: '1F1B16' },
-  'wheatcloud': { kind: 'image', path: '/pptx-bg-wheatcloud.jpg', text: '1F1B16' },
-  'bluesky': { kind: 'image', path: '/pptx-bg-bluesky.jpg', text: '1F1B16' },
-  'sunsetcloud': { kind: 'image', path: '/pptx-bg-sunsetcloud.jpg', text: '1F1B16' },
-  'goldsea': { kind: 'image', path: '/pptx-bg-goldsea.jpg', text: '1F1B16' },
-  'seaofclouds': { kind: 'image', path: '/pptx-bg-seaofclouds.jpg', text: '1F1B16' },
-  'mistymtn': { kind: 'image', path: '/pptx-bg-mistymtn.jpg', text: '1F1B16' },
-  'forestray': { kind: 'image', path: '/pptx-bg-forestray.jpg', text: '1F1B16' },
-  'wildflower': { kind: 'image', path: '/pptx-bg-wildflower.jpg', text: '1F1B16' },
-  'sunrays': { kind: 'image', path: '/pptx-bg-sunrays.jpg', text: '1F1B16' },
-  'clouds': { kind: 'image', path: '/pptx-bg-clouds.gif', text: '1F1B16', overlay: false, animated: true, fallback: '7FA8C8' },
-  // 내 교회 PPT — 이미지 데이터는 exportToPptx의 customBgData 파라미터로 받는다(path 미사용).
-  // 실사 테마처럼 흰 반투명 오버레이를 깔아 "투명도를 낮추고 가사를 얹는" 효과를 낸다.
-  'custom': { kind: 'image', path: '', text: '1F1B16', overlay: true },
-};
+// 테마별 PPT 출력 설정 — 배경 SSOT(BACKGROUNDS)에서 파생.
+// solid는 배경색+글자색, image는 경로+글자색(+오버레이/움직임/폴백).
+// 오버레이 규칙: SSOT의 image.overlay(흰 스크림)가 있으면 가독성 레이어 ON,
+//   없으면 overlay:false로 명시(그라데이션·어두운 배경은 자체 대비로 충분).
+// (export: scripts/verify-bg-ssot.mjs가 SSOT 일관성 회귀 검증에 사용)
+export const THEME_CONFIG: Record<PptTheme, ThemeConfig> = Object.fromEntries(
+  BG_DEFS.map((d) => {
+    if (d.solid) {
+      return [d.key, { kind: 'solid', bg: d.solid.bg, text: d.solid.text }];
+    }
+    const im = d.image!;
+    const cfg: Extract<ThemeConfig, { kind: 'image' }> = { kind: 'image', path: im.path, text: im.text };
+    if (!im.overlay) cfg.overlay = false; // 흰 스크림 없는 이미지는 오버레이 끔
+    if (d.animated) cfg.animated = true;
+    if (im.fallback) cfg.fallback = im.fallback;
+    return [d.key, cfg];
+  })
+) as Record<PptTheme, ThemeConfig>;
 
 // 한 슬라이드의 입력 — text-doc.ts의 Slide와 동일 구조를 그대로 재사용.
 // 이전에는 { lines: string[] }로 평탄화되어 title/memo도 lyric처럼 그려졌다 →
