@@ -1248,7 +1248,7 @@ export default function Home() {
       {/* Row 1: 1번 악보 업로드 (full width)
           Row 2: 2번 추출된 곡 | 3번 콘티 편집 (1:1 equal width — 실시간 추가 확인)
           Row 3: 4번 PPT 만들기 (full width — 슬라이드 필요한 사람만) */}
-      <main className="work-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '8px 32px 56px' }}>
+      <main className="work-main" style={{ maxWidth: 1360, margin: '0 auto', padding: '22px 32px 56px' }}>
         <UploadSection
           dragging={dragging}
           onDragOver={(e) => {
