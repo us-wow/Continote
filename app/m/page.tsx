@@ -34,10 +34,7 @@ import BrandMark from '@/components/BrandMark';
 import UploadSection from '@/components/UploadSection';
 import ExtractedSection from '@/components/ExtractedSection';
 // MobileSongPicker 제거 — 단일 스크롤에선 위 ExtractedSection의 칩으로 콘티에 추가한다.
-import EditorSection from '@/components/EditorSection';
-import PptSection from '@/components/PptSection';
-import PreviewDock from '@/components/PreviewDock';
-import SongThemePicker from '@/components/SongThemePicker';
+import SlideStudio from '@/components/SlideStudio';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
 import OnboardingGuide from '@/components/OnboardingGuide';
@@ -56,11 +53,8 @@ export default function MobilePage() {
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [text, setText] = useState<string>('');
-  // 하단 미리보기 독이 크게 보여줄 슬라이드 — 콘티 편집기에서 커서가 놓인 슬라이드를 따라간다.
-  // EditorSection이 현재 값 기준으로 환산한 슬라이드 인덱스를 onCaretChange로 직접 넘겨준다.
-  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
-  // 하단 독(fixed)의 실제 높이 — 독이 보고해주는 값. m-main 하단 여백으로 써서 마지막 콘텐츠가 안 가리게.
-  const [dockHeight, setDockHeight] = useState(0);
+  // 슬라이드 스튜디오에서 편집 중인 슬라이드 번호(데스크탑과 동일). 전체 보기에서 슬라이드 클릭 시 점프.
+  const [studioSelected, setStudioSelected] = useState(0);
 
   // 작업 중인 콘티 임시 저장 — 예배 순서 빌더(/worship)의 "방금 작업하던 콘티"가 읽어간다.
   // 데스크톱(app/page.tsx)과 같은 키·같은 규칙(0.5초 디바운스, 빈 텍스트는 건드리지 않음).
@@ -848,9 +842,8 @@ export default function MobilePage() {
       <div className="m-steps">
         {[
           { n: 1, id: 'm-sec-1', label: '업로드' },
-          { n: 2, id: 'm-sec-2', label: '곡 확인' },
-          { n: 3, id: 'm-sec-3', label: '콘티' },
-          { n: 4, id: 'm-sec-4', label: 'PPT' },
+          { n: 2, id: 'm-sec-2', label: '가사' },
+          { n: 3, id: 'm-sec-3', label: '슬라이드' },
         ].map((s) => (
           <button
             key={s.n}
@@ -867,9 +860,7 @@ export default function MobilePage() {
       </div>
 
       {/* ===== 현재 단계 본문 ===== */}
-      {/* 하단 미리보기 독(fixed)이 마지막 콘텐츠를 가리지 않게, 독이 보고한 실제 높이만큼
-          하단 여백을 확보한다. 독이 숨으면 dockHeight=0이라 여백도 0. */}
-      <main className="m-main" style={dockHeight ? { paddingBottom: dockHeight + 12 } : undefined}>
+      <main className="m-main">
         <div id="m-sec-1" style={{ scrollMarginTop: 64 }}>
           <UploadSection
             dragging={dragging}
@@ -911,112 +902,51 @@ export default function MobilePage() {
           />
         </div>
 
+        {/* 03 슬라이드 편집 — 데스크탑과 같은 SlideStudio(좁은 화면에선 목록/캔버스/배경이 세로로 쌓임).
+            기존 EditorSection+PptSection+곡별배경+하단독을 이 하나로 통합(모바일도 동일 기능·새 배경). */}
         <div id="m-sec-3" style={{ scrollMarginTop: 64 }}>
-            {/* Undo/Redo 액션 바 — 모바일엔 단축키가 없어 버튼으로 노출.
-                EditorSection은 그대로 두고 위에 별도 바를 둬서 공용 컴포넌트는 영향 없음. */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 6,
-                marginBottom: 8,
-                justifyContent: 'flex-end',
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleUndo}
-                aria-label="되돌리기"
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--rule)',
-                  background: 'var(--surface, #fff)',
-                  color: 'var(--ink-2)',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                }}
-              >
-                되돌리기
-              </button>
-              <button
-                type="button"
-                onClick={handleRedo}
-                aria-label="다시 실행"
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--rule)',
-                  background: 'var(--surface, #fff)',
-                  color: 'var(--ink-2)',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                }}
-              >
-                다시 실행
-              </button>
-            </div>
-            <EditorSection
-              text={text}
-              setText={setText}
-              // 커서 글자 offset → 슬라이드 인덱스로 바꿔 하단 독이 그 슬라이드를 크게 보여주게 함.
-              onCaretChange={(idx) => setActiveSlideIndex(idx)}
-              onClear={() => {
-                if (confirm('콘티를 모두 비울까요?')) {
-                  setText('');
-                  // 명시적으로 비울 때만 임시 저장도 삭제
-                  try { window.localStorage.removeItem('contino-working-draft'); } catch {}
-                }
-              }}
-              onCopy={handleCopy}
-              onDownloadTxt={handleSaveTxt}
-              onDownloadDocx={handleSaveDocx}
-              overflowSlideIndices={overflowSlideIndices}
-              // 모바일에선 textarea를 컨텐츠 높이만큼 자연 늘림 + 페이지 스크롤로 통일.
-              // (자체 스크롤 + transform 동기화는 모바일에서 거터 어긋남의 원인)
-              autoResize
-            />
-        </div>
-
-        <div id="m-sec-4" style={{ scrollMarginTop: 64 }}>
-          <PptSection
-            slideCount={slideCount}
-            pptFont={pptFont}
-            setPptFont={setPptFont}
+          {/* Undo/Redo — 모바일은 단축키가 없어 버튼으로 노출 */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, justifyContent: 'flex-end' }}>
+            <button type="button" onClick={handleUndo} aria-label="되돌리기"
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--rule)', background: 'var(--surface, #fff)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 14 }}>되돌리기</button>
+            <button type="button" onClick={handleRedo} aria-label="다시 실행"
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--rule)', background: 'var(--surface, #fff)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 14 }}>다시 실행</button>
+          </div>
+          <SlideStudio
+            text={text}
+            setText={setText}
+            selected={studioSelected}
+            setSelected={setStudioSelected}
             pptTheme={pptTheme}
             setPptTheme={setPptTheme}
+            pptFont={pptFont}
+            setPptFont={setPptFont}
             pptVAlign={pptVAlign}
             setPptVAlign={setPptVAlign}
-            embedFont={embedFont}
-            setEmbedFont={setEmbedFont}
+            songThemes={songThemes}
+            setSongThemes={setSongThemes}
             customBg={customBg}
-            premiumUnlocked={premiumUnlocked}
+            savedBgs={savedBgs}
             onCustomBgChange={handleCustomBgChange}
             onCustomNotice={showToast}
-            savedBgs={savedBgs}
             onSelectSaved={(bg) => {
               setCustomBg({ src: bg.url, kind: bg.kind });
               setPptTheme('custom');
             }}
             onDeleteSaved={handleDeleteSavedBg}
-            onLockedPremium={() => setPricingOpen(true)}
-            isLoggedIn={!!authUser}
-            onOpenPreview={() => setPreviewOpen(true)}
-            onDownloadPptx={handleSavePptx}
-            onCopyShareLink={handleCopyShareLink}
-            onDownloadOpenSong={handleSaveOpenSong}
-            onDownloadPlainSlides={handleSavePlainSlides}
-          />
-
-          {/* 곡별 배경(유료) — 곡 목록은 배경 그릴 때와 똑같은 buildSlidesFromText로 뽑는다. */}
-          <SongThemePicker
-            songTitles={buildSlidesFromText(text)
-              .filter((s) => s.kind === 'title')
-              .map((s) => (s.kind === 'title' ? s.title : ''))}
-            baseTheme={pptTheme}
-            songThemes={songThemes}
-            setSongThemes={setSongThemes}
             premiumUnlocked={premiumUnlocked}
             onLockedPremium={() => setPricingOpen(true)}
+            overflowSlideIndices={overflowSlideIndices}
+            onClear={() => {
+              if (confirm('콘티를 모두 비울까요?')) {
+                setText('');
+                try { window.localStorage.removeItem('contino-working-draft'); } catch {}
+              }
+            }}
+            onCopy={handleCopy}
+            onDownloadTxt={handleSaveTxt}
+            onOpenPreview={() => setPreviewOpen(true)}
+            onDownloadPptx={handleSavePptx}
           />
         </div>
       </main>
@@ -1033,34 +963,16 @@ export default function MobilePage() {
         overflowSlideIndices={overflowSlideIndices}
         customBgUrl={customBg?.src ?? null}
         customBgIsGif={customBg?.kind === 'gif'}
+        onSelectSlide={(i) => {
+          setStudioSelected(i);
+          setPreviewOpen(false);
+        }}
       />
 
       <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
 
       {/* 토스트 */}
       {toast && <div className="toast">{toast}</div>}
-
-      {/* ===== 하단 sticky 실시간 미리보기 독 =====
-          - EditorSection 바깥 형제(fixed)라 textarea autoResize/거터 동기화에 영향 없음.
-          - 배경/글씨체 빠른 칩은 setPptTheme/setPptFont 단축이고, 전체 SSOT는 위 sec-4 PptSection.
-          - TXT/복사는 기존 핸들러(handleSaveTxt/handleCopy) 재사용, 전체 보기는 PreviewModal 재사용.
-          - text가 비면 독 컴포넌트가 스스로 숨는다. */}
-      <PreviewDock
-        text={text}
-        pptTheme={pptTheme}
-        setPptTheme={setPptTheme}
-        pptFont={pptFont}
-        setPptFont={setPptFont}
-        songThemes={songThemes}
-        pptVAlign={pptVAlign}
-        customBg={customBg}
-        overflowSlideIndices={overflowSlideIndices}
-        activeSlideIndex={activeSlideIndex}
-        onCopy={handleCopy}
-        onDownloadTxt={handleSaveTxt}
-        onOpenFull={() => setPreviewOpen(true)}
-        onHeightChange={setDockHeight}
-      />
     </div>
   );
 }
