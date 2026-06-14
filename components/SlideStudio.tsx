@@ -317,7 +317,7 @@ export default function SlideStudio(props: SlideStudioProps) {
   const valignBtn = (on: boolean): React.CSSProperties => ({ padding: '4px 10px', fontSize: 12, borderRadius: 12, cursor: 'pointer', border: on ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: on ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' });
 
   return (
-    <section className="ss-root panel" aria-label="슬라이드 스튜디오" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+    <section className="ss-root panel" aria-label="슬라이드 스튜디오" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* ── 섹션 헤더 — 02 가사 편집과 같은 번호 배지 스타일로 통일 ── */}
       <div className="section-head">
         <div className="left">
