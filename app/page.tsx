@@ -1186,7 +1186,8 @@ export default function Home() {
       <section
         className="hero-section"
         style={{
-          maxWidth: 1240,
+          // 아래 본문(work-main maxWidth 1360, 좌우 패딩 32px → 내용폭 1296)과 좌우 가장자리를 맞춘다.
+          maxWidth: 1296,
           margin: '14px auto 0',
           padding: '28px 36px',
           display: 'flex',
