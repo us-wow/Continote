@@ -34,12 +34,20 @@ export const PPT_VALIGN_LABELS: Record<PptVAlign, string> = {
 
 type ThemeConfig =
   | { kind: 'solid'; bg: string; text: string }
-  // overlay: 글자 가독성용 흰 반투명 레이어 사용 여부. 실사 사진은 true(기본),
-  // 자체 대비가 충분한 그라데이션 배경은 false로 둬서 색이 흐려지지 않게 한다.
+  // overlay: 글자 가독성용 반투명 스크림 CSS rgba 문자열(흰색=밝은 배경, 검정=어두운 배경).
+  //   없으면 스크림 안 깖. 움직이는 배경도 동일하게 스크림을 깐다(아래 applyThemeBackground).
   // animated: 움직이는 GIF 배경. PowerPoint는 '배경 채우기'에 넣은 GIF를 첫 프레임
   // 정지화면으로만 보여주므로, 슬라이드 맨 뒤 전면 이미지(addImage)로 깔아야 움직인다.
   // fallback: 이미지 로드 실패 시(또는 GIF 뒤 안전망) 깔리는 단색 배경.
-  | { kind: 'image'; path: string; text: string; overlay?: boolean; animated?: boolean; fallback?: string };
+  | { kind: 'image'; path: string; text: string; overlay?: string; animated?: boolean; fallback?: string };
+
+// 'rgba(r,g,b,a)' → pptxgenjs용 { color:'RRGGBB', transparency: 0~100(%투명) }.
+function parseScrim(css: string): { color: string; transparency: number } | null {
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(css);
+  if (!m) return null;
+  const color = [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return { color, transparency: Math.round((1 - parseFloat(m[4])) * 100) };
+}
 
 // 테마별 PPT 출력 설정 — 배경 SSOT(BACKGROUNDS)에서 파생.
 // solid는 배경색+글자색, image는 경로+글자색(+오버레이/움직임/폴백).
@@ -53,7 +61,7 @@ export const THEME_CONFIG: Record<PptTheme, ThemeConfig> = Object.fromEntries(
     }
     const im = d.image!;
     const cfg: Extract<ThemeConfig, { kind: 'image' }> = { kind: 'image', path: im.path, text: im.text };
-    if (!im.overlay) cfg.overlay = false; // 흰 스크림 없는 이미지는 오버레이 끔
+    if (im.overlay) cfg.overlay = im.overlay; // 가독성 스크림(흰/검정 rgba) — 있으면 그대로
     if (d.animated) cfg.animated = true;
     if (im.fallback) cfg.fallback = im.fallback;
     return [d.key, cfg];
@@ -288,7 +296,7 @@ export async function exportToPptx(
   type ThemeRender = {
     config: ThemeConfig;
     bgData?: string;       // 배경 이미지 데이터(없으면 단색 폴백)
-    useOverlay: boolean;   // 흰 반투명 가독성 레이어 여부
+    overlayCss?: string;   // 가독성 스크림 CSS rgba(흰/검정). 없으면 스크림 안 깖.
     animatedBg: boolean;   // 움직이는 GIF 배경인지
     textColor: string;     // 글자색
     isLightText: boolean;  // 흰 글자 테마인지(이미지 로드 실패 시 폴백 배경색 결정)
@@ -300,8 +308,9 @@ export async function exportToPptx(
     const cached = themeCache.get(t);
     if (cached) return cached;
     const cfg = THEME_CONFIG[t];
-    // 흰 반투명 오버레이 — 실사 사진은 기본 ON, 그라데이션(overlay:false)은 OFF.
-    const overlay = cfg.kind === 'image' ? cfg.overlay !== false : false;
+    // 가독성 스크림(흰/검정 rgba) — SSOT의 overlay 그대로. 단, 커스텀 GIF(어두움 가정)는 스크림 생략.
+    const overlayCss =
+      cfg.kind === 'image' && !(t === 'custom' && customBgIsGif) ? cfg.overlay : undefined;
     // 흰 글자 테마인지 — 이미지 로드 실패 시 폴백 배경색을 정하는 데 쓴다.
     const lightText = cfg.kind === 'image' && cfg.text.toUpperCase() === 'FFFFFF';
     // 움직이는 배경 — 홀리 GIF 테마이거나, 사용자가 올린 커스텀 GIF(custom 테마에서만).
@@ -326,7 +335,7 @@ export async function exportToPptx(
       }
     }
     const entry: ThemeRender = {
-      config: cfg, bgData: data, useOverlay: overlay,
+      config: cfg, bgData: data, overlayCss,
       animatedBg: animated, textColor: txt, isLightText: lightText,
     };
     themeCache.set(t, entry);
@@ -345,6 +354,13 @@ export async function exportToPptx(
   // 한 슬라이드에 주어진 테마의 배경을 적용한다.
   const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>, tr: ThemeRender) => {
     const cfg = tr.config;
+    // 가독성 스크림 한 장 깔기 — 배경 이미지 위, 글자 아래. (정지·움직임 공통)
+    const addScrim = () => {
+      if (!tr.overlayCss) return;
+      const s = parseScrim(tr.overlayCss);
+      if (!s) return;
+      slide.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: s.color, transparency: s.transparency }, line: { type: 'none' } });
+    };
     if (cfg.kind === 'solid') {
       slide.background = { color: cfg.bg };
     } else if (tr.bgData && tr.animatedBg) {
@@ -354,20 +370,10 @@ export async function exportToPptx(
       // 재생은 슬라이드쇼(발표) 모드에서만 된다 — 편집 화면에선 정지로 보이는 게 정상.
       slide.background = { color: ('fallback' in cfg ? cfg.fallback : undefined) ?? '000000' };
       slide.addImage({ data: tr.bgData, x: 0, y: 0, w: 13.333, h: 7.5 });
+      addScrim(); // GIF 위에 스크림 → 움직이는 배경에서도 글자가 읽힌다.
     } else if (tr.bgData) {
       slide.background = { data: tr.bgData };
-      // 실사 이미지는 글자 가독성을 위해 흰 반투명 레이어를 깐다.
-      // 그라데이션 배경은 자체 대비가 충분해 레이어를 생략(useOverlay=false)한다.
-      if (tr.useOverlay) {
-        slide.addShape('rect', {
-          x: 0,
-          y: 0,
-          w: 13.333,
-          h: 7.5,
-          fill: { color: 'FFFFFF', transparency: 35 },
-          line: { type: 'none' },
-        });
-      }
+      addScrim(); // 실사 이미지 위 가독성 스크림(흰=밝은 배경 / 검정=어두운 배경).
     } else {
       // 이미지 로드 실패 시 글자색과 대비되는 단색으로 폴백 (흰 글자면 어두운 배경).
       slide.background = { color: tr.isLightText ? '111111' : 'FFFFFF' };

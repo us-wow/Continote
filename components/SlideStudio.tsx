@@ -47,11 +47,12 @@ function toRaw(type: SlideType, content: string): string {
 function slideForBlock(raw: string): Slide {
   return buildSlidesFromText(raw)[0] ?? ({ kind: 'lyric', lines: [''] } as Slide);
 }
-// 노란 선 각진 왕관(유료 표시) — 이모지 대신 브랜드 통일 마크.
-function CrownMark({ size = 14 }: { size?: number }) {
+// 노란 각진 왕관(유료 표시) — 이모지 대신 브랜드 통일 마크.
+// filled=true(즐겨찾기됨)면 속을 금빛으로 채워 북마크처럼 보인다.
+function CrownMark({ size = 14, filled = false }: { size?: number; filled?: boolean }) {
   return (
     <svg width={size} height={Math.round(size * (21 / 24))} viewBox="0 0 24 21" fill="none" aria-label="유료" style={{ display: 'inline-block', verticalAlign: '-2px', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))' }}>
-      <path d="M3 18 L3 6 L8.5 10.5 L12 3 L15.5 10.5 L21 6 L21 18 Z" stroke="#F2C14E" strokeWidth="2.2" strokeLinejoin="miter" fill="none" />
+      <path d="M3 18 L3 6 L8.5 10.5 L12 3 L15.5 10.5 L21 6 L21 18 Z" stroke="#F2C14E" strokeWidth="2.2" strokeLinejoin="miter" fill={filled ? '#F2C14E' : 'none'} />
     </svg>
   );
 }
@@ -108,6 +109,22 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [bgSearch, setBgSearch] = useState(''); // 배경 검색어 (분류 칩은 제거, 검색만)
   const [isNarrow, setIsNarrow] = useState(false); // 모바일(좁은 화면) 여부 → 캔버스 중심 레이아웃
   const [decorOpen, setDecorOpen] = useState(false); // 모바일 '꾸미기' 시트(배경·글씨체·정렬) 열림
+
+  // 즐겨찾기(유료) — 금빛 마크를 누르면 북마크처럼 채워지고 그 배경이 목록 맨 위로 올라온다.
+  // 기기에 저장(localStorage)해서 새로고침해도 유지. (서버 저장은 결제 도입 때 묶어서)
+  const [bookmarks, setBookmarks] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem('contionote.bgBookmarks') || '[]'); } catch { return []; }
+  });
+  const isBookmarked = (k: string) => bookmarks.includes(k);
+  const toggleBookmark = (k: string) => {
+    if (!premiumUnlocked) { onLockedPremium(); return; } // 즐겨찾기는 유료 기능
+    setBookmarks((prev) => {
+      const next = prev.includes(k) ? prev.filter((x) => x !== k) : [k, ...prev];
+      try { localStorage.setItem('contionote.bgBookmarks', JSON.stringify(next)); } catch { /* 저장 실패 무시 */ }
+      return next;
+    });
+  };
 
   // 화면 폭 감지 — 760px 이하면 모바일 전용 레이아웃.
   useEffect(() => {
@@ -183,10 +200,13 @@ export default function SlideStudio(props: SlideStudioProps) {
         .filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null))
         .sort(
           (a, b) =>
+            // 즐겨찾기(북마크)한 배경을 맨 위로 → 그다음 무료→유료정지→유료움직임 순.
+            ((isBookmarked(b.key) ? 1 : 0) - (isBookmarked(a.key) ? 1 : 0)) ||
             (a.tier === 'paid' ? 1 : 0) - (b.tier === 'paid' ? 1 : 0) ||
             (a.animated ? 1 : 0) - (b.animated ? 1 : 0)
         ),
-    [bgSearch]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bgSearch, bookmarks]
   );
 
   // 지금 선택한 슬라이드가 속한 곡의 순번(0번부터). title 슬라이드를 세어 구한다(없으면 -1).
@@ -349,14 +369,26 @@ export default function SlideStudio(props: SlideStudioProps) {
         cursor: 'pointer', opacity: locked ? 0.6 : 1, flex: '0 0 auto',
       }}
     >
-      <span style={swatchLabel}>{PPT_THEME_LABELS[theme].split(' ')[0]}</span>
+      {/* 이름(라벨)은 화면에 안 띄운다 — 카드는 깔끔하게, 검색으로만 찾게(title 툴팁엔 남김). */}
       {/* 움직이는 배경 표시 — 좌상단 ▶ 배지(정적 배경과 구분). 유료 잠금과 별개로 항상 표시. */}
       {animated && (
         <span style={{ position: 'absolute', top: 4, left: 4, display: 'inline-flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 999 }}>
           ▶ 움직임
         </span>
       )}
-      {paid && <span style={{ position: 'absolute', top: 3, right: 5 }} aria-hidden="true"><CrownMark size={15} /></span>}
+      {/* 금빛 왕관 = 유료 표시 + 즐겨찾기 토글. 한 번 더 누르면 채워지며(북마크) 목록 맨 위로. */}
+      {paid && (
+        <span
+          role="button"
+          tabIndex={-1}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => { e.stopPropagation(); toggleBookmark(theme); }}
+          title={isBookmarked(theme) ? '즐겨찾기 해제' : '즐겨찾기 — 맨 위로 고정 (유료)'}
+          style={{ position: 'absolute', top: 2, right: 3, padding: 3, cursor: 'pointer', lineHeight: 0 }}
+        >
+          <CrownMark size={16} filled={isBookmarked(theme)} />
+        </span>
+      )}
     </button>
   );
 
