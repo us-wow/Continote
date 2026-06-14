@@ -142,15 +142,15 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
   harvest: '#1F1B16',
   skyglow: '#1F1B16',
   ocean: '#1F1B16',
-  christmas: '#FFFFFF',
-  lent: '#FFFFFF',
+  christmas: '#1F1B16',
+  lent: '#1F1B16',
   ripple: '#FFFFFF',
   candlelive: '#FFFFFF',
   dawnsea: '#1F1B16',
-  tomb: '#FFFFFF',
-  starnight: '#FFFFFF',
-  nativity: '#FFFFFF',
-  stormlight: '#FFFFFF',
+  tomb: '#1F1B16',
+  starnight: '#1F1B16',
+  nativity: '#1F1B16',
+  stormlight: '#1F1B16',
   churchcross: '#1F1B16',
   wheatcloud: '#1F1B16',
   bluesky: '#1F1B16',
@@ -164,7 +164,7 @@ const THEME_SWATCH_FG: Record<PptTheme, string> = {
   clouds: '#1F1B16',
 };
 // 흰 반투명 오버레이를 까는 실사 테마 — lib/pptx.ts와 동일 규칙 (은하수는 어두워서 제외)
-const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers', 'easter', 'harvest', 'skyglow', 'ocean', 'dawnsea', 'churchcross', 'wheatcloud', 'bluesky', 'sunsetcloud', 'goldsea', 'seaofclouds', 'mistymtn', 'forestray', 'wildflower', 'sunrays'];
+const OVERLAY_THEMES: PptTheme[] = ['meadow', 'cross', 'bible', 'sunrise', 'godrays', 'wheat', 'sea', 'flowers', 'easter', 'harvest', 'skyglow', 'ocean', 'dawnsea', 'churchcross', 'wheatcloud', 'bluesky', 'sunsetcloud', 'goldsea', 'seaofclouds', 'mistymtn', 'forestray', 'wildflower', 'sunrays', 'christmas', 'lent', 'tomb', 'starnight', 'nativity', 'stormlight'];
 const isImageTheme = (theme: PptTheme): boolean => OVERLAY_THEMES.includes(theme);
 
 // 테마 26개를 묶음별로 접었다 펼 수 있게 그룹핑.

@@ -525,6 +525,15 @@ function SectionChipCard({
   const [linesText, setLinesText] = useState(section.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
+  // 콘티에 추가됐다는 피드백 — 탭할 때마다 "✓ N번 추가"를 잠깐 띄운다(몇 번 넣었는지 보이게).
+  const [addedCount, setAddedCount] = useState(0);
+  const flashTimerRef = useRef<number | null>(null);
+  const handleAdd = () => {
+    onAdd();
+    setAddedCount((c) => c + 1);
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setAddedCount(0), 1600) as unknown as number;
+  };
 
   // section 외부 변경 시 draft 동기화
   useEffect(() => {
@@ -679,9 +688,24 @@ function SectionChipCard({
     <button
       type="button"
       className="sec-chip"
-      onClick={onAdd}
+      onClick={handleAdd}
       aria-label={`${index}번 묶음 콘티에 추가`}
+      style={{ position: 'relative' }}
     >
+      {/* 추가 피드백 — 탭 직후 잠깐. 몇 번 넣었는지(N번) 표시. */}
+      {addedCount > 0 && (
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute', top: 6, right: 6, zIndex: 3,
+            background: 'var(--accent, #0f766e)', color: '#fff',
+            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+          }}
+        >
+          ✓ {addedCount}번 추가
+        </span>
+      )}
       <div className="sec-chip-head">
         <span className="sec-num">{index}</span>
         {/* 오타 의심 빨간 점 */}

@@ -957,6 +957,12 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .sec-chip:hover .sec-add-icon {
   opacity: 1;
 }
+/* 터치 기기(hover 없음): hover로만 나타나던 +추가·✎ 아이콘을 항상 보이게.
+   → 첫 탭이 'hover'로 소비되어 두 번 눌러야 하던 iOS 버그 방지(한 번 탭에 콘티 추가). */
+@media (hover: none) {
+  .sec-add-icon { opacity: 0.92; }
+  .sec-edit-btn { opacity: 0.8; }
+}
 .sec-preview {
   font-family: var(--font-display);
   font-size: 13px;
@@ -2823,7 +2829,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 .m-brand-name {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -2831,22 +2837,39 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 .m-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 .m-icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--rule);
   background: var(--surface);
   color: var(--ink-2);
-  font-size: 14px;
+  font-size: 18px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .m-icon-btn:hover { color: var(--ink); border-color: var(--rule-2); }
+/* 헤더 구글 로그인 버튼 — 맨 앞 노출 */
+.m-login-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.m-login-btn:hover { border-color: var(--rule-2); }
+.m-login-btn:disabled { opacity: 0.5; }
 
 /* 단계 indicator */
 .m-steps {

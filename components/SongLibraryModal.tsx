@@ -184,8 +184,9 @@ export default function SongLibraryModal({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="곡 제목 또는 가사 검색"
-          autoFocus
-          style={{ fontSize: 14, marginBottom: 18 }}
+          // 모바일 iOS는 입력칸 글자가 16px 미만이면 포커스 시 화면을 자동 확대한다 → 16px로 막음.
+          // autoFocus도 제거: 모바일에서 열자마자 키보드가 튀어 확대/가림이 생기던 문제 방지.
+          style={{ fontSize: 16, marginBottom: 18 }}
         />
 
         {loading ? (
