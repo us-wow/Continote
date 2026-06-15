@@ -255,8 +255,10 @@ export async function exportToPptx(
   customBgIsGif?: boolean,
   // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 곡 경계는 title 슬라이드(# 제목)로 센다.
   // 비어 있거나 해당 곡이 undefined면 기본 theme를 쓴다 → 기존 동작과 100% 호환.
-  songThemes?: (PptTheme | undefined)[]
-): Promise<void> {
+  songThemes?: (PptTheme | undefined)[],
+  // true면 파일을 받지 않고 Blob을 돌려준다(공유 버튼용 — navigator.share에 파일로 넘김).
+  asBlob: boolean = false
+): Promise<void | Blob> {
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
   const pptxgen = (await import('pptxgenjs')).default;
@@ -483,12 +485,15 @@ export async function exportToPptx(
     try {
       finalBlob = await dedupeGifMedia(blob);
     } catch (err) {
-      console.warn('GIF 중복 제거 실패 → 원본 그대로 다운로드(파일이 클 수 있음):', err);
+      console.warn('GIF 중복 제거 실패 → 원본 그대로(파일이 클 수 있음):', err);
     }
+    if (asBlob) return finalBlob; // 공유용 — 다운로드 대신 파일 반환
     downloadBlob(finalBlob, fileName);
     return;
   }
 
+  // 공유용: 다운로드 대신 Blob 반환.
+  if (asBlob) return (await (pres as any).write({ outputType: 'blob' })) as Blob;
   // 브라우저 환경에서는 pptxgenjs의 writeFile이 다운로드 처리를 맡는다.
   await pres.writeFile({ fileName });
 }

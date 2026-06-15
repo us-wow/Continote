@@ -889,6 +889,37 @@ export default function Home() {
     }
   };
 
+  // 즉시 공유 — 만든 PPT 파일을 네이티브 공유 시트로(모바일: 카톡·메일·드라이브 등).
+  // 파일 공유 미지원 기기(주로 데스크탑)는 다운로드로 폴백.
+  const handleSharePptx = async () => {
+    const slides = buildPptSlides();
+    if (slides.length === 0) { showToast('PPT로 만들 슬라이드가 없어요'); return; }
+    if (overflowSlideIndices.length > 0) {
+      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
+      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인하세요`);
+      return;
+    }
+    const fname = `contionote-${Date.now()}.pptx`;
+    try {
+      const blob = (await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes, true)) as Blob;
+      const file = new File([blob], fname, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+      const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
+        return;
+      }
+      // 폴백: 이 기기는 파일 즉시 공유 미지원 → 다운로드로 대체
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      showToast('이 기기는 즉시 공유가 안 돼 다운로드했어요 — 받은 파일을 공유하세요');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return; // 사용자가 공유 시트를 닫음
+      showToast('공유 준비 실패 — 다시 시도해 주세요');
+    }
+  };
+
   const handleSavePlainSlides = () => {
     const slides = buildPptSlides();
     if (slides.length === 0) {
@@ -1318,6 +1349,7 @@ export default function Home() {
             onDownloadTxt={handleSaveTxt}
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
+            onSharePptx={handleSharePptx}
           />
         </div>
 
