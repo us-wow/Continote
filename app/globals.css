@@ -3144,4 +3144,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 @media (max-width: 760px) {
   /* 모바일급: 스튜디오 내부를 세로로 (목록→캔버스→배경) */
   .ss-grid { grid-template-columns: 1fr !important; }
+
+  /* iOS Safari는 16px 미만 입력에 포커스 시 화면을 확대(zoom)한다 → 막는다.
+     select·검색창만 16px로 강제(인라인보다 우선). 캔버스 가사는 textarea(cqw 단위)라 제외해 글씨 크기 안 깨짐. */
+  select,
+  input[type="search"] { font-size: 16px !important; }
 }
