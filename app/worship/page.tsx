@@ -42,7 +42,7 @@ import {
 const THEME_GROUPS: { label: string; themes: PptTheme[] }[] = [
   { label: '단색', themes: ['black', 'white', 'paper'] },
   { label: '움직이는 홀리 배경', themes: ['light', 'dawn', 'serene', 'green', 'gold', 'pink', 'violet', 'wave', 'mist', 'candle', 'grace', 'aurora', 'crosslight'] },
-  { label: '실사 사진', themes: ['meadow', 'cross', 'bible', 'sunrise', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'] },
+  { label: '실사 사진', themes: ['meadow', 'cross', 'bible', 'milkyway', 'godrays', 'wheat', 'sea', 'flowers'] },
 ];
 const FONT_OPTIONS: { value: PptFont; label: string }[] = [
   { value: 'nanum-gothic', label: '나눔고딕' },
