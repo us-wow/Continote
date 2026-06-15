@@ -73,18 +73,6 @@ export function splitTextIntoBlocks(text: string): string[] {
     .filter((b) => b.trim().length > 0);
 }
 
-// 커서 위치(글자 offset) → 그 위치가 속한 슬라이드 인덱스(0-base).
-// 실시간 미리보기가 "커서 있는 슬라이드"를 따라가게 하는 데 쓴다.
-// 원리: 커서 앞쪽 텍스트만 잘라 슬라이드로 변환하면, 그 개수-1 = 커서가 있는(또는 직전) 슬라이드.
-// buildSlidesFromText와 같은 분리 규칙을 쓰므로 미리보기 곡 순번과도 정확히 맞는다.
-export function slideIndexAtOffset(text: string, caretOffset: number): number {
-  if (!text) return 0;
-  text = text.replace(/\r\n?/g, '\n'); // 줄끝 정규화 — 커서→슬라이드 인덱스 계산도 분리 규칙과 일치
-  const before = text.slice(0, Math.max(0, caretOffset));
-  const count = buildSlidesFromText(before).length;
-  return Math.max(0, count - 1);
-}
-
 // 곡 전체를 편집기 텍스트로 변환 (제목 + 2줄씩 그룹핑된 가사)
 // 기존 page.tsx의 groupLinesByTwo 동작을 텍스트 모델에 그대로 적용한다.
 export function songToText(song: Song): string {
@@ -137,13 +125,6 @@ export function memoToText(body: string): string {
     .filter(Boolean)
     .map((l) => `> ${l}`)
     .join('\n');
-}
-
-// 슬라이드 분리자 추가 (기존 "+ 슬라이드 구분" 버튼 대응)
-// 빈 paragraph 하나만 더 끼우면 같은 효과.
-export function appendBreak(existing: string): string {
-  if (!existing) return existing;
-  return existing.replace(/\n+$/, '') + '\n\n';
 }
 
 // ───────── 마이그레이션: 기존 Block[] → text 변환 ─────────

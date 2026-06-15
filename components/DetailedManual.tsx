@@ -5,7 +5,8 @@
 // OnboardingGuide(그림 캐러셀)는 "처음 흐름만 빠르게", 이 설명서는 "각 부분 자세히".
 // 내용은 항상 현재 앱 기준으로 정확하게 적는다(없어진 기능 설명 금지 — 예전 도움말의 실수 반복 X).
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 
 // 한 묶음 섹션 — 소제목 + 내용.
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -44,6 +45,8 @@ function List({ items }: { items: React.ReactNode[] }) {
 }
 
 export default function DetailedManual({ onClose }: { onClose: () => void }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
   // ESC로 닫기
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -71,6 +74,7 @@ export default function DetailedManual({ onClose }: { onClose: () => void }) {
       }}
     >
       <div
+        ref={cardRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--paper)',

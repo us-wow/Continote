@@ -263,9 +263,6 @@ export const BG_CATALOG: BgMeta[] = BG_DEFS.filter((d) => !d.hidden).map((d) => 
   animated: d.animated === true,
 }));
 
-// 필터 칩으로 보여줄 주요 분류(순서 고정). 절기 세부 태그는 검색으로 찾게 둔다.
-export const BG_FILTER_CATEGORIES = ['절기', '자연', '빛', '십자가', '묵상', '예배', '단색'];
-
 // 한 배경이 검색어/분류에 맞는지 — label은 호출부에서 PPT_THEME_LABELS로 넘긴다.
 export function bgMatches(meta: BgMeta, label: string, query: string, category: string | null): boolean {
   if (category && !meta.categories.includes(category)) return false;

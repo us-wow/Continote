@@ -16,8 +16,9 @@
 // 왜 캐러셀인가: 긴 글 목록은 초보자가 안 읽는다. 한 장에 "그림 1 + 한 줄"만.
 //   (찬양팀 로테이션 앱의 단계별 온보딩 방식을 콘티노트에 맞춰 차용)
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DetailedManual from './DetailedManual';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 
 // 한 장(슬라이드) = 소개(intro) 또는 단계(step).
 // step일 때만 num이 있어 "STEP 2 / 4"처럼 보여준다.
@@ -39,6 +40,8 @@ export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
   const [showManual, setShowManual] = useState(false);
   const isLast = step === SLIDES.length - 1;
   const current = SLIDES[step];
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
 
   // ESC 키로 닫기 — 다른 모달과 동일한 약속.
   useEffect(() => {
@@ -69,6 +72,7 @@ export default function OnboardingGuide({ onClose }: { onClose: () => void }) {
     >
       {/* 카드 — 배경 클릭은 닫힘이지만 카드 안 클릭은 막는다(stopPropagation). */}
       <div
+        ref={cardRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--paper)',

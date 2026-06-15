@@ -56,14 +56,3 @@ export function removeFromLibrary(id: string): void {
     JSON.stringify(all.filter((s) => s.id !== id))
   );
 }
-
-// 제목 + 섹션 text 모두에서 검색 (대소문자/공백 무시).
-export function searchLibrary(query: string): LibrarySong[] {
-  const q = query.trim().toLowerCase().replace(/\s+/g, '');
-  if (!q) return listLibrary();
-  return listLibrary().filter((s) => {
-    if (s.title.toLowerCase().replace(/\s+/g, '').includes(q)) return true;
-    if (s.sections.some((sec) => sec.text.toLowerCase().replace(/\s+/g, '').includes(q))) return true;
-    return false;
-  });
-}

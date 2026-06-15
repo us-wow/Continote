@@ -3,7 +3,8 @@
 // 요금제 안내 모달 — 잠긴 유료 기능(왕관)을 누르면 열린다.
 // 아직 결제는 오픈 전이라 "준비 중" 안내까지만. 결제 연동 시 CTA를 결제 버튼으로 교체.
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 
 type PricingModalProps = {
   open: boolean;
@@ -25,6 +26,8 @@ const ROWS: [string, string, string][] = [
 ];
 
 export default function PricingModal({ open, onClose }: PricingModalProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, open); // 열려 있을 때만 포커스를 모달 안에 가둠
   // ESC로 닫기
   useEffect(() => {
     if (!open) return;
@@ -50,6 +53,7 @@ export default function PricingModal({ open, onClose }: PricingModalProps) {
       }}
     >
       <div
+        ref={cardRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--paper)', borderRadius: 'var(--radius-lg)',

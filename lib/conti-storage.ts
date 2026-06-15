@@ -61,24 +61,3 @@ export function removeSet(id: string): void {
   const next = all.filter((s) => s.id !== id);
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
-
-// 사람이 읽기 좋은 시각 표기 (예: "오늘 14:32" / "어제" / "4월 28일")
-export function formatSavedAt(ms: number): string {
-  const d = new Date(ms);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return `오늘 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    d.getFullYear() === yesterday.getFullYear() &&
-    d.getMonth() === yesterday.getMonth() &&
-    d.getDate() === yesterday.getDate();
-  if (isYesterday) return '어제';
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
