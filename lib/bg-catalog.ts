@@ -80,8 +80,6 @@ export const BACKGROUNDS = [
     image: { path: '/pptx-bg-cross.jpg', text: '1F1B16', previewColor: '#1a140e', overlay: 'rgba(255,255,255,0.62)' } },
   { key: 'bible', label: '성경책 (실사 이미지)', tier: 'free', categories: ['예배'],
     image: { path: '/pptx-bg-bible.jpg', text: '1F1B16', previewColor: '#c19b6e', overlay: 'rgba(255,255,255,0.62)' } },
-  { key: 'sunrise', label: '일출 (산 위 운해)', tier: 'paid', categories: ['자연', '빛'],
-    image: { path: '/pptx-bg-sunrise.jpg', text: '1F1B16', previewColor: '#E8C8A0', overlay: 'rgba(255,255,255,0.45)' } },
   { key: 'milkyway', label: '은하수 (밤하늘)', tier: 'paid', categories: ['자연', '묵상'],
     image: { path: '/pptx-bg-milkyway.jpg', text: 'FFFFFF', previewColor: '#060A14', fallback: '060A14', overlay: 'rgba(0,0,0,0.5)' } },
   { key: 'godrays', label: '숲빛 (사이로 드는 해)', tier: 'paid', categories: ['자연', '빛'],
