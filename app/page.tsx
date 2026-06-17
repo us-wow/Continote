@@ -41,7 +41,7 @@ import type { User } from '@supabase/supabase-js';
 import type { Song, Section, SectionType } from '@/lib/types';
 import { attachRefChecks } from '@/lib/reference-lyrics';
 import { canUseCustomBg, checkPremiumAccess, type CustomBg } from '@/lib/custom-bg';
-import { BETA_ALL_FREE } from '@/lib/beta';
+import { BETA_ALL_FREE, SHOW_WORSHIP_BUILDER } from '@/lib/beta';
 import { listMyBackgrounds, saveBackground, deleteBackground, type SavedBg } from '@/lib/custom-bg-cloud';
 import Mascot from '@/components/Mascot';
 // SectionChip은 Phase 3에서 ExtractedSection 컴포넌트 내부로 이관됨 — page.tsx에선 import 안 함.
@@ -1225,8 +1225,8 @@ export default function Home() {
             sub="추출한 곡 재사용"
             onClick={() => { setShowMenu(false); setShowLibrary(true); }}
           />
-          {/* 예배 순서 빌더 — 유료 예정. 운영자/프리미엄에게만 메뉴 노출 (/worship 자체도 게이트 있음) */}
-          {premiumUnlocked && (
+          {/* 예배 순서 빌더 — 개발 중이라 숨김(SHOW_WORSHIP_BUILDER). 완성되면 노출. */}
+          {SHOW_WORSHIP_BUILDER && (
             <MenuItem
               label="예배 순서 빌더"
               sub="예배 전체 PPT 한 번에 (미리보기)"
@@ -1381,7 +1381,9 @@ export default function Home() {
 
         {/* Row 4: 예배 순서 빌더 진입 — PPT 만들기 바로 아래 항상 노출(유료=왕관).
             프리미엄이면 빌더로 이동, 아니면 가격 모달을 띄워 "유료 기능"임을 안내한다.
-            작업 중 콘티는 상단의 디바운스 effect가 localStorage에 자동 저장 → 빌더가 읽어간다. */}
+            작업 중 콘티는 상단의 디바운스 effect가 localStorage에 자동 저장 → 빌더가 읽어간다.
+            (SHOW_WORSHIP_BUILDER=false: 개발 중이라 진입점 숨김 — 라우트는 살아있어 직접 URL 테스트 가능) */}
+        {SHOW_WORSHIP_BUILDER && (
         <button
           type="button"
           className="worship-entry-card"
@@ -1421,6 +1423,7 @@ export default function Home() {
             {premiumUnlocked ? '열기 →' : '미리보기 →'}
           </span>
         </button>
+        )}
       </main>
 
       {/* PPT 전체 미리보기 모달 — 04 PptSection의 "전체 미리보기" 버튼이 트리거 */}

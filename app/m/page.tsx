@@ -18,7 +18,7 @@ import type { User } from '@supabase/supabase-js';
 import type { Song } from '@/lib/types';
 import { attachRefChecks } from '@/lib/reference-lyrics';
 import { canUseCustomBg, checkPremiumAccess, type CustomBg } from '@/lib/custom-bg';
-import { BETA_ALL_FREE } from '@/lib/beta';
+import { BETA_ALL_FREE, SHOW_WORSHIP_BUILDER } from '@/lib/beta';
 import { listMyBackgrounds, saveBackground, deleteBackground, type SavedBg } from '@/lib/custom-bg-cloud';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
@@ -1116,13 +1116,15 @@ function MobileMenuSheet({
 
           {/* 곡 라이브러리 항목 제거 — 이제 악보 업로드 영역의 '라이브러리' 버튼으로 접근. */}
 
-          {/* 예배 순서 빌더 — 유료(왕관). 프리미엄이면 /worship, 아니면 요금제 안내 */}
-          <button type="button" className="m-sheet-item" onClick={onOpenWorship}>
-            <span className="m-sheet-item-label">예배 순서 빌더</span>
-            <span className="m-sheet-item-sub">
-              {premiumUnlocked ? '예배 순서 전체를 한 PPT로' : '유료 기능 — 미리보기'}
-            </span>
-          </button>
+          {/* 예배 순서 빌더 — 개발 중이라 숨김(SHOW_WORSHIP_BUILDER). 완성되면 노출. */}
+          {SHOW_WORSHIP_BUILDER && (
+            <button type="button" className="m-sheet-item" onClick={onOpenWorship}>
+              <span className="m-sheet-item-label">예배 순서 빌더</span>
+              <span className="m-sheet-item-sub">
+                {premiumUnlocked ? '예배 순서 전체를 한 PPT로' : '유료 기능 — 미리보기'}
+              </span>
+            </button>
+          )}
 
           {supabaseEnabled && (
             <div className="m-sheet-auth">
