@@ -345,12 +345,7 @@ export default function Home() {
           migrateSongLibraryToCloud(),
           migrateTemplatesToCloud(),
         ])
-          .then(([conti, songs, templates]) => {
-            const total = conti.migrated + songs.migrated + templates.migrated;
-            if (total > 0) {
-              showToast('이전에 쓰던 작업을 계정으로 옮겼어요');
-            }
-          })
+          // 로컬→클라우드 마이그레이션은 조용히(알림 없이) 처리한다 — 사용자가 신경 쓸 일 아님.
           .catch((err) => console.error('[migrate] 실패:', err));
       }
     });

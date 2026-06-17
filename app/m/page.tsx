@@ -347,12 +347,7 @@ export default function MobilePage() {
           migrateSongLibraryToCloud(),
           migrateTemplatesToCloud(),
         ])
-          .then(([conti, songsR, templates]) => {
-            const total = conti.migrated + songsR.migrated + templates.migrated;
-            if (total > 0) {
-              showToast('이전에 쓰던 작업을 계정으로 옮겼어요');
-            }
-          })
+          // 로컬→클라우드 마이그레이션은 조용히(알림 없이) 처리.
           .catch((err) => console.error('[migrate] 실패:', err));
       }
     });
@@ -1116,11 +1111,7 @@ function MobileMenuSheet({
             <span className="m-sheet-item-sub">4단계로 보는 그림 가이드</span>
           </button>
 
-          {/* 곡 라이브러리 — 한 번 추출한 곡을 다시 불러와 콘티에 추가 */}
-          <button type="button" className="m-sheet-item" onClick={onOpenLibrary}>
-            <span className="m-sheet-item-label">곡 라이브러리</span>
-            <span className="m-sheet-item-sub">저장된 곡 검색해서 다시 추가</span>
-          </button>
+          {/* 곡 라이브러리 항목 제거 — 이제 악보 업로드 영역의 '라이브러리' 버튼으로 접근. */}
 
           {/* 예배 순서 빌더 — 유료(왕관). 프리미엄이면 /worship, 아니면 요금제 안내 */}
           <button type="button" className="m-sheet-item" onClick={onOpenWorship}>

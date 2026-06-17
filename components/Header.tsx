@@ -90,24 +90,7 @@ export default function Header({
             <span className="nav-label">사용법</span>
           </button>
 
-          <button
-            type="button"
-            className="btn btn-text"
-            onClick={onOpenMenu}
-            aria-label="내 보관함 열기"
-            title="내 보관함"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M2 4.5 C2 3.7 2.7 3 3.5 3 H6.2 L7.4 4.2 H12.5 C13.3 4.2 14 4.9 14 5.7 V12 C14 12.8 13.3 13.5 12.5 13.5 H3.5 C2.7 13.5 2 12.8 2 12 Z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="nav-label">내 보관함</span>
-          </button>
+          {/* '내 보관함' 제거 — 곡 라이브러리는 업로드 영역 옆, 예배 순서 빌더는 하단으로 이동해 메뉴가 비었음. */}
 
           {supabaseEnabled && (
             <>
