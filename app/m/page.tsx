@@ -958,6 +958,8 @@ export default function MobilePage() {
             progressStep={progressStep}
             hasResult={hasResult}
             onExtract={handleExtract}
+            loggedIn={!!authUser}
+            onOpenLibrary={() => setShowLibrary(true)}
           />
         </div>
 

@@ -1327,6 +1327,8 @@ export default function Home() {
           progressStep={progressStep}
           hasResult={hasResult}
           onExtract={handleExtract}
+          loggedIn={!!authUser}
+          onOpenLibrary={() => setShowLibrary(true)}
         />
 
         {/* Row 2~3 통합 워크스페이스: 02 추출된 곡(좌) | 슬라이드 스튜디오(우, 04 흡수).

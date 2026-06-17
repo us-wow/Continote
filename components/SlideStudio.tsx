@@ -211,10 +211,13 @@ export default function SlideStudio(props: SlideStudioProps) {
 
   // 배경 목록 — 검색 필터 + 항상 같은 순서(무료 → 유료 정지 그림 → 유료 움직이는).
   // 카탈로그에 어디에 추가하든 이 정렬로 자리가 잡혀서, 새 배경이 뒤죽박죽 안 섞인다.
+  // 배경 종류 필터 — 전체 / 고정(정지 이미지) / 움직임(GIF).
+  const [bgMotion, setBgMotion] = useState<'all' | 'static' | 'animated'>('all');
   const visibleBgs = useMemo(
     () =>
       [...BG_CATALOG]
         .filter((m) => bgMatches(m, PPT_THEME_LABELS[m.key], bgSearch, null))
+        .filter((m) => bgMotion === 'all' || (bgMotion === 'animated' ? m.animated : !m.animated))
         .sort(
           (a, b) =>
             // 즐겨찾기(북마크)한 배경을 맨 위로 → 그다음 무료→유료정지→유료움직임 순.
@@ -223,7 +226,29 @@ export default function SlideStudio(props: SlideStudioProps) {
             (a.animated ? 1 : 0) - (b.animated ? 1 : 0)
         ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bgSearch, bookmarks]
+    [bgSearch, bookmarks, bgMotion]
+  );
+
+  // 고정/움직임 필터 칩 — 데스크탑 패널·모바일 시트 양쪽에서 재사용.
+  const motionChips = (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+      {([['all', '전체'], ['static', '고정'], ['animated', '움직임']] as const).map(([v, label]) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => setBgMotion(v)}
+          aria-pressed={bgMotion === v}
+          style={{
+            flex: 1, padding: '5px 4px', fontSize: 11.5, borderRadius: 7, cursor: 'pointer',
+            border: bgMotion === v ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)',
+            background: bgMotion === v ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)',
+            color: 'var(--ink)',
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 
   // 지금 선택한 슬라이드가 속한 곡의 순번(0번부터). title 슬라이드를 세어 구한다(없으면 -1).
@@ -546,7 +571,8 @@ export default function SlideStudio(props: SlideStudioProps) {
                 <button type="button" onClick={() => (premiumUnlocked ? setBgScope('song') : onLockedPremium())} aria-pressed={bgScope === 'song'} style={{ flex: 1, padding: '6px', fontSize: 12, borderRadius: 7, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, border: bgScope === 'song' ? '1.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', background: bgScope === 'song' ? 'color-mix(in oklab, var(--accent, #0f766e) 12%, transparent)' : 'var(--paper)', color: 'var(--ink)' }}>이 곡만 {!premiumUnlocked && <CrownMark size={13} />}</button>
               </div>
               {songScope && <p style={{ fontSize: 11, color: 'var(--accent-ink)', margin: '0 0 6px', fontWeight: 600 }}>{curSongIndex + 1}번째 곡에만 적용돼요.</p>}
-              {/* 배경 검색 + 스와치(2열) */}
+              {/* 고정/움직임 필터 + 배경 검색 + 스와치(2열) */}
+              {motionChips}
               <input type="search" value={bgSearch} onChange={(e) => setBgSearch(e.target.value)} placeholder="배경 검색 (예: 부활, 십자가, 바다)" style={{ width: '100%', fontSize: 13, padding: '8px', borderRadius: 7, border: '1px solid var(--rule)', marginBottom: 8 }} />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {visibleBgs.map((m) => <Swatch key={m.key} theme={m.key} paid={m.tier === 'paid'} locked={m.tier === 'paid' && !premiumUnlocked} animated={m.animated} />)}
@@ -717,7 +743,8 @@ export default function SlideStudio(props: SlideStudioProps) {
             </p>
           )}
 
-          {/* 검색창 */}
+          {/* 고정/움직임 필터 + 검색창 */}
+          {motionChips}
           <input
             type="search"
             value={bgSearch}
