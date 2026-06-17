@@ -111,6 +111,19 @@ export default function SlideStudio(props: SlideStudioProps) {
   const [isNarrow, setIsNarrow] = useState(false); // 모바일(좁은 화면) 여부 → 캔버스 중심 레이아웃
   const [decorOpen, setDecorOpen] = useState(false); // 모바일 '꾸미기' 시트(배경·글씨체·정렬) 열림
 
+  // 파일 공유(Web Share) 지원 기기인지 — 폰은 true, PC는 거의 false.
+  // PC는 파일 공유가 원천적으로 안 되므로 '공유' 버튼 자체를 숨긴다(폰에서만 노출).
+  const [canShareFiles, setCanShareFiles] = useState(false);
+  useEffect(() => {
+    try {
+      const probe = new File([new Blob()], 't.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+      const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
+      setCanShareFiles(!!(nav.canShare && nav.canShare({ files: [probe] })));
+    } catch {
+      setCanShareFiles(false);
+    }
+  }, []);
+
   // 즐겨찾기(유료) — 금빛 마크를 누르면 북마크처럼 채워지고 그 배경이 목록 맨 위로 올라온다.
   // 기기에 저장(localStorage)해서 새로고침해도 유지. (서버 저장은 결제 도입 때 묶어서)
   const [bookmarks, setBookmarks] = useState<string[]>(() => {
@@ -490,7 +503,9 @@ export default function SlideStudio(props: SlideStudioProps) {
             <div style={{ display: 'flex', gap: 6 }}>
               <button type="button" onClick={() => setDecorOpen(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 8, border: '1.5px solid var(--accent, #0f766e)', background: 'color-mix(in oklab, var(--accent, #0f766e) 8%, transparent)', color: 'var(--ink)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>🎨 배경·글씨체</button>
               <button type="button" onClick={onOpenPreview} className="btn btn-text btn-sm">전체 보기</button>
-              <button type="button" onClick={onSharePptx} className="btn btn-text btn-sm" title="카톡·메일·드라이브로 보내기">공유</button>
+              {canShareFiles && (
+                <button type="button" onClick={onSharePptx} className="btn btn-text btn-sm" title="카톡·메일·드라이브로 보내기">공유</button>
+              )}
               <button type="button" onClick={onDownloadPptx} className="btn btn-primary btn-sm">PPT</button>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -583,7 +598,9 @@ export default function SlideStudio(props: SlideStudioProps) {
           <button type="button" className="btn btn-text btn-sm" onClick={onCopy} disabled={isEmpty}>복사</button>
           <button type="button" className="btn btn-text btn-sm" onClick={onDownloadTxt} disabled={isEmpty}>TXT</button>
           <button type="button" className="btn btn-text btn-sm" onClick={onOpenPreview} disabled={isEmpty}>전체 슬라이드 확인</button>
-          <button type="button" className="btn btn-text btn-sm" onClick={onSharePptx} disabled={isEmpty} title="카카오톡·이메일·드라이브 등으로 바로 보내기">공유</button>
+          {canShareFiles && (
+            <button type="button" className="btn btn-text btn-sm" onClick={onSharePptx} disabled={isEmpty} title="카카오톡·이메일·드라이브 등으로 바로 보내기">공유</button>
+          )}
           <button type="button" className="btn btn-primary btn-sm" onClick={onDownloadPptx} disabled={isEmpty}>PPT 다운로드</button>
         </div>
       </div>
