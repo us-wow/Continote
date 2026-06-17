@@ -230,19 +230,34 @@ export default function Home() {
     }
   };
 
-  // 추출 결과를 화면에 투입 — ①라이브러리 재사용(다듬은 확정본 우선) ②새 곡만 대조 검토
-  // ③새 곡만 라이브러리 적립(무료 5곡 한도) ④결과를 토스트 하나로 요약.
+  // 추출 결과를 화면에 투입 — ①라이브러리 재사용(다듬은 확정본 우선) ②새 곡만 대조 검토.
+  // ③ 라이브러리 저장은 자동으로 하지 않는다 → 사용자가 '곡 라이브러리에 저장' 버튼을 눌러야 담긴다.
   const ingestExtractedSongs = async (raw: Song[], markUnconfirmed: boolean) => {
-    const { songs: merged, reusedCount, freshSongs } = await reuseFromLibrary(raw, markUnconfirmed);
+    const { songs: merged, reusedCount } = await reuseFromLibrary(raw, markUnconfirmed);
     setSongs((prev) => [...prev, ...merged]);
     // 재사용 곡은 이미 확정본이라 대조 불필요 — 새 곡만 검토
     attachRefChecks(merged.filter((s) => !s.reused), setSongs);
-    // 새 곡만 적립 — 재사용 곡을 날것 AI 추출본으로 덮어쓰지 않기 위해
-    const { skipped } = await addToLibraryAsync(freshSongs, premiumUnlocked ? undefined : FREE_LIBRARY_LIMIT);
     const parts = [`${raw.length}곡 추출됨`];
-    if (reusedCount > 0) parts.push(`${reusedCount}곡은 지난번 다듬은 버전으로 가져왔어요 📚`);
-    if (skipped > 0) parts.push(`무료는 라이브러리 ${FREE_LIBRARY_LIMIT}곡까지라 ${skipped}곡은 저장 안 됐어요`);
+    if (reusedCount > 0) parts.push(`${reusedCount}곡은 지난번 다듬은 버전 📚`);
     showToast(parts.join(' · '));
+  };
+
+  // 곡 라이브러리에 수동 저장 — 지금 화면의 곡들을 한 번에 담는다(자동 저장 대체).
+  const [savingLibrary, setSavingLibrary] = useState(false);
+  const handleSaveLibrary = async () => {
+    if (songs.length === 0) { showToast('저장할 곡이 없어요'); return; }
+    setSavingLibrary(true);
+    try {
+      const { skipped } = await addToLibraryAsync(songs, premiumUnlocked ? undefined : FREE_LIBRARY_LIMIT);
+      const saved = songs.length - skipped;
+      let msg = `${saved}곡 라이브러리에 저장했어요 📚`;
+      if (skipped > 0) msg += ` · 무료는 ${FREE_LIBRARY_LIMIT}곡까지라 ${skipped}곡은 저장 안 됨`;
+      showToast(msg);
+    } catch {
+      showToast('저장 실패 — 다시 시도해 주세요');
+    } finally {
+      setSavingLibrary(false);
+    }
   };
 
   const handleDeleteSavedBg = (bg: SavedBg) => {
@@ -1322,6 +1337,8 @@ export default function Home() {
             suspectMap={suspectMap}
             onVerifyLyrics={handleVerifyLyrics}
             verifying={verifying}
+            onSaveLibrary={handleSaveLibrary}
+            saving={savingLibrary}
           />
           <SlideStudio
             text={text}

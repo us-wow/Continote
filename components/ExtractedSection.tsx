@@ -36,6 +36,9 @@ type ExtractedSectionProps = {
   suspectMap: Record<number, Record<number, string[]>>;
   onVerifyLyrics: () => void;
   verifying: boolean;
+  // 곡 라이브러리에 수동 저장(자동 저장 안 함) — 누른 곡만 저장.
+  onSaveLibrary: () => void;
+  saving: boolean;
 };
 
 // chip 클릭 시 EditorSection이 받을 커스텀 이벤트 dispatch
@@ -62,6 +65,8 @@ export default function ExtractedSection({
   suspectMap,
   onVerifyLyrics,
   verifying,
+  onSaveLibrary,
+  saving,
 }: ExtractedSectionProps) {
   const empty = songs.length === 0;
   const totalSuspects = Object.values(suspectMap).reduce(
@@ -93,6 +98,16 @@ export default function ExtractedSection({
             title="악보와 비교해 오타가 있을 만한 곳을 표시해요 (PPT엔 영향 없음)"
           >
             🔍 {verifying ? '검토 중…' : '전체 오타 검토'}
+          </button>
+          {/* 곡 저장 — 자동 저장 안 하고, 이 버튼을 눌러야 라이브러리에 담긴다(다음에 재사용). */}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onSaveLibrary}
+            disabled={saving}
+            title="지금 곡들을 라이브러리에 저장해요. 다음에 같은 곡을 바로 불러올 수 있어요."
+          >
+            📥 {saving ? '저장 중…' : '곡 라이브러리에 저장'}
           </button>
           {totalSuspects > 0 && (
             <span className="ex-verify-result">
