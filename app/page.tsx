@@ -153,8 +153,6 @@ export default function Home() {
   const [progressStep, setProgressStep] = useState<0 | 1 | 2 | 3>(0);
   const [toast, setToast] = useState('');
   const [dragging, setDragging] = useState(false);
-  // 정확도 우선 모드는 서버 분석 프롬프트를 더 보수적으로 쓰게 하므로, 업로드/붙여넣기 요청에 함께 전달한다.
-  const [accuracyMode, setAccuracyMode] = useState(false);
   // PPT 제작 폰트 선택 — lib/pptx.ts의 지원 폰트 타입과 동기화한다.
   // 기본 폰트는 '본명조'(Noto Serif KR) — 한국 CCM PPT에서 가장 모던하고 자연스럽게 어울림.
   const [pptFont, setPptFont] = useState<PptFont>('nanum-gothic');
@@ -535,7 +533,7 @@ export default function Home() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           // OCR 수정 이력은 서버가 활용할 수 있도록 힌트로만 전달한다.
-          body: JSON.stringify({ text: pasted.trim(), accuracyMode, hint: buildCorrectionHint() }),
+          body: JSON.stringify({ text: pasted.trim(), hint: buildCorrectionHint() }),
         });
         // 서버가 JSON이 아닌 응답(HTML 에러 페이지 등) 반환하면 res.json()이 throw —
         // try/catch로 감싸 의미있는 에러 메시지로 변환
@@ -581,7 +579,7 @@ export default function Home() {
           setLoadingMsg(`PDF 변환 중 (${i + 1}/${files.length})`);
           // 정확도 모드에서는 고해상도 렌더링이 OCR 판독 품질에 직접 영향을 준다.
           // 기본 모드는 lib/pdf.ts의 동적 scale 분기를 유지해 속도와 품질 균형을 맡긴다.
-          const pages = await pdfToImages(f, accuracyMode ? 2 : undefined);
+          const pages = await pdfToImages(f, 2);
           for (const p of pages) images.push({ data: p.data, mimeType: p.mimeType });
         } else if (f.type.startsWith('image/')) {
           setProgressStep(2);
@@ -601,7 +599,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // 이미지 분석도 사용자가 고른 정확도 모드와 OCR 수정 힌트를 서버에서 판단할 수 있게 함께 보낸다.
-        body: JSON.stringify({ images, accuracyMode, hint: buildCorrectionHint() }),
+        body: JSON.stringify({ images, hint: buildCorrectionHint() }),
       });
       // res.json() 실패 시 의미있는 에러로 변환
       let data: any;
@@ -1300,8 +1298,6 @@ export default function Home() {
           files={files}
           thumbs={thumbs}
           onRemoveFile={removeFile}
-          accuracyMode={accuracyMode}
-          setAccuracyMode={(v) => setAccuracyMode(v)}
           pasteMode={pasteMode}
           setPasteMode={(v) => setPasteMode(v)}
           pasted={pasted}

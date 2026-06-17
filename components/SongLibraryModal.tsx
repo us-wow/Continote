@@ -239,7 +239,9 @@ export default function SongLibraryModal({
                         }}
                         autoFocus
                         style={{
-                          fontFamily: 'var(--serif)',
+                          // 곡 제목엔 영문(Born Again 등)이 많은데 디스플레이 명조/미로드 폰트가
+                          // 라틴 글자를 깨뜨려 보여 → 깨끗하게 렌더되는 본문 산세리프로.
+                          fontFamily: 'var(--font-body)',
                           fontWeight: 600,
                           fontSize: 18,
                           color: 'var(--ink)',
@@ -261,7 +263,9 @@ export default function SongLibraryModal({
                         tabIndex={0}
                         title="제목 클릭해서 수정"
                         style={{
-                          fontFamily: 'var(--serif)',
+                          // 곡 제목엔 영문(Born Again 등)이 많은데 디스플레이 명조/미로드 폰트가
+                          // 라틴 글자를 깨뜨려 보여 → 깨끗하게 렌더되는 본문 산세리프로.
+                          fontFamily: 'var(--font-body)',
                           fontWeight: 600,
                           fontSize: 18,
                           color: 'var(--ink)',

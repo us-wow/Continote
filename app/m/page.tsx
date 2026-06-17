@@ -75,7 +75,6 @@ export default function MobilePage() {
   }, [text]);
 
   // 업로드 옵션
-  const [accuracyMode, setAccuracyMode] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
   const [pasted, setPasted] = useState('');
   const [extracting, setExtracting] = useState(false);
@@ -444,7 +443,6 @@ export default function MobilePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: pasted.trim(),
-            accuracyMode,
             hint: buildCorrectionHint(),
           }),
         });
@@ -465,7 +463,7 @@ export default function MobilePage() {
         for (const f of files) {
           if (f.type === 'application/pdf') {
             setProgressStep(2);
-            const pages = await pdfToImages(f, accuracyMode ? 2 : undefined);
+            const pages = await pdfToImages(f, 2);
             for (const p of pages) images.push({ data: p.data, mimeType: p.mimeType });
           } else if (f.type.startsWith('image/')) {
             const img = await fileToBase64(f);
@@ -476,7 +474,7 @@ export default function MobilePage() {
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ images, accuracyMode, hint: buildCorrectionHint() }),
+          body: JSON.stringify({ images, hint: buildCorrectionHint() }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '분석 실패');
@@ -929,8 +927,6 @@ export default function MobilePage() {
             files={files}
             thumbs={thumbs}
             onRemoveFile={removeFile}
-            accuracyMode={accuracyMode}
-            setAccuracyMode={(v) => setAccuracyMode(v)}
             pasteMode={pasteMode}
             setPasteMode={(v) => setPasteMode(v)}
             pasted={pasted}

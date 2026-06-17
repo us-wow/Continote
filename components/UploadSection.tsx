@@ -19,9 +19,6 @@ type UploadSectionProps = {
   files: File[];
   thumbs: string[];
   onRemoveFile: (idx: number) => void;
-  // 정확도 우선 토글
-  accuracyMode: boolean;
-  setAccuracyMode: (next: boolean) => void;
   // 직접 가사 붙여넣기
   pasteMode: boolean;
   setPasteMode: (next: boolean) => void;
@@ -45,8 +42,6 @@ export default function UploadSection({
   files,
   thumbs,
   onRemoveFile,
-  accuracyMode,
-  setAccuracyMode,
   pasteMode,
   setPasteMode,
   pasted,
@@ -115,23 +110,6 @@ export default function UploadSection({
             <span style={{ margin: '0 8px', color: 'var(--ink-3)' }}>·</span>
             JPG · PNG · PDF
           </div>
-        </button>
-
-        {/* 정확도 우선 토글 — 업로드 1차 행동을 가리지 않게 드롭존 아래 고급 옵션으로 둠 */}
-        <button
-          type="button"
-          role="switch"
-          className="toggle"
-          data-on={accuracyMode}
-          aria-checked={accuracyMode}
-          onClick={() => setAccuracyMode(!accuracyMode)}
-          style={{ marginTop: 10, padding: 0 }}
-        >
-          <span className="track" />
-          <span>
-            정확도 우선
-            <span style={{ marginLeft: 6, color: 'var(--ink-3)' }}>(느려짐)</span>
-          </span>
         </button>
 
         {/* 썸네일 그리드 — 1개일 때도 화면 다 안 차게 minmax 80~110px */}
