@@ -74,14 +74,14 @@ export default function SongLibraryModal({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const formatLibrarySavedAt = (ms: number) =>
-    new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(ms));
+  // 짧은 날짜만 — 예: 26.06.17 (시간·긴 포맷 제거로 카드 깔끔하게)
+  const formatLibrarySavedAt = (ms: number) => {
+    const d = new Date(ms);
+    const yy = String(d.getFullYear()).slice(2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}.${mm}.${dd}`;
+  };
 
   const handleRemove = async (id: string) => {
     await removeFromLibraryAsync(id);
@@ -279,7 +279,7 @@ export default function SongLibraryModal({
                       </div>
                     )}
                     <div className="mono" style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-                      묶음 {song.sections.length}개 · {formatLibrarySavedAt(song.savedAt)}
+                      {song.sections.length}세션 구성 · {formatLibrarySavedAt(song.savedAt)}
                     </div>
                   </div>
                   <button

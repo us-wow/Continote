@@ -616,6 +616,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   .cn-header .nav-label { display: none; }
   /* 디자인 변경 라벨도 같이 숨김 (theme-switch-btn span은 .nav-label과 동일) */
   .cn-header .theme-switch-btn span { display: none; }
+  /* 라벨 숨긴 아이콘 버튼들 — 아이콘을 키우고 가운데 정렬해 큰 원에 휑하지 않게. */
+  .cn-nav .btn { display: inline-flex; align-items: center; justify-content: center; }
+  .cn-header .theme-switch-btn svg { width: 21px; height: 21px; }
   /* gap 줄여서 더 컴팩트하게 */
   .cn-nav { gap: 2px; }
   .cn-nav .btn { padding: 6px 8px; }
@@ -962,6 +965,9 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 @media (hover: none) {
   .sec-chip:hover { border-color: var(--rule); background: var(--surface); }
   .sec-edit-btn { opacity: 0.8; }
+  /* 터치에서 버튼 hover 배경 변화 제거 → iOS '첫 탭=hover'로 두 번 눌러야 하던 문제 차단(라이브러리 +추가 등). */
+  .btn-text:hover:not(:disabled) { background: none; }
+  .btn:hover:not(:disabled), .btn-ghost:hover:not(:disabled) { filter: none; }
 }
 .sec-preview {
   font-family: var(--font-display);
