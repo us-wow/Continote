@@ -348,9 +348,7 @@ export default function Home() {
           .then(([conti, songs, templates]) => {
             const total = conti.migrated + songs.migrated + templates.migrated;
             if (total > 0) {
-              showToast(
-                `이전에 쓰던 데이터를 클라우드에 저장했어요 — 콘티 ${conti.migrated}개, 곡 ${songs.migrated}개, 템플릿 ${templates.migrated}개`
-              );
+              showToast('이전에 쓰던 작업을 계정으로 옮겼어요');
             }
           })
           .catch((err) => console.error('[migrate] 실패:', err));
@@ -921,24 +919,31 @@ export default function Home() {
       return;
     }
     const fname = `contionote-${Date.now()}.pptx`;
+    let blob: Blob;
     try {
-      const blob = (await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes, true)) as Blob;
-      const file = new File([blob], fname, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
-      const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
-      if (nav.canShare && nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
-        return;
-      }
-      // 폴백: 이 기기는 파일 즉시 공유 미지원 → 다운로드로 대체
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-      showToast('이 기기는 즉시 공유가 안 돼 다운로드했어요 — 받은 파일을 공유하세요');
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return; // 사용자가 공유 시트를 닫음
-      showToast('공유 준비 실패 — 다시 시도해 주세요');
+      blob = (await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes, true)) as Blob;
+    } catch {
+      showToast('PPT 만들기 실패 — 다시 시도해 주세요');
+      return;
     }
+    // 모바일: 네이티브 공유 시트로 파일 전송 시도. 실패(데스크탑·공유 거부 등)하면 다운로드로 폴백.
+    const file = new File([blob], fname, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
+    if (nav.canShare && nav.canShare({ files: [file] })) {
+      try {
+        await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
+        return; // 공유 성공
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return; // 사용자가 공유 시트를 닫음 → 조용히 종료
+        // 그 외 공유 실패(데스크탑 등) → 아래 다운로드로 떨어진다
+      }
+    }
+    // 폴백: 즉시 공유가 안 되는 기기(주로 데스크탑) → 파일 다운로드
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast('PPT를 다운로드했어요 — 받은 파일을 공유하세요');
   };
 
   const handleSavePlainSlides = () => {
