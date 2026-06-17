@@ -18,6 +18,7 @@ import type { User } from '@supabase/supabase-js';
 import type { Song } from '@/lib/types';
 import { attachRefChecks } from '@/lib/reference-lyrics';
 import { canUseCustomBg, checkPremiumAccess, type CustomBg } from '@/lib/custom-bg';
+import { BETA_ALL_FREE } from '@/lib/beta';
 import { listMyBackgrounds, saveBackground, deleteBackground, type SavedBg } from '@/lib/custom-bg-cloud';
 import { pdfToImages, fileToBase64, pdfFirstPageThumb } from '@/lib/pdf';
 import { exportToDocx } from '@/lib/docx';
@@ -89,7 +90,7 @@ export default function MobilePage() {
   // 클라우드에 저장된 "내 배경" 목록 (유료 기능 — 현재 운영자만)
   const [savedBgs, setSavedBgs] = useState<SavedBg[]>([]);
   // 잠금 해제 여부 — localStorage는 렌더 중에 읽으면 hydration이 어긋나므로 effect에서 판별.
-  const [premiumUnlocked, setPremiumUnlocked] = useState(false);
+  const [premiumUnlocked, setPremiumUnlocked] = useState(BETA_ALL_FREE);
   const [pptTheme, setPptTheme] = useState<PptTheme>('black');
   // 곡별 배경(유료) — 곡 순번(0번부터)별 테마. 비어 있으면 전부 기본 테마(pptTheme)를 따른다.
   const [songThemes, setSongThemes] = useState<(PptTheme | undefined)[]>([]);
@@ -106,6 +107,8 @@ export default function MobilePage() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   // 유료 기능 잠금 해제 — 운영자 이메일 또는 테스트 스위치(localStorage)
   useEffect(() => {
+    // 베타테스트: 모든 유료 기능 무료 개방(lib/beta.ts). 정식 결제 도입 시 플래그 끄면 복귀.
+    if (BETA_ALL_FREE) { setPremiumUnlocked(true); return; }
     // 1차: 운영자 이메일·테스트 스위치 (즉시) → 2차: 무료 체험 명단(premium_access) 조회 (비동기)
     if (canUseCustomBg(authUser?.email)) {
       setPremiumUnlocked(true);
