@@ -450,7 +450,7 @@ const SLIDES: GuideSlide[] = [
     kind: 'step',
     num: 1,
     title: '악보를 올려요',
-    desc: '찬양 악보를 사진이나 PDF로 올려요. 한 번에 12장까지 한꺼번에 올릴 수 있어요.',
+    desc: '찬양 악보를 사진이나 PDF로 올려요. 한 번에 10장까지 한꺼번에 올릴 수 있어요.',
     illust: <IllustUpload />,
   },
   {

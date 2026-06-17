@@ -123,7 +123,7 @@ export default function DetailedManual({ onClose }: { onClose: () => void }) {
         <Section title="1단계 · 악보 올리기">
           <List
             items={[
-              <>악보를 <b>사진(JPG·PNG)이나 PDF</b>로 올려요. 한 번에 <b>12장</b>까지 가능해요.</>,
+              <>악보를 <b>사진(JPG·PNG)이나 PDF</b>로 올려요. 한 번에 <b>10장</b>까지 가능해요.</>,
               <>화면에 끌어다 놓거나 ‘파일 선택’으로 올려요.</>,
               <><b>정확도 우선</b> — 흐릿하거나 글씨가 작은 악보일 때만 켜요. 더 신중히 읽는 대신 조금 느려요.</>,
               <><b>가사 추출하기</b>를 누르면 시작돼요. (단축키: Ctrl/⌘ + Enter)</>,

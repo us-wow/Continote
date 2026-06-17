@@ -374,15 +374,24 @@ export default function MobilePage() {
   };
 
   // ----- 파일 처리 -----
+  const MAX_IMAGES = 10; // 한 번에 올릴 수 있는 최대 장수(서버 분석 한도와 동일)
+  // 10장을 넘으면 자르지 않고 통째로 막는다(경고 + 추가 안 함).
+  const addFiles = (incoming: File[]) => {
+    if (!incoming.length) return;
+    if (files.length + incoming.length > MAX_IMAGES) {
+      showToast('이미지는 10개 이하만 올려주세요');
+      return;
+    }
+    setFiles((prev) => [...prev, ...incoming]);
+  };
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files || []);
-    setFiles((prev) => [...prev, ...picked]);
+    addFiles(Array.from(e.target.files || []));
+    e.target.value = '';
   };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const dropped = Array.from(e.dataTransfer.files || []);
-    setFiles((prev) => [...prev, ...dropped]);
+    addFiles(Array.from(e.dataTransfer.files || []));
   };
   const removeFile = (i: number) =>
     setFiles((prev) => prev.filter((_, idx) => idx !== i));
