@@ -68,6 +68,15 @@ export default function UploadSection({
             <span className="step-num-inline">01</span>
             <h2>악보 업로드</h2>
           </div>
+          {/* 곡 라이브러리 바로가기 — 로그인 시 헤더 오른쪽 끝에 작게. 악보 업로드 없이 저장곡 추가. */}
+          {loggedIn && (
+            <button type="button" className="lib-quick-btn" onClick={onOpenLibrary} title="저장한 곡을 바로 불러와 콘티에 추가해요">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+              </svg>
+              라이브러리
+            </button>
+          )}
         </div>
 
         <button
@@ -116,23 +125,6 @@ export default function UploadSection({
             JPG · PNG · PDF
           </div>
         </button>
-
-        {/* 곡 라이브러리에서 가져오기 — 로그인 사용자만. 악보 업로드 없이 저장한 곡을 바로 콘티에 추가. */}
-        {loggedIn && (
-          <button
-            type="button"
-            onClick={onOpenLibrary}
-            style={{
-              marginTop: 10, width: '100%', padding: '11px', fontSize: 13.5, fontWeight: 600,
-              borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--paper)',
-              color: 'var(--ink)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: 6,
-            }}
-            title="저장해 둔 곡을 악보 업로드 없이 바로 불러와 콘티에 추가해요"
-          >
-            📚 곡 라이브러리에서 가져오기
-          </button>
-        )}
 
         {/* 썸네일 그리드 — 1개일 때도 화면 다 안 차게 minmax 80~110px */}
         {files.length > 0 && (

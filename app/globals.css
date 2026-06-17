@@ -2225,8 +2225,29 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 .section-head .left {
   display: flex;
-  align-items: baseline;
+  align-items: center; /* 번호 배지(알약)와 제목을 세로 가운데로 — baseline은 살짝 어긋나 보임 */
   gap: 10px;
+}
+/* 곡 라이브러리 바로가기 — 섹션 헤더 오른쪽 끝 작은 버튼(폴더 아이콘 + 라이브러리) */
+.lib-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lib-quick-btn svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.lib-quick-btn:hover { border-color: var(--accent); color: var(--ink); }
+@media (max-width: 760px) {
+  .lib-quick-btn { font-size: 11px; padding: 4px 8px; gap: 4px; }
+  .lib-quick-btn svg { width: 13px; height: 13px; }
 }
 .section-head h2 {
   font-family: var(--font-display);
