@@ -4,6 +4,8 @@ import './globals.css';
 
 // 콘티노트 메타데이터 — 검색·SNS 공유 미리보기용
 export const metadata: Metadata = {
+  // metadataBase: og:image 등 상대경로를 절대주소로 바꿔주는 기준(없으면 SNS에서 이미지가 안 뜸).
+  metadataBase: new URL('https://contionote.vercel.app'),
   title: '콘티노트 — ContiNote',
   description: '찬양 악보 한 장이면 콘티부터 예배 PPT까지. 찬양팀·예배 사역자를 위한 AI 콘티 메이커',
   manifest: '/manifest.webmanifest',
@@ -21,9 +23,22 @@ export const metadata: Metadata = {
     title: '콘티노트',
   },
   openGraph: {
-    title: '콘티노트',
-    description: '찬양 악보 한 장이면 콘티부터 예배 PPT까지',
+    title: '콘티노트 — 악보 한 장이면, 예배 PPT까지',
+    description: '찬양 악보를 올리면 가사 추출부터 배경 입힌 예배 PPT까지. 찬양팀·예배 사역자를 위한 AI 콘티 메이커.',
     type: 'website',
+    url: 'https://contionote.vercel.app',
+    siteName: '콘티노트',
+    locale: 'ko_KR',
+    images: [
+      { url: '/og.png', width: 1200, height: 630, alt: '콘티노트 — 악보 한 장이면, 예배 PPT까지' },
+    ],
+  },
+  // 트위터/X·일부 메신저는 twitter 카드 메타를 따로 본다(큰 이미지 카드).
+  twitter: {
+    card: 'summary_large_image',
+    title: '콘티노트 — 악보 한 장이면, 예배 PPT까지',
+    description: '찬양 악보를 올리면 가사 추출부터 배경 입힌 예배 PPT까지.',
+    images: ['/og.png'],
   },
 };
 
