@@ -748,7 +748,6 @@ function SectionChipCard({
           >
             ✎
           </span>
-          <span className="sec-add-icon">+</span>
         </span>
       </div>
       <div className="sec-preview">
