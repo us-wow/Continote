@@ -6,3 +6,7 @@ export const BETA_ALL_FREE = true;
 // 예배 순서 빌더(/worship) — 아직 개발 중이라 UI 진입점을 숨긴다.
 // (라우트 자체는 살아 있어 운영자가 직접 URL로 테스트 가능.) 완성되면 true로.
 export const SHOW_WORSHIP_BUILDER = false;
+
+// 베타 심화 설문(Tally 등) 링크. 비워두면 피드백 카드에서 "자세한 의견" 링크가 숨겨진다.
+// Tally 폼 만든 뒤 여기에 URL만 붙이면 바로 노출됨.
+export const FEEDBACK_SURVEY_URL = '';

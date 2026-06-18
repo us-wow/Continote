@@ -2311,6 +2311,77 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 }
 @media (hover: hover) { .saved-bg-tile:hover .saved-bg-del { opacity: 1; } }
 @media (hover: none) { .saved-bg-del { opacity: 0.85; } }
+
+/* ── 베타 피드백 카드 (첫 다운로드 후 1회) ── */
+.fb-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  z-index: 1200;
+  display: flex;
+  justify-content: center;
+  pointer-events: none; /* 카드만 클릭 받게 */
+  padding: 0 16px;
+}
+.fb-card {
+  pointer-events: auto;
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  padding: 18px 18px 16px;
+  animation: fb-rise 0.25s ease;
+}
+@keyframes fb-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.fb-x {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-soft, #888);
+  cursor: pointer;
+}
+.fb-title { font-weight: 700; font-size: 15px; }
+.fb-sub { font-size: 12.5px; color: var(--ink-soft, #777); margin-top: 3px; line-height: 1.5; }
+.fb-thumbs { display: flex; gap: 10px; margin: 14px 0 12px; }
+.fb-thumb {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper, #fff);
+  color: var(--ink-soft, #777);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.fb-thumb.is-on.up { border-color: #157a6e; color: #157a6e; background: color-mix(in oklab, #157a6e 8%, var(--surface)); }
+.fb-thumb.is-on.down { border-color: #c2553a; color: #c2553a; background: color-mix(in oklab, #c2553a 8%, var(--surface)); }
+.fb-input {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  font-size: 13.5px;
+  background: var(--paper, #fff);
+  color: inherit;
+}
+.fb-input:focus { outline: none; border-color: var(--accent, #157a6e); }
+.fb-send { width: 100%; margin-top: 10px; justify-content: center; }
+.fb-survey { display: block; text-align: center; margin-top: 10px; font-size: 12.5px; color: var(--accent, #157a6e); text-decoration: none; }
+.fb-thanks { font-size: 14px; font-weight: 600; text-align: center; padding: 8px 4px; line-height: 1.6; }
 /* 01은 카드(.panel)가 아니라 .stack이라 상단 띠 아래 글자가 붙지 않게 위 여백을 준다.
    radius를 줘서 02/03 카드처럼 상단 색선 양끝을 둥글게 맞춘다. */
 .up-panel { padding-top: 28px; padding-bottom: 28px; padding-left: 28px; padding-right: 28px; border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl); }

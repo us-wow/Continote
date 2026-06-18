@@ -38,6 +38,7 @@ import ExtractedSection from '@/components/ExtractedSection';
 import SlideStudio from '@/components/SlideStudio';
 import PreviewModal from '@/components/PreviewModal';
 import PricingModal from '@/components/PricingModal';
+import FeedbackCard from '@/components/FeedbackCard';
 import OnboardingGuide from '@/components/OnboardingGuide';
 import SongLibraryModal from '@/components/SongLibraryModal';
 import type { DesignTheme } from '@/components/Header';
@@ -102,6 +103,18 @@ export default function MobilePage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   // 요금제 안내 모달 — 잠긴 유료 기능(왕관) 클릭 시 열림
   const [pricingOpen, setPricingOpen] = useState(false);
+  // 베타 피드백 카드 — 첫 PPT 다운로드 직후 1회만.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const maybeShowFeedback = useCallback(() => {
+    try {
+      if (localStorage.getItem('cn_feedback_done')) return;
+      setTimeout(() => setFeedbackOpen(true), 1200);
+    } catch { /* 무시 */ }
+  }, []);
+  const closeFeedback = useCallback(() => {
+    setFeedbackOpen(false);
+    try { localStorage.setItem('cn_feedback_done', '1'); } catch { /* 무시 */ }
+  }, []);
 
   // Auth + 디자인
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -718,6 +731,7 @@ export default function MobilePage() {
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
       await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes);
       showToast('PPT 다운로드 시작');
+      maybeShowFeedback(); // 첫 다운로드면 잠시 후 피드백 카드
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
     }
@@ -744,6 +758,7 @@ export default function MobilePage() {
     if (nav.canShare && nav.canShare({ files: [file] })) {
       try {
         await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
+        maybeShowFeedback(); // 공유 성공도 가치 전달 시점
         return; // 공유 성공
       } catch (err: any) {
         if (err?.name === 'AbortError') return; // 사용자가 닫음
@@ -756,6 +771,7 @@ export default function MobilePage() {
     a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     showToast('PPT를 다운로드했어요 — 받은 파일을 공유하세요');
+    maybeShowFeedback();
   };
   const handleSavePlainSlides = () => {
     const slides = buildPptSlides();
@@ -1046,6 +1062,8 @@ export default function MobilePage() {
       />
 
       <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
+
+      <FeedbackCard open={feedbackOpen} onClose={closeFeedback} userId={authUser?.id ?? null} />
 
       {/* 토스트 */}
       {toast && <div className="toast">{toast}</div>}
