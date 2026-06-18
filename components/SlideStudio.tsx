@@ -760,13 +760,47 @@ export default function SlideStudio(props: SlideStudioProps) {
             <p style={{ fontSize: 11.5, color: 'var(--ink-3)', padding: '6px 2px' }}>검색 결과가 없어요.</p>
           )}
 
-          {/* 저장된 내 배경 */}
-          {savedBgs.map((bg) => (
-            <div key={bg.id} style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <button type="button" onClick={() => onSelectSaved(bg)} title={bg.name} style={{ flex: 1, height: 90, borderRadius: 8, background: `url('${bg.url}') center/cover`, border: customBg?.src === bg.url ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }} />
-              <button type="button" onClick={() => onDeleteSaved(bg)} aria-label="배경 삭제" style={{ ...miniBtn, height: 90, color: 'var(--danger)' }}>🗑</button>
-            </div>
-          ))}
+          {/* 저장된 내 배경 — 즐겨찾기(왕관)한 것 먼저. 삭제 ×는 작게(데스크탑 hover, 터치는 항상). */}
+          {[...savedBgs]
+            .sort((a, b) => (isBookmarked(b.id) ? 1 : 0) - (isBookmarked(a.id) ? 1 : 0))
+            .map((bg) => {
+              const marked = isBookmarked(bg.id);
+              return (
+                <button
+                  key={bg.id}
+                  type="button"
+                  onClick={() => onSelectSaved(bg)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  title={bg.name}
+                  className="saved-bg-tile"
+                  style={{ position: 'relative', width: '100%', height: 90, borderRadius: 8, background: `url('${bg.url}') center/cover`, border: customBg?.src === bg.url ? '2.5px solid var(--accent, #0f766e)' : '1px solid var(--rule)', cursor: 'pointer' }}
+                >
+                  {/* 왕관 = 즐겨찾기 토글 (맨 위로 고정). 카탈로그 배경과 동일. */}
+                  <span
+                    role="button" tabIndex={0}
+                    aria-label={marked ? '즐겨찾기 해제' : '즐겨찾기 — 맨 위로 고정'}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => { e.stopPropagation(); toggleBookmark(bg.id); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleBookmark(bg.id); } }}
+                    style={{ position: 'absolute', top: 2, right: 3, padding: 3, cursor: 'pointer', lineHeight: 0 }}
+                  >
+                    <CrownMark size={16} filled={marked} />
+                  </span>
+                  {/* 삭제 × — 작은 코너 버튼. 데스크탑은 hover 시, 터치는 항상 살짝 보임(CSS). */}
+                  <span
+                    role="button" tabIndex={0}
+                    className="saved-bg-del"
+                    aria-label="배경 삭제"
+                    title="삭제"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => { e.stopPropagation(); onDeleteSaved(bg); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onDeleteSaved(bg); } }}
+                  >
+                    ×
+                  </span>
+                </button>
+              );
+            })}
 
           {/* 방금 올렸지만 저장 안 한 커스텀 배경 — 재선택 가능하게 */}
           {customBg?.src?.startsWith('data:') && (
