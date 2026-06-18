@@ -2313,7 +2313,7 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
 @media (hover: none) { .saved-bg-del { opacity: 0.85; } }
 /* 01은 카드(.panel)가 아니라 .stack이라 상단 띠 아래 글자가 붙지 않게 위 여백을 준다.
    radius를 줘서 02/03 카드처럼 상단 색선 양끝을 둥글게 맞춘다. */
-.up-panel { padding-top: 14px; border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl); }
+.up-panel { padding-top: 14px; padding-left: 28px; padding-right: 28px; border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl); }
 /* 슬라이드 스튜디오(03) — 원래 콘티 편집과 같은 틸(로고색)으로 생기 복구(배지·상단 띠). */
 .ss-root { --panel-accent: #157a6e; }
 
