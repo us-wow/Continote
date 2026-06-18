@@ -9,4 +9,4 @@ export const SHOW_WORSHIP_BUILDER = false;
 
 // 베타 심화 설문(Tally 등) 링크. 비워두면 피드백 카드에서 "자세한 의견" 링크가 숨겨진다.
 // Tally 폼 만든 뒤 여기에 URL만 붙이면 바로 노출됨.
-export const FEEDBACK_SURVEY_URL = '';
+export const FEEDBACK_SURVEY_URL = 'https://tally.so/r/RG2K5j';
