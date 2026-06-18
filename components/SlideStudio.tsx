@@ -118,7 +118,10 @@ export default function SlideStudio(props: SlideStudioProps) {
     try {
       const probe = new File([new Blob()], 't.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
       const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
-      setCanShareFiles(!!(nav.canShare && nav.canShare({ files: [probe] })));
+      // 맥/PC 크롬도 canShare({files})가 true를 반환할 수 있어 버튼이 떴다.
+      // 터치 기기(coarse pointer)인지도 함께 확인해 폰에서만 '공유'를 노출한다.
+      const isTouch = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      setCanShareFiles(!!(nav.canShare && nav.canShare({ files: [probe] })) && isTouch);
     } catch {
       setCanShareFiles(false);
     }
