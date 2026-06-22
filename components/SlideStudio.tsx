@@ -93,6 +93,8 @@ type SlideStudioProps = {
   onOpenPreview: () => void;
   onDownloadPptx: () => void;
   onSharePptx: () => void;
+  // PPT 생성 중 여부 — 버튼을 잠그고 '만드는 중…'으로 바꿔 중복 클릭을 막는다.
+  exporting?: boolean;
 };
 
 export default function SlideStudio(props: SlideStudioProps) {
@@ -102,6 +104,7 @@ export default function SlideStudio(props: SlideStudioProps) {
     onCustomBgChange, onCustomNotice, onSelectSaved, onDeleteSaved,
     premiumUnlocked, onLockedPremium, overflowSlideIndices = [],
     onClear, onCopy, onDownloadTxt, onOpenPreview, onDownloadPptx, onSharePptx,
+    exporting = false,
   } = props;
 
   const [blocks, setBlocks] = useState<string[]>(() => splitTextIntoBlocks(text));
@@ -532,9 +535,9 @@ export default function SlideStudio(props: SlideStudioProps) {
               <button type="button" onClick={() => setDecorOpen(true)} style={{ flex: 1, padding: '11px 8px', borderRadius: 8, border: '1.5px solid var(--accent, #0f766e)', background: 'color-mix(in oklab, var(--accent, #0f766e) 8%, transparent)', color: 'var(--ink)', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>🎨 배경·글씨체</button>
               <button type="button" onClick={onOpenPreview} className="btn btn-text btn-sm">전체 보기</button>
               {canShareFiles && (
-                <button type="button" onClick={onSharePptx} className="btn btn-text btn-sm" title="카톡·메일·드라이브로 보내기">공유</button>
+                <button type="button" onClick={onSharePptx} disabled={exporting} className="btn btn-text btn-sm" title="카톡·메일·드라이브로 보내기">{exporting ? '만드는 중…' : '공유'}</button>
               )}
-              <button type="button" onClick={onDownloadPptx} className="btn btn-primary btn-sm">PPT</button>
+              <button type="button" onClick={onDownloadPptx} disabled={exporting} className="btn btn-primary btn-sm">{exporting ? '만드는 중…' : 'PPT'}</button>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <button type="button" onClick={() => setBulkOpen((o) => !o)} style={addBtn}>붙여넣기</button>
@@ -628,9 +631,9 @@ export default function SlideStudio(props: SlideStudioProps) {
           <button type="button" className="btn btn-text btn-sm" onClick={onDownloadTxt} disabled={isEmpty}>TXT</button>
           <button type="button" className="btn btn-text btn-sm" onClick={onOpenPreview} disabled={isEmpty}>전체 슬라이드 확인</button>
           {canShareFiles && (
-            <button type="button" className="btn btn-text btn-sm" onClick={onSharePptx} disabled={isEmpty} title="카카오톡·이메일·드라이브 등으로 바로 보내기">공유</button>
+            <button type="button" className="btn btn-text btn-sm" onClick={onSharePptx} disabled={isEmpty || exporting} title="카카오톡·이메일·드라이브 등으로 바로 보내기">{exporting ? '만드는 중…' : '공유'}</button>
           )}
-          <button type="button" className="btn btn-primary btn-sm" onClick={onDownloadPptx} disabled={isEmpty}>PPT 다운로드</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onDownloadPptx} disabled={isEmpty || exporting}>{exporting ? '만드는 중…' : 'PPT 다운로드'}</button>
         </div>
       </div>
 

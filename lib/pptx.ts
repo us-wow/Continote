@@ -222,9 +222,16 @@ export function computeUniformLyricSizes(slides: PptSlide[]): number[] {
   return sizes;
 }
 
+// 정적 자산(글꼴·배경 이미지) 캐시 — 경로가 같으면 내용도 같으므로(public 정적 파일·고정 URL)
+// export 한 번마다 다시 받고 base64로 변환하던 비용을 두 번째부터는 없앤다.
+const fontBufCache = new Map<string, ArrayBuffer>();
+const imageB64Cache = new Map<string, string>();
+
 // public/ 경로의 이미지 파일을 fetch해서 base64로 변환.
 // pptxgenjs background.path는 브라우저에서 동작하지 않아 'image/jpeg;base64,...' 형식의 data 문자열이 필요하다.
 async function loadPublicImageAsBase64(path: string): Promise<string> {
+  const cached = imageB64Cache.get(path);
+  if (cached) return cached; // 같은 배경 재사용 — 재다운로드·재변환 생략
   const res = await fetch(path);
   if (!res.ok) throw new Error(`이미지를 가져오지 못했습니다 (${res.status}): ${path}`);
   const blob = await res.blob();
@@ -235,7 +242,9 @@ async function loadPublicImageAsBase64(path: string): Promise<string> {
     reader.readAsDataURL(blob);
   });
   // 'data:' 접두사 제거 → pptxgenjs가 받는 형식
-  return dataUrl.replace(/^data:/, '');
+  const out = dataUrl.replace(/^data:/, '');
+  imageB64Cache.set(path, out);
+  return out;
 }
 
 // 모든 슬라이드 PPT로 변환해서 다운로드
@@ -262,32 +271,6 @@ export async function exportToPptx(
   // Next.js 서버 렌더링 경로에서 pptxgenjs가 브라우저 API를 건드리지 않도록
   // 다운로드 시점에만 동적으로 로드한다.
   const pptxgen = (await import('pptxgenjs')).default;
-
-  // 글꼴 임베드 — EMBED_FONT_FILES에 서브셋 파일이 있는 글꼴(본명조·나눔고딕)만 지원.
-  // pptx-embed-fonts로 감싼 클래스를 쓰면 writeFile 때 글꼴이 PPT에 자동으로 심긴다.
-  // 실패하면(라이브러리/네트워크) 조용히 일반 PPT로 폴백 → 다운로드 자체는 항상 된다.
-  const embedFile = EMBED_FONT_FILES[font];
-  const canEmbed = embedFont && Boolean(embedFile);
-  let pres: InstanceType<typeof pptxgen>;
-  if (canEmbed && embedFile) {
-    try {
-      // @ts-ignore — 서브패스('./pptxgenjs')에 타입 선언이 없어 무시
-      const { withPPTXEmbedFonts } = await import('pptx-embed-fonts/pptxgenjs');
-      const Enhanced = withPPTXEmbedFonts(pptxgen);
-      const embedPres = new Enhanced();
-      const res = await fetch(embedFile.path);
-      if (!res.ok) throw new Error(`글꼴 파일 로드 실패 (${res.status})`);
-      const fontBuf = await res.arrayBuffer();
-      await embedPres.addFont({ fontFace: FONT_FACE_MAP[font], fontFile: fontBuf, fontType: embedFile.type });
-      pres = embedPres as unknown as InstanceType<typeof pptxgen>;
-    } catch (err) {
-      console.warn('글꼴 임베드 실패 → 일반 PPT로 대체:', err);
-      pres = new pptxgen();
-    }
-  } else {
-    pres = new pptxgen();
-  }
-  pres.layout = 'LAYOUT_WIDE';
 
   // ── 테마별 렌더 정보 ──────────────────────────────────────────────────
   // 곡별 배경 기능: 슬라이드마다 다른 테마를 쓸 수 있으므로, 테마 1개를 고정으로
@@ -342,14 +325,48 @@ export async function exportToPptx(
     return entry;
   };
 
-  // 기본 테마 + 곡별로 쓰인 테마를 미리 모두 로드해 캐시에 채운다.
-  // (아래 슬라이드 루프는 동기로 그려야 하므로 배경 로드는 여기서 끝낸다.)
-  const baseRender = await resolveTheme(theme);
-  if (songThemes) {
-    for (const st of songThemes) {
-      if (st) await resolveTheme(st);
+  // 배경 이미지 로드를 '시작'만 해둔다 — 아래 글꼴 임베드(네트워크)와 동시에 진행돼
+  // 두 대기가 순차로 쌓이지 않고 겹친다. 슬라이드 루프 전에 await로 완료를 보장.
+  const bgReady = (async () => {
+    await resolveTheme(theme);
+    if (songThemes) for (const st of songThemes) if (st) await resolveTheme(st);
+  })();
+
+  // 글꼴 임베드 — EMBED_FONT_FILES에 서브셋 파일이 있는 글꼴(본명조·나눔고딕)만 지원.
+  // pptx-embed-fonts로 감싼 클래스를 쓰면 writeFile 때 글꼴이 PPT에 자동으로 심긴다.
+  // 실패하면(라이브러리/네트워크) 조용히 일반 PPT로 폴백 → 다운로드 자체는 항상 된다.
+  const embedFile = EMBED_FONT_FILES[font];
+  const canEmbed = embedFont && Boolean(embedFile);
+  let pres: InstanceType<typeof pptxgen>;
+  if (canEmbed && embedFile) {
+    try {
+      // @ts-ignore — 서브패스('./pptxgenjs')에 타입 선언이 없어 무시
+      const { withPPTXEmbedFonts } = await import('pptx-embed-fonts/pptxgenjs');
+      const Enhanced = withPPTXEmbedFonts(pptxgen);
+      const embedPres = new Enhanced();
+      // 글꼴 파일(744KB~1MB)은 한 번만 받아 캐시 — 같은 글꼴로 또 내보낼 땐 재다운로드 생략.
+      let fontBuf = fontBufCache.get(embedFile.path);
+      if (!fontBuf) {
+        const res = await fetch(embedFile.path);
+        if (!res.ok) throw new Error(`글꼴 파일 로드 실패 (${res.status})`);
+        fontBuf = await res.arrayBuffer();
+        fontBufCache.set(embedFile.path, fontBuf);
+      }
+      // 사본(slice)을 넘긴다 — addFont가 버퍼를 건드려도 캐시 원본이 보존되게.
+      await embedPres.addFont({ fontFace: FONT_FACE_MAP[font], fontFile: fontBuf.slice(0), fontType: embedFile.type });
+      pres = embedPres as unknown as InstanceType<typeof pptxgen>;
+    } catch (err) {
+      console.warn('글꼴 임베드 실패 → 일반 PPT로 대체:', err);
+      pres = new pptxgen();
     }
+  } else {
+    pres = new pptxgen();
   }
+  pres.layout = 'LAYOUT_WIDE';
+
+  // 배경 로드 완료 대기 — 아래 슬라이드 루프는 동기로 그리므로 여기서 끝내둔다.
+  await bgReady;
+  const baseRender = themeCache.get(theme) ?? (await resolveTheme(theme));
 
   // 한 슬라이드에 주어진 테마의 배경을 적용한다.
   const applyThemeBackground = (slide: ReturnType<typeof pres.addSlide>, tr: ThemeRender) => {

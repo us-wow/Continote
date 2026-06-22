@@ -99,6 +99,8 @@ export default function MobilePage() {
   const [pptVAlign, setPptVAlign] = useState<PptVAlign>('middle');
   // 글꼴 포함(임베드) — 기본 ON. 본명조 선택 시 글꼴을 PPT에 심어 어디서나 똑같이.
   const [embedFont, setEmbedFont] = useState(true);
+  // PPT 생성/공유 진행 중 여부 — 버튼을 잠가 "되고 있나?" 하고 여러 번 누르는 걸 막는다.
+  const [exporting, setExporting] = useState(false);
   // 저작권(CCLI) 상태 제거됨 — 한국 교회 미사용
   const [previewOpen, setPreviewOpen] = useState(false);
   // 요금제 안내 모달 — 잠긴 유료 기능(왕관) 클릭 시 열림
@@ -716,6 +718,7 @@ export default function MobilePage() {
   }, [text]);
 
   const handleSavePptx = async () => {
+    if (exporting) return; // 이미 만드는 중이면 무시 — 중복 클릭 방지
     const slides = buildPptSlides();
     if (slides.length === 0) {
       showToast('PPT로 만들 슬라이드가 없어요');
@@ -726,6 +729,9 @@ export default function MobilePage() {
       showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인`);
       return;
     }
+    setExporting(true);
+    // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
+    await new Promise((r) => setTimeout(r, 0));
     try {
       const fname = `contionote-${Date.now()}.pptx`;
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
@@ -734,10 +740,13 @@ export default function MobilePage() {
       maybeShowFeedback(); // 첫 다운로드면 잠시 후 피드백 카드
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
+    } finally {
+      setExporting(false);
     }
   };
   // 즉시 공유 — 만든 PPT 파일을 네이티브 공유 시트로(카톡·메일·드라이브 등). 미지원 시 다운로드 폴백.
   const handleSharePptx = async () => {
+    if (exporting) return; // 이미 만드는 중이면 무시 — 중복 클릭 방지
     const slides = buildPptSlides();
     if (slides.length === 0) { showToast('PPT로 만들 슬라이드가 없어요'); return; }
     if (overflowSlideIndices.length > 0) {
@@ -745,33 +754,40 @@ export default function MobilePage() {
       showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인`);
       return;
     }
-    const fname = `contionote-${Date.now()}.pptx`;
-    let blob: Blob;
+    setExporting(true);
+    // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
+    await new Promise((r) => setTimeout(r, 0));
     try {
-      blob = (await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes, true)) as Blob;
-    } catch {
-      showToast('PPT 만들기 실패 — 다시 시도해 주세요');
-      return;
-    }
-    const file = new File([blob], fname, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
-    const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
-    if (nav.canShare && nav.canShare({ files: [file] })) {
+      const fname = `contionote-${Date.now()}.pptx`;
+      let blob: Blob;
       try {
-        await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
-        maybeShowFeedback(); // 공유 성공도 가치 전달 시점
-        return; // 공유 성공
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return; // 사용자가 닫음
-        // 그 외(권한 만료 등) → 아래 다운로드로 폴백
+        blob = (await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes, true)) as Blob;
+      } catch {
+        showToast('PPT 만들기 실패 — 다시 시도해 주세요');
+        return;
       }
+      const file = new File([blob], fname, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+      const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        try {
+          await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
+          maybeShowFeedback(); // 공유 성공도 가치 전달 시점
+          return; // 공유 성공
+        } catch (err: any) {
+          if (err?.name === 'AbortError') return; // 사용자가 닫음
+          // 그 외(권한 만료 등) → 아래 다운로드로 폴백
+        }
+      }
+      // PC 등 파일 공유 미지원 → 다운로드(PC는 이게 정상 공유 방식)
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      showToast('PPT를 다운로드했어요 — 받은 파일을 공유하세요');
+      maybeShowFeedback();
+    } finally {
+      setExporting(false);
     }
-    // PC 등 파일 공유 미지원 → 다운로드(PC는 이게 정상 공유 방식)
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-    showToast('PPT를 다운로드했어요 — 받은 파일을 공유하세요');
-    maybeShowFeedback();
   };
   const handleSavePlainSlides = () => {
     const slides = buildPptSlides();
@@ -1039,6 +1055,7 @@ export default function MobilePage() {
             onOpenPreview={() => setPreviewOpen(true)}
             onDownloadPptx={handleSavePptx}
             onSharePptx={handleSharePptx}
+            exporting={exporting}
           />
         </div>
       </main>
