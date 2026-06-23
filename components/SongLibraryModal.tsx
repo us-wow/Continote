@@ -49,6 +49,14 @@ export default function SongLibraryModal({
     void refresh();
   }, [refresh]);
 
+  // 스켈레톤 지연 노출 — 빠른 로드(흔한 경우)엔 깜빡임이 없도록 200ms 넘게 걸릴 때만 보여준다.
+  const [showSkel, setShowSkel] = useState(false);
+  useEffect(() => {
+    if (!loading) { setShowSkel(false); return; }
+    const t = setTimeout(() => setShowSkel(true), 200);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   // 검색은 fetch 없이 client-side 필터링 — 입력할 때마다 즉시 반영.
   const library = useMemo(() => {
     const q = query.trim().toLowerCase().replace(/\s+/g, '');
@@ -190,9 +198,26 @@ export default function SongLibraryModal({
         />
 
         {loading ? (
-          <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
-            불러오는 중…
-          </div>
+          // 고스트 카드 — 실제 곡 카드와 같은 테두리·높이라 목록이 떠도 화면이 안 튄다.
+          showSkel ? (
+            <div className="stack" style={cssVar('--gap', '10px')} aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    border: '1px solid var(--rule)',
+                    borderLeft: '2px solid var(--accent)',
+                    padding: '14px 14px 12px',
+                    borderRadius: 2,
+                    background: 'color-mix(in oklab, var(--paper) 65%, white)',
+                  }}
+                >
+                  <div className="skelBar" style={{ height: 14, width: `${58 - i * 8}%`, marginBottom: 10 }} />
+                  <div className="skelBar" style={{ height: 10, width: '38%' }} />
+                </div>
+              ))}
+            </div>
+          ) : null
         ) : library.length === 0 ? (
           <div className="caption" style={{ color: 'var(--ink-3)', padding: 12 }}>
             아직 라이브러리에 곡이 없어요. 가사 추출하면 자동으로 모입니다.

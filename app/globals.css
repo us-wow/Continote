@@ -3232,6 +3232,25 @@ button.toggle-pill[data-on="true"]::after { transform: translateX(16px); }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* 스켈레톤 로딩 — 목록 fetch 중 고스트 막대. 빛이 한 번 훑고 지나가는 shimmer. */
+@keyframes skelShimmer {
+  0% { background-position: -180px 0; }
+  100% { background-position: calc(180px + 100%) 0; }
+}
+.skelBar {
+  border-radius: 4px;
+  background-color: var(--rule);
+  background-image: linear-gradient(90deg, transparent, color-mix(in oklab, white 60%, transparent), transparent);
+  background-size: 180px 100%;
+  background-repeat: no-repeat;
+  animation: skelShimmer 1.2s ease-in-out infinite;
+}
+/* 접근성 — 움직임 줄이기 설정이면 깜빡임만 없애고 막대는 그대로 보여준다. */
+@media (prefers-reduced-motion: reduce) {
+  .skelBar { animation: none; }
+}
+
 .toast {
   position: fixed;
   bottom: 32px;
