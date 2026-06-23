@@ -906,13 +906,6 @@ export default function Home() {
       showToast('PPT로 만들 슬라이드가 없어요');
       return;
     }
-    if (overflowSlideIndices.length > 0) {
-      // 첫 번째 하나만 알려주지 않고 모든 문제 슬라이드 번호를 한 번에 표시.
-      // 사용자가 미리보기 열어서 빨간 테두리 카드를 보고 수정할 수 있게.
-      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
-      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인하세요`);
-      return;
-    }
     setExporting(true);
     // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
     await new Promise((r) => setTimeout(r, 0));
@@ -935,11 +928,6 @@ export default function Home() {
     if (exporting) return; // 이미 만드는 중이면 무시 — 중복 클릭 방지
     const slides = buildPptSlides();
     if (slides.length === 0) { showToast('PPT로 만들 슬라이드가 없어요'); return; }
-    if (overflowSlideIndices.length > 0) {
-      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
-      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인하세요`);
-      return;
-    }
     setExporting(true);
     // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
     await new Promise((r) => setTimeout(r, 0));

@@ -724,11 +724,6 @@ export default function MobilePage() {
       showToast('PPT로 만들 슬라이드가 없어요');
       return;
     }
-    if (overflowSlideIndices.length > 0) {
-      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
-      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인`);
-      return;
-    }
     setExporting(true);
     // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
     await new Promise((r) => setTimeout(r, 0));
@@ -749,11 +744,6 @@ export default function MobilePage() {
     if (exporting) return; // 이미 만드는 중이면 무시 — 중복 클릭 방지
     const slides = buildPptSlides();
     if (slides.length === 0) { showToast('PPT로 만들 슬라이드가 없어요'); return; }
-    if (overflowSlideIndices.length > 0) {
-      const list = overflowSlideIndices.map((i) => i + 1).join(', ');
-      showToast(`${list}번 슬라이드 4줄 초과 — 미리보기에서 확인`);
-      return;
-    }
     setExporting(true);
     // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
     await new Promise((r) => setTimeout(r, 0));

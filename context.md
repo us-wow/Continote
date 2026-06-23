@@ -48,3 +48,21 @@
 - 모바일: `PptSection`에 optional prop 4개(`ccliNumber/setCcliNumber/licenseLabel/setLicenseLabel`)로 인라인 입력
 - 데스크톱은 PptSection에 prop을 안 넘기면 인라인 폼이 안 뜸 → 두 UX가 한 컴포넌트로 공존
 - 같은 패턴(optional 4-prop)은 다른 공용 컴포넌트 분기에도 재사용 가능
+
+## 8. reference_lyrics — 저작권-안전 가사 대조 (⚠️ RLS 정책 0개 = 의도)
+
+- `lib/reference-lyrics.ts` + `docs/reference-lyrics.sql`. 확정 가사를 제목 키로 Supabase에 쌓고, 추출 직후 줄 단위로 대조해 오탈자 교정 제안.
+- **⚠️ 테이블 RLS는 켜고 정책을 하나도 안 만든다 = 직접 SELECT 전면 차단.** 접근은 `SECURITY DEFINER` 함수 둘(submit/compare)로만. `compare`는 levenshtein 30% 이내 "이미 거의 맞은 줄"의 오탈자만 반환 → 가사 통째 유출 불가. **이 테이블에 RLS 정책 추가 금지(가사 유출 위험).**
+- 갱신 트리거는 **'나누기 확정' 한 곳에서만**(`ExtractedSection` SplitMode onConfirm). 인라인 카드 수정·수동 라이브러리 저장은 대조본을 안 건드림.
+- `ocr-learning`(localStorage)은 같은 브라우저 한정 약한 힌트 — reference_lyrics와 별개 레이어. 악보 이미지는 DB에 저장 안 함(가사 텍스트만).
+
+## 9. PPT 생성 성능 — 정적 자산 캐시 + 병렬화 (`lib/pptx.ts`)
+
+- `fontBufCache`/`imageB64Cache` 모듈 스코프 Map — 글꼴 서브셋(744KB~1MB)·배경 base64를 탭 수명 동안 캐시(두 번째 export부터 재다운로드·재변환 생략). 캐시 원본 보존 위해 글꼴은 `fontBuf.slice(0)` 사본을 addFont에 넘김.
+- `bgReady` IIFE로 배경 로드를 글꼴 임베드와 **병렬** 진행 후 슬라이드 루프 전 `await`. 독립 작업이라 대기가 순차로 안 쌓임.
+- 글꼴 임베드는 **유지**(폰트 없는 교회 PC 대비). 캐시로 반복 비용만 제거.
+
+## 10. 비동기 버튼 UX — exporting 가드 + 스켈레톤
+
+- PPT 다운로드/공유: `exporting` state(부모) + try/finally, `SlideStudio`에 `exporting` prop → 버튼 `disabled` + '만드는 중…'. 다운로드·공유를 한 state로 묶음(둘 다 pptx 생성 호출 → 동시 2회 방지). `setExporting(true)` 직후 `await new Promise(r=>setTimeout(r,0))`로 한 프레임 양보(버튼 리페인트 후 무거운 작업 시작).
+- 스켈레톤: **곡 라이브러리 모달만**(`SongLibraryModal` + globals.css `.skelBar`/`@keyframes skelShimmer`). 200ms 넘을 때만 노출(`showSkel`, 지연 표시). AI 추출(staged progress)·PPT 다운로드(파일)·미리보기(안 느림)는 의도적 제외 — 스켈레톤은 "들어올 모양을 아는 목록"에서만 유효.
