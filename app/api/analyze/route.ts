@@ -7,6 +7,7 @@ import {
   rateLimit,
   rejectLargeRequest,
 } from '@/lib/request-guards';
+import { dropEchoedSections } from '@/lib/dedup-sections';
 
 export const runtime = 'nodejs';
 // 정확도 모드에서 큰 PDF 처리 시간 여유 확보. Vercel Hobby 플랜에서 함수 실행 한도가 늘어남.
@@ -170,6 +171,9 @@ export async function POST(req: NextRequest) {
           return { type: 'verse', label: '', verseNum: null, text: text.trim() };
         })
         .filter((s: any) => s.text.length > 0);
+
+      // 인접 중복(에코) 묶음 제거 — 1./2. ending 등에서 절을 두 번 출력하는 버그 교정 (비용 0)
+      song.sections = dropEchoedSections(song.sections);
 
       // 제목 폴백 — AI가 제목을 못 찾아 비었거나 "Untitled"면 첫 가사 줄로 채운다.
       // (검색·식별이 쉬워짐. 'Untitled'끼리는 구분이 안 돼 최악이라.)
