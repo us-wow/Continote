@@ -9,9 +9,11 @@
 --
 -- 저작권/보안 설계 (중요):
 --   - 테이블은 RLS만 켜고 정책을 하나도 안 만든다 → 누구도 직접 SELECT/INSERT 불가.
---   - 접근은 오직 아래 두 함수(SECURITY DEFINER)로만. compare는 "이미 거의 알고 있는 줄"의
---     오탈자 교정만 돌려주므로(전혀 다른 줄은 안 알려줌) 가사를 통째로 꺼내가는 건 불가능.
---   - 즉 "검토 보조"일 뿐 가사 재배포가 아님.
+--   - 접근은 오직 아래 두 함수(SECURITY DEFINER)로만.
+--   - 핵심: 저장도 대조도 "본인(auth.uid()) 것"만 다룬다. 남이 확정한 가사를
+--     다른 사용자에게 꺼내주지 않는다 → 공용 가사 창고가 아니라 "내 서랍" 격리(사적 이용).
+--   - 게다가 compare는 "이미 거의 같은 줄"의 오탈자 교정만 돌려주므로, 본인 것이라도
+--     통째로 재구성하는 용도가 아니라 검토 보조일 뿐이다.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- levenshtein(두 문자열이 몇 글자나 다른지) 함수를 쓰기 위한 확장
@@ -97,10 +99,13 @@ begin
 
   v_key := lower(regexp_replace(btrim(p_title), '\s+', ' ', 'g'));
 
-  -- 같은 제목의 가장 최근 확정본 1개 (자기 것 포함)
+  -- 내가 확정한 같은 제목의 가장 최근 본 1개만.
+  -- user_id = auth.uid() 가 핵심 — 남이 저장한 가사는 절대 안 꺼낸다(사적 이용 격리).
+  -- 비로그인(auth.uid() is null)이면 매칭이 0건 → found:false 로 조용히 빠진다.
   select content into v_ref
   from reference_lyrics
   where title_key = v_key
+    and user_id = auth.uid()
   order by updated_at desc
   limit 1;
 
