@@ -105,17 +105,27 @@ export default function MobilePage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   // 요금제 안내 모달 — 잠긴 유료 기능(왕관) 클릭 시 열림
   const [pricingOpen, setPricingOpen] = useState(false);
-  // 베타 피드백 카드 — 첫 PPT 다운로드 직후 1회만.
+  // 베타 피드백 게이트 — 첫 다운로드/공유 전에 피드백을 한 번 받고 통과시킨다.
+  // 제출하면 localStorage(cn_feedback_done)에 기록 → 이후엔 게이트 없이 바로 다운로드.
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const maybeShowFeedback = useCallback(() => {
-    try {
-      if (localStorage.getItem('cn_feedback_done')) return;
-      setTimeout(() => setFeedbackOpen(true), 1200);
-    } catch { /* 무시 */ }
+  const pendingDownloadRef = useRef<null | (() => void)>(null); // 제출 후 실행할 미뤄둔 다운로드
+  const feedbackDone = () => {
+    try { return !!localStorage.getItem('cn_feedback_done'); } catch { return true; }
+  };
+  const openFeedbackGate = useCallback((retry: () => void) => {
+    pendingDownloadRef.current = retry;
+    setFeedbackOpen(true);
   }, []);
-  const closeFeedback = useCallback(() => {
-    setFeedbackOpen(false);
+  const onFeedbackSubmitted = useCallback(() => {
     try { localStorage.setItem('cn_feedback_done', '1'); } catch { /* 무시 */ }
+    setFeedbackOpen(false);
+    const retry = pendingDownloadRef.current;
+    pendingDownloadRef.current = null;
+    if (retry) retry();
+  }, []);
+  const cancelFeedback = useCallback(() => {
+    setFeedbackOpen(false);
+    pendingDownloadRef.current = null;
   }, []);
 
   // Auth + 디자인
@@ -724,6 +734,8 @@ export default function MobilePage() {
       showToast('PPT로 만들 슬라이드가 없어요');
       return;
     }
+    // 첫 다운로드면 피드백 게이트 — 제출하면 onFeedbackSubmitted가 이 함수를 다시 부른다(통과).
+    if (!feedbackDone()) { openFeedbackGate(() => { void handleSavePptx(); }); return; }
     setExporting(true);
     // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
     await new Promise((r) => setTimeout(r, 0));
@@ -732,7 +744,6 @@ export default function MobilePage() {
       // 저작권 슬라이드 기능 제거됨 → copyright는 항상 undefined.
       await exportToPptx(slides, pptFont, fname, pptTheme, undefined, pptVAlign, embedFont, customBg?.src, customBg?.kind === 'gif', songThemes);
       showToast('PPT 다운로드 시작');
-      maybeShowFeedback(); // 첫 다운로드면 잠시 후 피드백 카드
     } catch (err: any) {
       showToast(`PPT 생성 실패: ${err.message}`);
     } finally {
@@ -744,6 +755,8 @@ export default function MobilePage() {
     if (exporting) return; // 이미 만드는 중이면 무시 — 중복 클릭 방지
     const slides = buildPptSlides();
     if (slides.length === 0) { showToast('PPT로 만들 슬라이드가 없어요'); return; }
+    // 첫 공유/다운로드면 피드백 게이트 — 제출 후 이 함수를 다시 부른다(통과).
+    if (!feedbackDone()) { openFeedbackGate(() => { void handleSharePptx(); }); return; }
     setExporting(true);
     // 한 박자 양보 — 버튼이 '만드는 중…'으로 먼저 그려진 뒤 무거운 생성이 돌게 한다.
     await new Promise((r) => setTimeout(r, 0));
@@ -761,7 +774,6 @@ export default function MobilePage() {
       if (nav.canShare && nav.canShare({ files: [file] })) {
         try {
           await nav.share({ files: [file], title: '콘티노트 PPT', text: '콘티노트로 만든 예배 PPT예요.' });
-          maybeShowFeedback(); // 공유 성공도 가치 전달 시점
           return; // 공유 성공
         } catch (err: any) {
           if (err?.name === 'AbortError') return; // 사용자가 닫음
@@ -774,7 +786,6 @@ export default function MobilePage() {
       a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       showToast('PPT를 다운로드했어요 — 받은 파일을 공유하세요');
-      maybeShowFeedback();
     } finally {
       setExporting(false);
     }
@@ -1070,7 +1081,7 @@ export default function MobilePage() {
 
       <PricingModal open={pricingOpen} onClose={() => setPricingOpen(false)} />
 
-      <FeedbackCard open={feedbackOpen} onClose={closeFeedback} userId={authUser?.id ?? null} />
+      <FeedbackCard open={feedbackOpen} required onClose={cancelFeedback} onSubmitted={onFeedbackSubmitted} userId={authUser?.id ?? null} />
 
       {/* 토스트 */}
       {toast && <div className="toast">{toast}</div>}
